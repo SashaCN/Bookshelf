@@ -3,11 +3,21 @@
 namespace App\Http\Requests;
 
 use App\Enums\BookStatus;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 class UpdateUserBookRequest extends FormRequest
 {
+    /**
+     * Checked before the body, so a foreign entry is "not found" whatever is sent to it.
+     */
+    public function authorize(): Response
+    {
+        return Gate::inspect('update', $this->route('userBook'));
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */

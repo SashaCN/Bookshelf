@@ -10,7 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class UpdateUserBook
 {
-    public function __construct(private readonly ChangeUserBookStatus $changeStatus) {}
+    public function __construct(
+        private readonly ChangeUserBookStatus $changeStatus,
+        private readonly RecordReadingLog $recordLog,
+    ) {}
 
     /**
      * Applies a partial update. Everything is saved together or not at all.
@@ -22,6 +25,9 @@ class UpdateUserBook
     public function handle(UserBook $userBook, array $data): UserBook
     {
         DB::transaction(function () use ($userBook, $data): void {
+            $wasReading = $userBook->status === BookStatus::Reading;
+            $pageBefore = $userBook->current_page;
+
             // Pages go first so that "want" to "reading" can be requested together with the page count.
             if (array_key_exists('total_pages', $data)) {
                 $this->setTotalPages($userBook, (int) $data['total_pages']);
@@ -41,6 +47,12 @@ class UpdateUserBook
             }
 
             $userBook->save();
+
+            // Finishing a book that is being read jumps the bookmark to the last page. Those pages were read
+            // (unlike a book marked as read earlier), so they belong in the log and in the statistics.
+            if ($wasReading && $userBook->status === BookStatus::Finished) {
+                $this->recordLog->handle($userBook, $pageBefore, $userBook->current_page);
+            }
         });
 
         return $userBook->refresh()->load('book.authors');

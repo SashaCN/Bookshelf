@@ -56,8 +56,6 @@ class UserBookController extends Controller
      */
     public function update(UpdateUserBookRequest $request, UserBook $userBook, UpdateUserBook $updateUserBook): UserBookResource
     {
-        Gate::authorize('update', $userBook);
-
         return new UserBookResource($updateUserBook->handle($userBook, $request->validated()));
     }
 
