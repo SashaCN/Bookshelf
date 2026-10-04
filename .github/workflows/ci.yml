@@ -242,11 +242,17 @@ jobs:
           ssh-keygen -F "$DEPLOY_HOST" -f ~/.ssh/known_hosts > /dev/null \
             || { echo "::error::DEPLOY_KNOWN_HOSTS has no entry for $DEPLOY_HOST (use the output of: ssh-keyscan -t ed25519 $DEPLOY_HOST)"; exit 1; }
 
+      # Annotations written with ::error:: are visible on the run page without signing in, so the
+      # real ssh/scp message is repeated there instead of only "exit code 255" in the hidden log.
       - name: Copy the deployment files
         run: |
-          scp -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 \
-            deploy/docker-compose.prod.yml deploy/Caddyfile deploy/backup.sh \
-            "$DEPLOY_USER@$DEPLOY_HOST:/opt/bookshelf/"
+          if ! out=$(scp -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 \
+              deploy/docker-compose.prod.yml deploy/Caddyfile deploy/backup.sh deploy/rollout.sh \
+              "$DEPLOY_USER@$DEPLOY_HOST:/opt/bookshelf/" 2>&1); then
+            echo "$out"
+            echo "::error::Copying the deployment files failed: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-400)"
+            exit 1
+          fi
 
       - name: Roll out
         env:
@@ -254,22 +260,24 @@ jobs:
           ACTOR: ${{ github.actor }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # The registry token goes over stdin so it never appears in a command line or a log.
-          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 "$DEPLOY_USER@$DEPLOY_HOST" \
-            "docker login ghcr.io -u '$ACTOR' --password-stdin"
+          ssh_options=(-i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20)
 
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 "$DEPLOY_USER@$DEPLOY_HOST" bash -s -- "$IMAGE_REPO" "$IMAGE_TAG" <<'EOF'
-          set -euo pipefail
-          cd /opt/bookshelf
-          chmod +x backup.sh
-          export IMAGE_REPO="$1" IMAGE_TAG="$2"
-          compose="docker compose --env-file production.env -f docker-compose.prod.yml"
-          $compose pull
-          $compose up -d --remove-orphans
-          $compose exec -T app php artisan migrate --force
-          docker logout ghcr.io
-          docker image prune -f
-          EOF
+          # The user name and the registry token go over stdin, so the token never appears in a
+          # command line or a log.
+          if ! out=$(printf '%s\n%s' "$ACTOR" "$REGISTRY_TOKEN" | ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+              'read -r actor; docker login ghcr.io -u "$actor" --password-stdin' 2>&1); then
+            echo "$out"
+            echo "::error::Logging in to the registry on the server failed: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-400)"
+            exit 1
+          fi
+
+          # The script validates both values before it uses them.
+          if ! out=$(printf '%s\n%s\n' "$IMAGE_REPO" "$IMAGE_TAG" | ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" bash /opt/bookshelf/rollout.sh 2>&1); then
+            echo "$out"
+            echo "::error::The rollout failed: $(printf '%s' "$out" | tail -n 8 | tr '\n' ' ' | cut -c1-500)"
+            exit 1
+          fi
+          echo "$out"
 
       - name: Check that the site answers
         env:

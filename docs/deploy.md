@@ -123,8 +123,8 @@ exit
 
 - **Нова версія:** мерж у `main`, більше нічого.
 - **Відкат:** відкрийте старий успішний прогін у Actions і натисніть **Re-run**, або на сервері:
-  `IMAGE_TAG=<sha коміту> docker compose --env-file production.env -f docker-compose.prod.yml up -d`.
-  Міграції автоматично не відкочуються.
+  `bash /opt/bookshelf/rollout.sh ghcr.io/sashacn <sha коміту>`. Образ має бути вже завантажений на сервер або доступний у реєстрі
+  після `docker login ghcr.io`. Міграції автоматично не відкочуються.
 - **Бекап бази:** `/opt/bookshelf/backup.sh` робить стиснений дамп у `/opt/bookshelf/backups` і видаляє дампи старші
   за 14 днів. Щоб запускалось щоночі, виконайте `crontab -e` і додайте рядок `0 3 * * * /opt/bookshelf/backup.sh`.
   Дампи лежать на тому ж диску, тож раз на якийсь час забирайте їх до себе: `scp -i ~/.ssh/bookshelf_deploy azureuser@<IP>:/opt/bookshelf/backups/* .`
@@ -150,6 +150,7 @@ exit
 | Контейнер `mysql` перезапускається або сервер «вішається» | Ймовірно, не вистачає пам'яті: `free -m`, `docker stats`; перевірте, що swap увімкнений (`swapon --show`) |
 | Сайт не відкривається, у `caddy` помилки сертифіката | Домен має вказувати на IP сервера, а порти 80 і 443 бути відкриті в Azure (Networking → Inbound rules) |
 | Крок `Roll out` падає на `docker login` або `pull` | Перевірте, що пакети `bookshelf-app` і `bookshelf-web` зʼявились у Packages репозиторію й привʼязані до нього |
-| `Permission denied (publickey)` | `DEPLOY_SSH_KEY` має містити приватний ключ повністю, а публічний має бути в VM |
-| `Host key verification failed` | Оновіть `DEPLOY_KNOWN_HOSTS` (він змінюється, якщо створити машину заново) |
+| Крок `Copy the deployment files` падає з кодом 255 | Дивіться анотацію червоного кроку на сторінці прогону (її видно без входу в GitHub): там повний текст помилки ssh. Типові причини: порожній або неправильно названий секрет, неповний `DEPLOY_SSH_KEY`, чужий відбиток у `DEPLOY_KNOWN_HOSTS`, закритий порт 22 в Azure |
+| `Permission denied (publickey)` у анотації помилки | `DEPLOY_SSH_KEY` має містити приватний ключ повністю, а публічний має бути в VM |
+| `Host key verification failed` у анотації помилки | Оновіть `DEPLOY_KNOWN_HOSTS` (він змінюється, якщо створити машину заново) |
 | Вхід у застосунок не тримається | `production.env` має містити правильний `APP_DOMAIN`; сесійна кука працює лише по HTTPS |
