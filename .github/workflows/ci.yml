@@ -64,6 +64,11 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # All settings come from the job's environment variables. An empty file only stops
+      # phpdotenv from emitting a "file not found" warning in every test.
+      - name: Create empty environment file
+        run: touch .env
+
       - name: Code style (Pint)
         run: vendor/bin/pint --test
 
