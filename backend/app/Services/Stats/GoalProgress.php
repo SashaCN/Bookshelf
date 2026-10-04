@@ -11,7 +11,7 @@ use Carbon\CarbonImmutable;
 final class GoalProgress
 {
     /**
-     * @return array{year: int, target_books: int|null, finished_books: int, expected_books: float|null, remaining_books: int|null, on_track: bool|null}
+     * @return array{year: int, target_books: int|null, finished_books: int, expected_books: float|null, due_books: int|null, remaining_books: int|null, on_track: bool|null}
      */
     public function handle(User $user, int $year): array
     {
@@ -28,6 +28,7 @@ final class GoalProgress
                 'target_books' => null,
                 'finished_books' => $finished,
                 'expected_books' => null,
+                'due_books' => null,
                 'remaining_books' => null,
                 'on_track' => null,
             ];
@@ -45,6 +46,8 @@ final class GoalProgress
             'target_books' => $target,
             'finished_books' => $finished,
             'expected_books' => round($expected, 1),
+            // Whole books that should be finished by today.
+            'due_books' => $due,
             'remaining_books' => max(0, $target - $finished),
             // Books are whole: being 0.02 of a book short on the second day of the year is not being behind.
             'on_track' => $year > $today->year ? null : $finished >= $due,

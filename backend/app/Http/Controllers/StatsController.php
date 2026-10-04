@@ -40,18 +40,22 @@ class StatsController extends Controller
     }
 
     /**
-     * Pages per day for a chart. Without a range it is the last 30 days; at most a year can be asked for.
+     * Pages per day for a chart: a range (`from`, `to`) or the last `days` days up to today. Without any of them it is
+     * the last 30 days. At most a year can be asked for.
      */
     public function daily(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'days' => ['nullable', 'integer', 'between:1,366'],
         ]);
 
         $statistics = new ReadingStatistics($request->user());
         $to = isset($validated['to']) ? CarbonImmutable::parse($validated['to']) : $statistics->today();
-        $from = isset($validated['from']) ? CarbonImmutable::parse($validated['from']) : $to->subDays(29);
+        $from = isset($validated['from'])
+            ? CarbonImmutable::parse($validated['from'])
+            : $to->subDays(((int) ($validated['days'] ?? 30)) - 1);
 
         if ($from->diffInDays($to) > 365) {
             return response()->json([

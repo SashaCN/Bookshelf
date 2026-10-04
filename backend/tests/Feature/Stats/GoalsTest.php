@@ -32,6 +32,7 @@ describe('reading the goal', function () {
                 'target_books' => null,
                 'finished_books' => 1,
                 'expected_books' => null,
+                'due_books' => null,
                 'remaining_books' => null,
                 'on_track' => null,
             ]]);
@@ -66,6 +67,7 @@ describe('being on track this year', function () {
         $this->actingAs($this->user)->getJson('/api/goals/2026')
             ->assertJsonPath('data.target_books', 12)
             ->assertJsonPath('data.expected_books', 6)
+            ->assertJsonPath('data.due_books', 6)
             ->assertJsonPath('data.remaining_books', 12);
     });
 
@@ -77,6 +79,7 @@ describe('being on track this year', function () {
 
         $this->actingAs($this->user)->getJson('/api/goals/2026')
             ->assertJsonPath('data.finished_books', 5)
+            ->assertJsonPath('data.due_books', 6)
             ->assertJsonPath('data.on_track', false);
     });
 
@@ -133,6 +136,7 @@ describe('other years', function () {
 
         $this->actingAs($this->user)->getJson('/api/goals/2025')
             ->assertJsonPath('data.expected_books', 3)
+            ->assertJsonPath('data.due_books', 3)
             ->assertJsonPath('data.on_track', false);
 
         finishedBook($this->user, '2025-11-01 10:00:00');
@@ -145,6 +149,7 @@ describe('other years', function () {
 
         $this->actingAs($this->user)->getJson('/api/goals/2027')
             ->assertJsonPath('data.expected_books', 0)
+            ->assertJsonPath('data.due_books', 0)
             ->assertJsonPath('data.on_track', null);
     });
 });

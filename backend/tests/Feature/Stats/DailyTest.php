@@ -27,6 +27,22 @@ it('covers the last 30 days by default, with zeros for the days without reading'
         ->assertJsonPath('meta', ['from' => '2026-09-16', 'to' => '2026-10-15', 'total_pages' => 25]);
 });
 
+it('covers the last N days when asked for N', function () {
+    readingLog($this->userBook, 0, 20, '2026-10-15');
+
+    $this->actingAs($this->user)->getJson('/api/stats/daily?days=7')
+        ->assertOk()
+        ->assertJsonCount(7, 'data')
+        ->assertJsonPath('data.0.date', '2026-10-09')
+        ->assertJsonPath('data.6', ['date' => '2026-10-15', 'pages' => 20]);
+
+    $this->actingAs($this->user)->getJson('/api/stats/daily?days=1')->assertJsonCount(1, 'data');
+});
+
+it('refuses a number of days that makes no sense', function (int $days) {
+    $this->actingAs($this->user)->getJson("/api/stats/daily?days={$days}")->assertUnprocessable()->assertJsonValidationErrors('days');
+})->with([0, 367]);
+
 it('returns the requested range, both ends included', function () {
     readingLog($this->userBook, 0, 10, '2026-10-01');
     readingLog($this->userBook, 10, 30, '2026-10-03');
