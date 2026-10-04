@@ -17,6 +17,7 @@ export function createTestRouter() {
       { path: '/quotes/new', name: 'quote-new', component: stub, meta: { tab: 'quotes' } },
       { path: '/quotes/:id(\\d+)/edit', name: 'quote-edit', component: stub, meta: { tab: 'quotes' } },
       { path: '/quotes/:id(\\d+)/share', name: 'quote-share', component: stub, meta: { tab: 'quotes' } },
+      { path: '/stats', name: 'stats', component: stub, meta: { tab: 'stats' } },
       { path: '/profile', name: 'profile', component: stub },
       { path: '/login', name: 'login', component: stub },
     ],

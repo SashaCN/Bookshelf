@@ -148,7 +148,7 @@ describe('library store', () => {
       vi.mocked(libraryApi.list).mockResolvedValue([reading(1)])
       vi.mocked(libraryApi.progress).mockResolvedValue({
         data: { ...reading(1, 130), rating: 5 },
-        meta: { pages: 30, reached_end: false },
+        meta: { pages: 30, reached_end: false, streak: 1 },
       })
       const library = useLibraryStore()
       await library.load()
@@ -161,7 +161,7 @@ describe('library store', () => {
 
     it('keeps the book where it is in the list', async () => {
       vi.mocked(libraryApi.list).mockResolvedValue([reading(1), reading(2), reading(3)])
-      vi.mocked(libraryApi.progress).mockResolvedValue({ data: reading(2, 150), meta: { pages: 50, reached_end: false } })
+      vi.mocked(libraryApi.progress).mockResolvedValue({ data: reading(2, 150), meta: { pages: 50, reached_end: false, streak: 1 } })
       const library = useLibraryStore()
       await library.load()
 
@@ -175,7 +175,7 @@ describe('library store', () => {
       const first = deferred<Awaited<ReturnType<typeof libraryApi.progress>>>()
       vi.mocked(libraryApi.progress)
         .mockReturnValueOnce(first.promise)
-        .mockResolvedValueOnce({ data: reading(1, 120), meta: { pages: 10, reached_end: false } })
+        .mockResolvedValueOnce({ data: reading(1, 120), meta: { pages: 10, reached_end: false, streak: 1 } })
       const library = useLibraryStore()
       await library.load()
 
@@ -186,7 +186,7 @@ describe('library store', () => {
       expect(libraryApi.progress).toHaveBeenCalledTimes(1)
       expect(library.find(1)?.current_page).toBe(120)
 
-      first.resolve({ data: reading(1, 110), meta: { pages: 10, reached_end: false } })
+      first.resolve({ data: reading(1, 110), meta: { pages: 10, reached_end: false, streak: 1 } })
       await Promise.all([one, two])
 
       expect(libraryApi.progress).toHaveBeenNthCalledWith(1, 1, 110)
@@ -198,7 +198,7 @@ describe('library store', () => {
       vi.mocked(libraryApi.list).mockResolvedValue([reading(1)])
       const second = deferred<Awaited<ReturnType<typeof libraryApi.progress>>>()
       vi.mocked(libraryApi.progress)
-        .mockResolvedValueOnce({ data: reading(1, 110), meta: { pages: 10, reached_end: false } })
+        .mockResolvedValueOnce({ data: reading(1, 110), meta: { pages: 10, reached_end: false, streak: 1 } })
         .mockReturnValueOnce(second.promise)
       const library = useLibraryStore()
       await library.load()
@@ -238,7 +238,7 @@ describe('library store', () => {
       vi.mocked(libraryApi.list).mockResolvedValue([reading(1)])
       vi.mocked(libraryApi.progress)
         .mockRejectedValueOnce(new Error('hiccup'))
-        .mockResolvedValueOnce({ data: reading(1, 120), meta: { pages: 20, reached_end: false } })
+        .mockResolvedValueOnce({ data: reading(1, 120), meta: { pages: 20, reached_end: false, streak: 1 } })
       vi.mocked(libraryApi.get).mockResolvedValue(reading(1, 100))
       const library = useLibraryStore()
       await library.load()

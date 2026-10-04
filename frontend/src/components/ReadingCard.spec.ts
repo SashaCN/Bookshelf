@@ -24,10 +24,10 @@ function reading(overrides: Partial<UserBook> = {}): UserBook {
 }
 
 /** What the server answers to a progress update: the book on the new page and the pages it was worth. */
-function answer(userBook: UserBook, page: number, pages: number): ProgressResult {
+function answer(userBook: UserBook, page: number, pages: number, streak = 1): ProgressResult {
   return {
     data: { ...userBook, current_page: page, progress_percent: Math.floor((page / 320) * 100) },
-    meta: { pages, reached_end: page === 320 },
+    meta: { pages, reached_end: page === 320, streak },
   }
 }
 
@@ -93,6 +93,30 @@ describe('ReadingCard', () => {
     await flushPromises()
 
     expect(wrapper.get('[aria-live="polite"]').text()).toBe('+25 стор.')
+  })
+
+  it('adds the streak to the note from the second day in a row', async () => {
+    const userBook = reading()
+    const { wrapper } = await mountCard(userBook)
+    vi.mocked(libraryApi.progress).mockResolvedValue(answer(userBook, 118, 18, 5))
+
+    await buttonWithText(wrapper, 'Я на сторінці…').trigger('click')
+    await wrapper.get('input').setValue('118')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[aria-live="polite"]').text()).toBe('+18 стор. · 🔥 5')
+  })
+
+  it('does not boast about a streak of one day', async () => {
+    const userBook = reading()
+    const { wrapper } = await mountCard(userBook)
+    vi.mocked(libraryApi.progress).mockResolvedValue(answer(userBook, 110, 10, 1))
+
+    await buttonWithText(wrapper, '+10').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[aria-live="polite"]').text()).toBe('+10 стор.')
   })
 
   it('adds up quick taps into one note, which fades after a moment', async () => {

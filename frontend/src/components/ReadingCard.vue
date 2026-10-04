@@ -31,12 +31,20 @@ const total = computed(() => props.userBook.total_pages ?? 0)
 const atEnd = computed(() => total.value > 0 && props.userBook.current_page >= total.value)
 const authors = computed(() => props.userBook.book.authors.join(', '))
 
-/** Taps in a row add up to one note ("+35 стор."), instead of flashing one note per tap. */
-function showFeedback(pages: number) {
+/** A streak of one day is not worth mentioning; from two days on it is encouragement. */
+const MIN_STREAK_TO_SHOW = 2
+
+/** Taps in a row add up to one note ("+35 стор. · 🔥 5"), instead of flashing one note per tap. */
+function showFeedback(pages: number, streak: number) {
   if (pages === 0) return
 
   gained += pages
-  feedback.value = t('progress.gained', { count: signed(gained) })
+  feedback.value = [
+    t('progress.gained', { count: signed(gained) }),
+    streak >= MIN_STREAK_TO_SHOW ? t('progress.streak', { days: streak }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   clearTimeout(feedbackTimer)
   feedbackTimer = setTimeout(() => {
     gained = 0
@@ -50,7 +58,7 @@ async function moveTo(page: number) {
   try {
     const { meta } = await library.setProgress(props.userBook.id, Math.min(Math.max(page, 0), total.value))
     editing.value = false
-    showFeedback(meta.pages)
+    showFeedback(meta.pages, meta.streak)
   } catch (e) {
     error.value = errorMessage(e)
   }

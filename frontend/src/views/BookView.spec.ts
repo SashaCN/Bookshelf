@@ -89,7 +89,7 @@ describe('BookView', () => {
     )
     vi.mocked(libraryApi.progress).mockResolvedValue({
       data: makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 150, progress_percent: 46 }),
-      meta: { pages: 50, reached_end: false },
+      meta: { pages: 50, reached_end: false, streak: 1 },
     })
     expect(libraryApi.logs).toHaveBeenCalledTimes(1)
 
@@ -110,7 +110,7 @@ describe('BookView', () => {
 
     vi.mocked(libraryApi.progress).mockResolvedValue({
       data: makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 20 }),
-      meta: { pages: 20, reached_end: false },
+      meta: { pages: 20, reached_end: false, streak: 1 },
     })
     await wrapper.get('#current-page').setValue('20')
     await wrapper.get('form').trigger('submit')

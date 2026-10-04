@@ -10,7 +10,7 @@ async function mountBar(name: string) {
 }
 
 describe('TabBar', () => {
-  it('has a tab for reading, the library and the quotes', async () => {
+  it('has a tab for reading, the library, the quotes and the statistics', async () => {
     const wrapper = await mountBar('home')
 
     const tabs = wrapper.findAll('a').map((link) => [link.text(), link.attributes('href')])
@@ -19,6 +19,7 @@ describe('TabBar', () => {
       ['Читаю', '/'],
       ['Бібліотека', '/library'],
       ['Цитати', '/quotes'],
+      ['Статистика', '/stats'],
     ])
   })
 
@@ -33,6 +34,7 @@ describe('TabBar', () => {
     ['quote-new', {}, 'Цитати'],
     ['quote-edit', { id: 1 }, 'Цитати'],
     ['quote-share', { id: 1 }, 'Цитати'],
+    ['stats', {}, 'Статистика'],
     ['book', { id: 1 }, 'Бібліотека'],
     ['home', {}, 'Читаю'],
   ])('highlights the right tab on the "%s" page', async (name, params, label) => {

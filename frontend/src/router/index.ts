@@ -11,6 +11,7 @@ import QuoteFormView from '@/views/QuoteFormView.vue'
 import QuoteShareView from '@/views/QuoteShareView.vue'
 import QuotesView from '@/views/QuotesView.vue'
 import RegisterView from '@/views/RegisterView.vue'
+import StatsView from '@/views/StatsView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -46,6 +47,7 @@ export const router = createRouter({
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'quotes' },
         },
+        { path: 'stats', name: 'stats', component: StatsView, meta: { tab: 'stats' } },
         { path: 'profile', name: 'profile', component: ProfileView },
       ],
     },

@@ -75,6 +75,8 @@ export interface ProgressResult {
     pages: number
     /** The bookmark is on the last page, so the book can be marked as finished. */
     reached_end: boolean
+    /** Days in a row with something read, counting the update just made. */
+    streak: number
   }
 }
 
@@ -144,4 +146,55 @@ export interface QuoteFilters {
 export interface QuotesPage {
   data: Quote[]
   links: { next: string | null }
+}
+
+export interface StreakStats {
+  current: number
+  longest: number
+  /** Whether anything was read today; a streak that was not extended today is still alive until midnight. */
+  read_today: boolean
+}
+
+/** When a book that is being read will be finished at the current pace. */
+export interface BookForecast {
+  user_book_id: number
+  title: string
+  current_page: number
+  total_pages: number
+  /** Null when nothing has been read lately. */
+  pages_per_day: number | null
+  days_left: number | null
+  finish_on: string | null
+}
+
+export interface StatsSummary {
+  today: { date: string; pages: number }
+  streak: StreakStats
+  /** Pages per day over the last 14 days. */
+  pace: number
+  month: { pages: number; books_finished: number }
+  year: { pages: number; books_finished: number }
+  forecasts: BookForecast[]
+}
+
+export interface DailyPages {
+  date: string
+  pages: number
+}
+
+export interface DailyStats {
+  data: DailyPages[]
+  meta: { from: string; to: string; total_pages: number }
+}
+
+/** The yearly goal "N books" and how the reader stands against it. */
+export interface GoalProgress {
+  year: number
+  target_books: number | null
+  finished_books: number
+  expected_books: number | null
+  /** Whole books that should be finished by today. */
+  due_books: number | null
+  remaining_books: number | null
+  on_track: boolean | null
 }

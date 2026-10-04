@@ -9,6 +9,6 @@ declare module 'vue-router' {
     /** Redirect to the home page when the visitor is already signed in. */
     guestOnly?: boolean
     /** The bottom tab that stays highlighted on this page. */
-    tab?: 'home' | 'library' | 'quotes'
+    tab?: 'home' | 'library' | 'quotes' | 'stats'
   }
 }
