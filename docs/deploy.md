@@ -42,13 +42,13 @@ ssh-keygen -t ed25519 -f ~/.ssh/bookshelf_deploy -C bookshelf-deploy -N ""
 
 | Поле | Значення |
 |---|---|
-| Region | **Poland Central.** Безкоштовні розміри доступні не в кожному регіоні й залежать від підписки: у Poland Central B2ats_v2 для підписки Azure for Students доступний, а, наприклад, у West Europe всі B2-розміри були недоступні |
+| Region | **Denmark East.** Підписка Azure for Students дозволяє розгортання лише в п'яти регіонах (політика «Allowed resource deployment regions»): Austria East, Denmark East, Italy North, Norway East, Switzerland North. У решті регіонів валідація падає з `RequestDisallowedByAzure`, хоча самі регіони в списку є. З цих п'яти B2ats_v2 для підписки доступний саме в Denmark East; в Italy North квота vCPU нульова, а в Norway East і Switzerland North цей розмір недоступний. Austria East не перевірявся |
 | Availability options | **No infrastructure redundancy required.** За замовчуванням стоїть «Availability zone» (Zone 1), і тоді в списку розмірів усе недоступне з поясненням «Unsupported availability zone» |
 | Image | Ubuntu Server 24.04 LTS, **x64 Gen2** (VM architecture: x64) |
 | Size | **B2ats_v2** (2 vCPU, **1 ГБ RAM**). Він входить у безкоштовні 750 годин на місяць протягом 12 місяців. Розмір за замовчуванням `Standard_D2s_v3` недоступний для вашої підписки, його треба замінити через «See all sizes» |
 | Authentication | SSH public key, Username `azureuser`, вставте вміст `~/.ssh/bookshelf_deploy.pub` |
 | Inbound ports | SSH (22), HTTP (80), HTTPS (443) |
-| OS disk | Standard SSD, 30 ГБ (Premium коштує більше) |
+| OS disk | **Standard SSD** (за замовчуванням стоїть Premium SSD, він дорожчий), 30 ГБ |
 | Public IP | **Static**, інакше IP зміниться після зупинки машини, і ламаються DNS та сертифікат |
 
 Вимкніть автоматичне вимкнення (auto-shutdown), якщо воно запропоноване. Після створення скопіюйте публічну IP-адресу.
@@ -57,7 +57,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/bookshelf_deploy -C bookshelf-deploy -N ""
 MySQL з буфером 128 МБ і вимкненою performance schema, PHP-FPM запускає працівників на вимогу, а `bootstrap-server.sh` додає swap на 2 ГБ.
 Для навчального проєкту з малим навантаженням цього вистачає, але запас невеликий. Якщо сервер почне «задихатись», варіанти такі:
 розмір із 4 ГБ (`B2als_v2`, але він платний і витрачає кредит $100, ціна в порталі для цієї підписки не показується) або інший хостинг.
-Arm-розмір `B2pts_v2` для вашої підписки в Poland Central відсутній.
+Arm-розмір `B2pts_v2` у Denmark East для вашої підписки не з'являвся, тому образи x64.
 
 > Збірка образів у `ci.yml` розрахована на x64 (`linux/amd64`). Якщо ви колись перейдете на Arm-сервер, змініть там `platforms`
 > на `linux/arm64`, а `runs-on` у job `images` на `ubuntu-24.04-arm`.
@@ -145,7 +145,8 @@ exit
 |---|---|
 | Крок `Publish images` не стартує | Змінна `DEPLOY_ENABLED` має бути рівно `true`, а пуш іти в `main` |
 | `exec format error` у логах `app` | Образ зібраний під іншу архітектуру, ніж сервер (образи x64, див. примітку в кроці 3) |
-| У списку розмірів усе сіре («Unsupported availability zone», «Size not available») | Поставте Availability options = No infrastructure redundancy required, перевірте, що VM architecture = x64, спробуйте інший регіон |
+| Валідація падає з `RequestDisallowedByAzure` | Регіон не входить у дозволені для підписки (див. таблицю в кроці 3). Оберіть Denmark East |
+| У списку розмірів усе сіре («Unsupported availability zone», «Size not available») | Поставте Availability options = No infrastructure redundancy required, перевірте, що VM architecture = x64, спробуйте інший з п'яти дозволених регіонів |
 | Контейнер `mysql` перезапускається або сервер «вішається» | Ймовірно, не вистачає пам'яті: `free -m`, `docker stats`; перевірте, що swap увімкнений (`swapon --show`) |
 | Сайт не відкривається, у `caddy` помилки сертифіката | Домен має вказувати на IP сервера, а порти 80 і 443 бути відкриті в Azure (Networking → Inbound rules) |
 | Крок `Roll out` падає на `docker login` або `pull` | Перевірте, що пакети `bookshelf-app` і `bookshelf-web` зʼявились у Packages репозиторію й привʼязані до нього |
