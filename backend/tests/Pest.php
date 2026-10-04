@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\ReadingLog;
+use App\Models\UserBook;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -43,4 +45,17 @@ function fakeOpenLibrary(array $docs): void
         'numFound' => count($docs),
         'docs' => $docs,
     ])]);
+}
+
+/**
+ * A move of the bookmark on the given calendar day (YYYY-MM-DD) of the reader.
+ */
+function readingLog(UserBook $userBook, int $fromPage, int $toPage, string $day): ReadingLog
+{
+    return ReadingLog::factory()->for($userBook)->create([
+        'user_id' => $userBook->user_id,
+        'from_page' => $fromPage,
+        'to_page' => $toPage,
+        'logged_on' => $day,
+    ]);
 }

@@ -28,6 +28,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<ReadingGoal, $this>
+     */
+    public function readingGoals(): HasMany
+    {
+        return $this->hasMany(ReadingGoal::class);
+    }
+
+    /**
      * @return HasMany<Quote, $this>
      */
     public function quotes(): HasMany

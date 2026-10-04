@@ -63,6 +63,13 @@ describe('moving the bookmark', function () {
         expect(ReadingLog::query()->sole()->logged_on->toDateString())->toBe('2026-10-06');
     });
 
+    it('reports how many days in a row the reader has read', function () {
+        $userBook = UserBook::factory()->for($this->user)->reading(100)->create(['total_pages' => 320]);
+        readingLog($userBook, 50, 100, '2026-10-04');
+
+        setPage($userBook, 118)->assertOk()->assertJsonPath('meta.streak', 2);
+    });
+
     it('does nothing when the page has not changed', function () {
         $userBook = UserBook::factory()->for($this->user)->reading(100)->create();
 

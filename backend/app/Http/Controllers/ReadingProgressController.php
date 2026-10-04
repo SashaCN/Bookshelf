@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateProgressRequest;
 use App\Http\Resources\ReadingLogResource;
 use App\Http\Resources\UserBookResource;
 use App\Models\UserBook;
+use App\Services\Stats\ReadingStatistics;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 
@@ -24,6 +25,8 @@ class ReadingProgressController extends Controller
             'meta' => [
                 'pages' => $update->pages(),
                 'reached_end' => $update->reachedEnd(),
+                // Days in a row with something read, for the "+18 pages, 5 days in a row" reply.
+                'streak' => (new ReadingStatistics($request->user()))->streak()['current'],
             ],
         ]);
     }
