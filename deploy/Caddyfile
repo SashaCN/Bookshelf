@@ -1,0 +1,14 @@
+# Caddy terminates HTTPS and gets/renews the certificate from Let's Encrypt by itself.
+# APP_DOMAIN must point to this server (a DNS A record, or a name like 20-1-2-3.sslip.io).
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy web:80
+}

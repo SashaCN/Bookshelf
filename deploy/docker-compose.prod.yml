@@ -1,0 +1,89 @@
+# Production stack, run on the server from /opt/bookshelf:
+#
+#   docker compose --env-file production.env -f docker-compose.prod.yml up -d
+#
+# Secrets and the domain come from production.env (created once by bootstrap-server.sh).
+# The images are built and published by the CI workflow.
+name: bookshelf
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is not set in production.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here, so a restart does not ask Let's Encrypt for new ones.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+  web:
+    image: ${IMAGE_REPO:-ghcr.io/sashacn}/bookshelf-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - app
+
+  app:
+    image: ${IMAGE_REPO:-ghcr.io/sashacn}/bookshelf-app:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      APP_NAME: Bookshelf
+      APP_ENV: production
+      APP_KEY: ${APP_KEY:?APP_KEY is not set in production.env}
+      APP_DEBUG: "false"
+      APP_URL: https://${APP_DOMAIN}
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: warning
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: bookshelf
+      DB_USERNAME: bookshelf
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is not set in production.env}
+      DB_CHARSET: utf8mb4
+      DB_COLLATION: utf8mb4_0900_ai_ci
+      SESSION_DRIVER: database
+      SESSION_LIFETIME: "43200"
+      SESSION_DOMAIN: "null"
+      # The browser only ever sends the session cookie over HTTPS.
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-${APP_DOMAIN}}
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      MAIL_MAILER: log
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    # Trimmed for a small server: the performance schema alone would take a few hundred MB of RAM.
+    command: >-
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_0900_ai_ci
+      --performance-schema=OFF
+      --innodb-buffer-pool-size=256M
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is not set in production.env}
+      MYSQL_DATABASE: bookshelf
+      MYSQL_USER: bookshelf
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  caddy_data:
+  caddy_config:
+  mysql_data:

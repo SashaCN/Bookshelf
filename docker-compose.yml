@@ -46,7 +46,8 @@ services:
 
   app:
     build:
-      context: ./docker/php
+      context: .
+      dockerfile: docker/php/Dockerfile
       target: dev
       args:
         APP_UID: ${APP_UID:-1000}

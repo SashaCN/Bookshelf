@@ -65,6 +65,12 @@ Books missing from the catalog (many Ukrainian editions) are added by hand.
 - CI (GitHub Actions) runs Pint, Larastan and Pest for the backend and ESLint, vue-tsc, Vitest and a build for the
   frontend on every pull request.
 
+## Deployment
+
+Pushes to `main` publish Arm64 images to GitHub Container Registry and roll them out to a server over SSH, behind Caddy
+with an automatic HTTPS certificate. The steps are skipped until the server exists. See [`docs/deploy.md`](docs/deploy.md)
+(in Ukrainian) for the one-time setup on Azure for Students.
+
 ## Conventions
 
 - Code, comments and commit messages are in English; the UI is in Ukrainian (strings live in `frontend/src/i18n`).

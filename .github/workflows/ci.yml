@@ -7,7 +7,8 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push replaces an unfinished pull request run, but never interrupts a run on main (it may be deploying).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
@@ -108,3 +109,156 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  docker:
+    name: Production images build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Nothing is pushed here: this only proves the production Dockerfiles still build.
+      - name: Build the app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          target: prod
+          push: false
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
+
+      - name: Build the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web/Dockerfile
+          push: false
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+  # ---------------------------------------------------------------------------------------------
+  # Delivery. Both jobs below stay skipped until the repository variable DEPLOY_ENABLED is set
+  # to "true" (see docs/deploy.md), so CI is green on a repository that has no server yet.
+  # ---------------------------------------------------------------------------------------------
+  images:
+    name: Publish images
+    needs: [backend, frontend, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    # Native arm64 runner: the server is an Arm virtual machine, and this avoids slow emulation.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Registry names must be lowercase
+        run: echo "IMAGE_REPO=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          target: prod
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.IMAGE_REPO }}/bookshelf-app:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=app-arm64
+          cache-to: type=gha,scope=app-arm64,mode=max
+
+      - name: Publish the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.IMAGE_REPO }}/bookshelf-web:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=web-arm64
+          cache-to: type=gha,scope=web-arm64,mode=max
+
+  deploy:
+    name: Deploy to the server
+    needs: images
+    runs-on: ubuntu-latest
+    environment: production
+    # Two deploys must never run at the same time.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Registry names must be lowercase
+        run: echo "IMAGE_REPO=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+
+      - name: Prepare SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # The server's host key is pinned in a secret, so a man in the middle cannot pose as the server.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Copy the deployment files
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            deploy/docker-compose.prod.yml deploy/Caddyfile deploy/backup.sh \
+            "$DEPLOY_USER@$DEPLOY_HOST:/opt/bookshelf/"
+
+      - name: Roll out
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # The registry token goes over stdin so it never appears in a command line or a log.
+          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker login ghcr.io -u '$ACTOR' --password-stdin"
+
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" bash -s -- "$IMAGE_REPO" "$IMAGE_TAG" <<'EOF'
+          set -euo pipefail
+          cd /opt/bookshelf
+          chmod +x backup.sh
+          export IMAGE_REPO="$1" IMAGE_TAG="$2"
+          compose="docker compose --env-file production.env -f docker-compose.prod.yml"
+          $compose pull
+          $compose up -d --remove-orphans
+          $compose exec -T app php artisan migrate --force
+          docker logout ghcr.io
+          docker image prune -f
+          EOF
+
+      - name: Check that the site answers
+        env:
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors \
+            "https://$DEPLOY_DOMAIN/up" > /dev/null
+          echo "https://$DEPLOY_DOMAIN is up"
