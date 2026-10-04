@@ -22,6 +22,8 @@ automatically, which takes a couple of minutes.
 | API documentation (Scramble) | <http://localhost:8000/docs/api>                       |
 | MySQL from the host        | `127.0.0.1:3308`, user/password/database `bookshelf`    |
 
+The app also works at <http://127.0.0.1:8000>; cookies are per origin, so that is handy for a second test user.
+
 If a port is taken, put e.g. `WEB_PORT=8090` or `MYSQL_PORT=3310` into a root-level `.env` file.
 On Linux also add `APP_UID=$(id -u)` and `APP_GID=$(id -g)` there so files created in containers belong to you.
 
@@ -47,6 +49,13 @@ frontend/   Vue 3 + TypeScript + Tailwind SPA (Vite)
 docker/     Dockerfile, nginx and MySQL init scripts
 docs/       Product plan and project documents
 ```
+
+## Book catalog (Open Library)
+
+Search and "add from the catalog" go through the backend, which asks the public Open Library API, caches answers for
+24 hours and limits each reader to 30 searches a minute. The tests never reach the network (`Http::preventStrayRequests`).
+To work offline or against a stand-in, set `OPENLIBRARY_BASE_URL` and `OPENLIBRARY_COVERS_URL` in the root `.env`.
+Books missing from the catalog (many Ukrainian editions) are added by hand.
 
 ## How the pieces fit
 

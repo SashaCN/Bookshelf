@@ -24,10 +24,13 @@ x-backend-env: &backend-env
   SESSION_LIFETIME: "43200"
   SESSION_DOMAIN: "null"
   # The SPA is served from the same origin as the API (nginx on WEB_PORT).
-  SANCTUM_STATEFUL_DOMAINS: localhost:${WEB_PORT:-8000}
+  SANCTUM_STATEFUL_DOMAINS: localhost:${WEB_PORT:-8000},127.0.0.1:${WEB_PORT:-8000}
   CACHE_STORE: database
   QUEUE_CONNECTION: database
   MAIL_MAILER: log
+  # Book catalog. Point these at a local stand-in to work offline.
+  OPENLIBRARY_BASE_URL: ${OPENLIBRARY_BASE_URL:-https://openlibrary.org}
+  OPENLIBRARY_COVERS_URL: ${OPENLIBRARY_COVERS_URL:-https://covers.openlibrary.org}
 
 services:
   web:
