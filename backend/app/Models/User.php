@@ -28,6 +28,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<Quote, $this>
+     */
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(Quote::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

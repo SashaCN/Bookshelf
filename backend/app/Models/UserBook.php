@@ -71,6 +71,14 @@ class UserBook extends Model
         return $this->hasMany(ReadingLog::class);
     }
 
+    /**
+     * @return HasMany<Quote, $this>
+     */
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(Quote::class);
+    }
+
     public function progressPercent(): ?int
     {
         if (! $this->total_pages) {
