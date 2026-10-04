@@ -220,15 +220,31 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
+          # An empty secret (a typo in its name, or one created outside the "production" environment)
+          # would otherwise show up only as an unreadable "exit code 255" from ssh.
+          missing=0
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The secret $name is empty or missing in the 'production' environment"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
+
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           # The server's host key is pinned in a secret, so a man in the middle cannot pose as the server.
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
+            || { echo "::error::DEPLOY_SSH_KEY is not a valid private key (paste the whole file, including the BEGIN and END lines)"; exit 1; }
+          ssh-keygen -F "$DEPLOY_HOST" -f ~/.ssh/known_hosts > /dev/null \
+            || { echo "::error::DEPLOY_KNOWN_HOSTS has no entry for $DEPLOY_HOST (use the output of: ssh-keyscan -t ed25519 $DEPLOY_HOST)"; exit 1; }
+
       - name: Copy the deployment files
         run: |
-          scp -i ~/.ssh/deploy_key \
+          scp -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 \
             deploy/docker-compose.prod.yml deploy/Caddyfile deploy/backup.sh \
             "$DEPLOY_USER@$DEPLOY_HOST:/opt/bookshelf/"
 
@@ -239,10 +255,10 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           # The registry token goes over stdin so it never appears in a command line or a log.
-          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 "$DEPLOY_USER@$DEPLOY_HOST" \
             "docker login ghcr.io -u '$ACTOR' --password-stdin"
 
-          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" bash -s -- "$IMAGE_REPO" "$IMAGE_TAG" <<'EOF'
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 "$DEPLOY_USER@$DEPLOY_HOST" bash -s -- "$IMAGE_REPO" "$IMAGE_TAG" <<'EOF'
           set -euo pipefail
           cd /opt/bookshelf
           chmod +x backup.sh
