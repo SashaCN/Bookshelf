@@ -47,6 +47,7 @@ FROM base AS prod
 
 RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 COPY docker/php/prod.ini "$PHP_INI_DIR/conf.d/zz-bookshelf.ini"
+COPY docker/php/prod-fpm.conf /usr/local/etc/php-fpm.d/zz-bookshelf.conf
 
 COPY --from=vendor --chown=www-data:www-data /app ./
 

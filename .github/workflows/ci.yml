@@ -147,8 +147,8 @@ jobs:
     name: Publish images
     needs: [backend, frontend, docker]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
-    # Native arm64 runner: the server is an Arm virtual machine, and this avoids slow emulation.
-    runs-on: ubuntu-24.04-arm
+    # The server is an x64 virtual machine (Azure B2ats_v2), so the images are built for linux/amd64.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -173,24 +173,24 @@ jobs:
           context: .
           file: docker/php/Dockerfile
           target: prod
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ env.IMAGE_REPO }}/bookshelf-app:${{ github.sha }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          cache-from: type=gha,scope=app-arm64
-          cache-to: type=gha,scope=app-arm64,mode=max
+          cache-from: type=gha,scope=app-amd64
+          cache-to: type=gha,scope=app-amd64,mode=max
 
       - name: Publish the web image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/web/Dockerfile
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ env.IMAGE_REPO }}/bookshelf-web:${{ github.sha }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          cache-from: type=gha,scope=web-arm64
-          cache-to: type=gha,scope=web-arm64,mode=max
+          cache-from: type=gha,scope=web-amd64
+          cache-to: type=gha,scope=web-amd64,mode=max
 
   deploy:
     name: Deploy to the server

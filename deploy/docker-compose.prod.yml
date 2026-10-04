@@ -64,12 +64,13 @@ services:
   mysql:
     image: mysql:8.4
     restart: unless-stopped
-    # Trimmed for a small server: the performance schema alone would take a few hundred MB of RAM.
+    # Trimmed for a server with 1 GB of RAM: the performance schema alone would take a few hundred MB.
     command: >-
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_0900_ai_ci
       --performance-schema=OFF
-      --innodb-buffer-pool-size=256M
+      --innodb-buffer-pool-size=128M
+      --max-connections=40
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is not set in production.env}
       MYSQL_DATABASE: bookshelf

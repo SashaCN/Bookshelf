@@ -67,7 +67,7 @@ Books missing from the catalog (many Ukrainian editions) are added by hand.
 
 ## Deployment
 
-Pushes to `main` publish Arm64 images to GitHub Container Registry and roll them out to a server over SSH, behind Caddy
+Pushes to `main` publish images to GitHub Container Registry and roll them out to a server over SSH, behind Caddy
 with an automatic HTTPS certificate. The steps are skipped until the server exists. See [`docs/deploy.md`](docs/deploy.md)
 (in Ukrainian) for the one-time setup on Azure for Students.
 
