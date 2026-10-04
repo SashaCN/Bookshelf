@@ -14,6 +14,37 @@ export class ApiError extends Error {
   }
 }
 
+/** The request never got an answer: no network, a dropped connection, a server that is down. */
+export class NetworkError extends Error {
+  constructor() {
+    super('The server could not be reached')
+    this.name = 'NetworkError'
+  }
+}
+
+let unauthorizedHandler: (() => void) | null = null
+
+/**
+ * Called when the server says the reader is no longer signed in (an expired session) in answer to a request
+ * made while using the app. Asking who is signed in, or signing in, are expected to answer 401 and do not count.
+ */
+export function onUnauthorized(handler: (() => void) | null): void {
+  unauthorizedHandler = handler
+}
+
+/** How long to wait for an answer. A phone with one bar of signal may never get one, and waiting for ever helps nobody. */
+const TIMEOUT_MS = 20_000
+
+/** `fetch` that tells a missing network (or no answer in time) apart from an answer of the server. */
+async function send(input: string, init: RequestInit): Promise<Response> {
+  try {
+    const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined
+    return await fetch(input, { ...init, signal })
+  } catch {
+    throw new NetworkError()
+  }
+}
+
 function readCookie(name: string): string | null {
   const entry = document.cookie.split('; ').find((cookie) => cookie.startsWith(`${name}=`))
   return entry ? decodeURIComponent(entry.slice(name.length + 1)) : null
@@ -25,7 +56,7 @@ async function ensureCsrfCookie(force = false): Promise<void> {
     return
   }
 
-  await fetch('/api/sanctum/csrf-cookie', {
+  await send('/api/sanctum/csrf-cookie', {
     credentials: 'same-origin',
     headers: { Accept: 'application/json' },
   })
@@ -52,7 +83,7 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
     headers['X-XSRF-TOKEN'] = csrfToken
   }
 
-  const response = await fetch(path, {
+  const response = await send(path, {
     method,
     headers,
     credentials: 'same-origin',
@@ -68,6 +99,10 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
   // Only parse real JSON: a redirected HTML page (e.g. "already signed in") must not crash the client.
   const isJson = response.headers.get('content-type')?.includes('json') ?? false
   const data = isJson ? ((await response.json()) as unknown) : null
+
+  if (response.status === 401 && path !== '/api/me' && !path.startsWith('/api/auth/')) {
+    unauthorizedHandler?.()
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, data)

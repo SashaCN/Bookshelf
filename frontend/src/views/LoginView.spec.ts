@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { ApiError } from '@/api/http'
+import { ApiError, NetworkError } from '@/api/http'
 import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import LoginView from './LoginView.vue'
@@ -63,5 +63,29 @@ describe('LoginView', () => {
     await fillAndSubmit(wrapper)
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Забагато спроб. Спробуйте за хвилину.')
+  })
+
+  it('explains why the reader is asked to sign in again after the session ended', async () => {
+    const { wrapper, router } = mountView()
+    await router.push('/login?expired=1')
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toBe('Сесія закінчилась. Увійдіть ще раз.')
+  })
+
+  it('says nothing about a session when the reader just opened the form', async () => {
+    const { wrapper, router } = mountView()
+    await router.isReady()
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+
+  it('blames the connection, not the password, when the server cannot be reached', async () => {
+    const { wrapper, auth } = mountView()
+    vi.spyOn(auth, 'login').mockRejectedValue(new NetworkError())
+
+    await fillAndSubmit(wrapper)
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Немає зв’язку із сервером')
   })
 })

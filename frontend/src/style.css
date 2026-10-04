@@ -58,3 +58,17 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/* Behaves like an app on a phone: no grey flash on tap, no double-tap zoom, text keeps its size when the phone turns. */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a,
+button,
+select,
+summary,
+[role='button'] {
+  touch-action: manipulation;
+}

@@ -10,5 +10,7 @@ declare module 'vue-router' {
     guestOnly?: boolean
     /** The bottom tab that stays highlighted on this page. */
     tab?: 'home' | 'library' | 'quotes' | 'stats'
+    /** The i18n key of the page title shown in the browser tab and the task switcher. */
+    title?: string
   }
 }

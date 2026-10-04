@@ -7,6 +7,7 @@ import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLibraryStore } from '@/stores/library'
 import { useQuotesStore } from '@/stores/quotes'
@@ -73,6 +74,10 @@ async function load() {
     if (props.id === undefined) {
       const requested = Number(route.query.book)
       bookId.value = library.find(requested) ? requested : ''
+
+      // Text shared to the app from another app (the manifest's share target) arrives as ?text=.
+      const shared = typeof route.query.text === 'string' ? route.query.text.trim().slice(0, MAX_LENGTH) : ''
+      if (shared && !form.content) form.content = shared
     } else {
       quote.value = await quotes.get(props.id)
       fill(quote.value)
@@ -163,7 +168,7 @@ async function submit() {
 
   <ErrorNotice v-else-if="loadError" :message="loadError" retryable @retry="load" />
 
-  <p v-else-if="!ready" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+  <SkeletonList v-else-if="!ready" />
 
   <div
     v-else-if="!editing && !library.items.length"

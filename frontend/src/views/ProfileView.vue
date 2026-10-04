@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ErrorNotice from '@/components/ErrorNotice.vue'
+import InstallCard from '@/components/InstallCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useAuthStore } from '@/stores/auth'
@@ -89,6 +90,8 @@ async function logout() {
     </button>
     <p v-if="saved" role="status" class="text-sm text-ink-muted">{{ $t('profile.saved') }}</p>
   </form>
+
+  <InstallCard class="mt-6" />
 
   <div class="mt-8 border-t border-line pt-4">
     <button

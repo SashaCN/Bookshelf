@@ -12,6 +12,7 @@ import PageJumpForm from '@/components/PageJumpForm.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import ReadingJournal from '@/components/ReadingJournal.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLibraryStore } from '@/stores/library'
 import type { BookStatus, UserBook } from '@/types/api'
@@ -146,7 +147,7 @@ function isDisabled(target: BookStatus): boolean {
 
   <ErrorNotice v-else-if="error && !userBook" :message="error" retryable @retry="load" />
 
-  <p v-else-if="!userBook || !book" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+  <SkeletonList v-else-if="!userBook || !book" :count="2" tall />
 
   <div v-else class="flex flex-col gap-6">
     <ErrorNotice v-if="error" :message="error" />

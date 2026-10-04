@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, http } from './http'
+import { ApiError, http, NetworkError, onUnauthorized } from './http'
 
 function jsonResponse(status: number, body?: unknown): Response {
   return new Response(body === undefined ? null : JSON.stringify(body), {
@@ -19,6 +19,7 @@ describe('http client', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     fetchMock.mockReset()
+    onUnauthorized(null)
   })
 
   it('does not fetch a CSRF cookie for GET requests', async () => {
@@ -74,5 +75,64 @@ describe('http client', () => {
     fetchMock.mockResolvedValueOnce(new Response('<html></html>', { status: 200, headers: { 'Content-Type': 'text/html' } }))
 
     await expect(http.get('/api/me')).resolves.toBeNull()
+  })
+
+  describe('when there is no network', () => {
+    it('gives up waiting for an answer after a while', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { data: 1 }))
+
+      await http.get('/api/me')
+
+      expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal)
+    })
+
+    it('takes a request that ran out of time for a missing network', async () => {
+      fetchMock.mockRejectedValueOnce(new DOMException('The operation timed out.', 'TimeoutError'))
+
+      await expect(http.get('/api/me')).rejects.toBeInstanceOf(NetworkError)
+    })
+
+    it('tells a missing network apart from an answer of the server', async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+      const error = await http.get('/api/me').catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(NetworkError)
+      expect(error).not.toBeInstanceOf(ApiError)
+    })
+
+    it('does the same when the CSRF cookie of a write cannot be fetched', async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+      await expect(http.post('/api/library', {})).rejects.toBeInstanceOf(NetworkError)
+    })
+  })
+
+  describe('when the session has ended', () => {
+    it('lets the app know when a request made while using it answers 401', async () => {
+      const handler = vi.fn()
+      onUnauthorized(handler)
+      fetchMock.mockResolvedValueOnce(jsonResponse(401, { message: 'Unauthenticated.' }))
+
+      await expect(http.get('/api/library')).rejects.toBeInstanceOf(ApiError)
+
+      expect(handler).toHaveBeenCalledTimes(1)
+    })
+
+    it.each(['/api/me', '/api/auth/login', '/api/auth/register'])('expects a 401 from %s and says nothing', async (path) => {
+      const handler = vi.fn()
+      onUnauthorized(handler)
+      fetchMock.mockResolvedValueOnce(jsonResponse(401, { message: 'Unauthenticated.' }))
+
+      await expect(http.get(path)).rejects.toBeInstanceOf(ApiError)
+
+      expect(handler).not.toHaveBeenCalled()
+    })
+
+    it('does not mind when nobody listens', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(401, { message: 'Unauthenticated.' }))
+
+      await expect(http.get('/api/library')).rejects.toBeInstanceOf(ApiError)
+    })
   })
 })

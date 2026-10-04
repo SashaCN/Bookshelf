@@ -5,6 +5,7 @@ import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useQuotesStore } from '@/stores/quotes'
 import type { Quote } from '@/types/api'
@@ -122,7 +123,7 @@ async function share() {
 
   <ErrorNotice v-else-if="loadError" :message="loadError" retryable @retry="load" />
 
-  <p v-else-if="!quote" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+  <SkeletonList v-else-if="!quote" :count="1" tall />
 
   <div v-else class="flex flex-col gap-4">
     <SegmentedControl v-model="template" :label="$t('quotes.shareCard.template')" :options="templateOptions" />

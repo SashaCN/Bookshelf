@@ -15,6 +15,6 @@ const value = computed(() => Math.min(100, Math.max(0, props.percent ?? 0)))
     aria-valuemax="100"
     :aria-valuenow="value"
   >
-    <div class="h-full rounded-full bg-accent transition-[width]" :style="{ width: `${value}%` }" />
+    <div class="h-full rounded-full bg-accent transition-[width] motion-reduce:transition-none" :style="{ width: `${value}%` }" />
   </div>
 </template>

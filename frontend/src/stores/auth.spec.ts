@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '@/api/auth'
-import { ApiError } from '@/api/http'
+import { ApiError, NetworkError } from '@/api/http'
 import { makeQuote } from '@/test/fixtures'
 import type { User } from '@/types/api'
 import { useAuthStore } from './auth'
@@ -39,11 +39,51 @@ describe('auth store', () => {
   })
 
   it('does not swallow unexpected errors on init', async () => {
-    vi.mocked(authApi.me).mockRejectedValue(new ApiError(500, null))
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(403, null))
     const auth = useAuthStore()
 
     await expect(auth.init()).rejects.toBeInstanceOf(ApiError)
     expect(auth.initialized).toBe(false)
+  })
+
+  it.each([500, 502, 503, 504])('does not take a server that answers %i for a guest either', async (status) => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(status, null))
+    const auth = useAuthStore()
+
+    await auth.init()
+
+    expect(auth.unreachable).toBe(true)
+    expect(auth.isAuthenticated).toBe(false)
+    expect(auth.initialized).toBe(false)
+  })
+
+  it('does not take a missing network for a guest, and can try again', async () => {
+    vi.mocked(authApi.me).mockRejectedValueOnce(new NetworkError()).mockResolvedValueOnce(user)
+    const auth = useAuthStore()
+
+    await auth.init()
+
+    expect(auth.unreachable).toBe(true)
+    expect(auth.initialized).toBe(false)
+    expect(auth.isAuthenticated).toBe(false)
+
+    await auth.init()
+
+    expect(auth.unreachable).toBe(false)
+    expect(auth.initialized).toBe(true)
+    expect(auth.user).toEqual(user)
+  })
+
+  it('forgets the reader and their data when the session expires', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+    const auth = useAuthStore()
+    await auth.init()
+    useQuotesStore().items.push(makeQuote())
+
+    auth.expireSession()
+
+    expect(auth.isAuthenticated).toBe(false)
+    expect(useQuotesStore().items).toEqual([])
   })
 
   it('loads the user after logging in and clears it on logout', async () => {

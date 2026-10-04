@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
-import { ApiError } from '@/api/http'
+import { useRoute, useRouter } from 'vue-router'
+import { ApiError, NetworkError } from '@/api/http'
 import AuthLayout from '@/components/AuthLayout.vue'
 import FormField from '@/components/FormField.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const email = ref('')
@@ -28,6 +29,8 @@ async function submit() {
       error.value = t('auth.errors.invalidCredentials')
     } else if (e instanceof ApiError && e.status === 429) {
       error.value = t('auth.errors.tooManyAttempts')
+    } else if (e instanceof NetworkError) {
+      error.value = t('apiErrors.offline')
     } else {
       error.value = t('auth.errors.generic')
     }
@@ -40,6 +43,10 @@ async function submit() {
 <template>
   <AuthLayout :title="$t('auth.login.title')">
     <form class="flex flex-col gap-4" @submit.prevent="submit">
+      <p v-if="route.query.expired" role="status" class="rounded-lg bg-sunken px-3 py-2 text-sm">
+        {{ $t('auth.sessionExpired') }}
+      </p>
+
       <FormField id="email" v-model="email" type="email" autocomplete="email" :label="$t('auth.fields.email')" />
       <FormField
         id="password"

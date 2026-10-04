@@ -17,6 +17,11 @@ export default defineConfig([
     languageOptions: { globals: globals.browser },
   },
   {
+    // Filled in at build time by vite.sw.config.ts.
+    files: ['src/sw/sw.ts'],
+    languageOptions: { globals: { __PRECACHE__: 'readonly', __VERSION__: 'readonly' } },
+  },
+  {
     // Layout of templates is a formatting concern; long Tailwind class lists make these rules noisy.
     rules: {
       'vue/max-attributes-per-line': 'off',

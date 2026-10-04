@@ -2,7 +2,7 @@
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { ApiError } from '@/api/http'
+import { ApiError, NetworkError } from '@/api/http'
 import AuthLayout from '@/components/AuthLayout.vue'
 import FormField from '@/components/FormField.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -38,6 +38,8 @@ async function submit() {
       if (errors.password) fieldErrors.password = t('auth.errors.passwordTooShort')
       if (errors.name) fieldErrors.name = errors.name[0]
       if (!errors.email && !errors.password && !errors.name) error.value = t('auth.errors.generic')
+    } else if (e instanceof NetworkError) {
+      error.value = t('apiErrors.offline')
     } else {
       error.value = t('auth.errors.generic')
     }

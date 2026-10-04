@@ -8,6 +8,7 @@ import GoalCard from '@/components/GoalCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PagesChart from '@/components/PagesChart.vue'
 import StatTile from '@/components/StatTile.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import type { DailyPages, GoalProgress, StatsSummary } from '@/types/api'
 import { formatDay, formatNumber } from '@/utils/format'
@@ -100,7 +101,7 @@ onMounted(load)
 
   <ErrorNotice v-if="failed" :message="$t('apiErrors.generic')" retryable @retry="load" />
 
-  <p v-else-if="!summary || !goal" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+  <SkeletonList v-else-if="!summary || !goal" tall />
 
   <div v-else class="flex flex-col gap-4">
     <GoalCard :goal="goal" :busy="goalBusy" :error="goalError" @save="saveGoal" @remove="removeGoal" />

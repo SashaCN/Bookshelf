@@ -47,7 +47,7 @@ Composer and artisan run inside the container, e.g. `docker compose exec app com
 backend/    Laravel API (Sanctum cookie sessions, Fortify headless auth)
 frontend/   Vue 3 + TypeScript + Tailwind SPA (Vite)
 docker/     Dockerfile, nginx and MySQL init scripts
-docs/       Product plan and project documents
+docs/       Product plan, deployment and PWA notes
 ```
 
 ## Book catalog (Open Library)
@@ -64,6 +64,13 @@ Books missing from the catalog (many Ukrainian editions) are added by hand.
 - Tests run against MySQL in a separate `bookshelf_testing` database, so they can never touch development data.
 - CI (GitHub Actions) runs Pint, Larastan and Pest for the backend and ESLint, vue-tsc, Vitest and a build for the
   frontend on every pull request.
+
+## Installable app (PWA)
+
+The frontend is an installable progressive web app: a manifest, icons and a small hand-written service worker that
+caches the app shell (never the reader's data). `npm run build` builds the app and then the worker. In development the
+worker is not registered. See [`docs/pwa.md`](docs/pwa.md) (in Ukrainian) for how it works and a checklist for testing
+on real phones.
 
 ## Deployment
 

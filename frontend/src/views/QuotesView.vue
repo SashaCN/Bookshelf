@@ -5,6 +5,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import QuoteCard from '@/components/QuoteCard.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLibraryStore } from '@/stores/library'
 import { useQuotesStore } from '@/stores/quotes'
@@ -132,7 +133,7 @@ onMounted(() => {
 
   <ErrorNotice v-if="error" :message="error" retryable @retry="load" />
 
-  <p v-else-if="!quotes.loaded" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+  <SkeletonList v-else-if="!quotes.loaded" />
 
   <template v-if="quotes.loaded">
     <ul v-if="quotes.items.length" class="mt-4 flex flex-col gap-3">

@@ -61,6 +61,19 @@ describe('QuoteFormView', () => {
   })
 
   describe('adding a quote', () => {
+    it('starts with the text that another app shared to Bookshelf', async () => {
+      const { wrapper } = await mountCreate({ text: '  Не все те золото, що блищить.  ' })
+
+      expect((wrapper.get('#quote-content').element as HTMLTextAreaElement).value).toBe('Не все те золото, що блищить.')
+      expect((wrapper.get('#quote-book').element as HTMLSelectElement).value).toBe('')
+    })
+
+    it('cuts shared text that is longer than a quote can be', async () => {
+      const { wrapper } = await mountCreate({ text: 'я'.repeat(2500) })
+
+      expect((wrapper.get('#quote-content').element as HTMLTextAreaElement).value).toHaveLength(2000)
+    })
+
     it('asks for the book among the books of the library, alphabetically', async () => {
       const { wrapper } = await mountCreate()
 
