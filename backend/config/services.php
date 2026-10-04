@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    // Public book catalog. No API key is needed, but Open Library asks every client
+    // to identify itself with an application name and a contact in the User-Agent.
+    'openlibrary' => [
+        'base_url' => env('OPENLIBRARY_BASE_URL', 'https://openlibrary.org'),
+        'covers_url' => env('OPENLIBRARY_COVERS_URL', 'https://covers.openlibrary.org'),
+        'user_agent' => env('OPENLIBRARY_USER_AGENT', 'Bookshelf/1.0 (+https://github.com/SashaCN/Bookshelf)'),
+        'timeout' => (int) env('OPENLIBRARY_TIMEOUT', 8),
+        'cache_ttl' => (int) env('OPENLIBRARY_CACHE_TTL', 86400),
+    ],
+
 ];

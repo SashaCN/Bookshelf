@@ -3,6 +3,8 @@ includes:
 
 parameters:
     level: 6
+    # Read the casts() method of models, so enum and date casts are typed correctly.
+    parseModelCastsMethod: true
     paths:
         - app
         - bootstrap
