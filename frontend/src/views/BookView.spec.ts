@@ -9,13 +9,22 @@ import type { UserBook } from '@/types/api'
 import BookView from './BookView.vue'
 
 vi.mock('@/api/library', () => ({
-  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  libraryApi: {
+    list: vi.fn(),
+    get: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    progress: vi.fn(),
+    logs: vi.fn(),
+  },
   catalogApi: { search: vi.fn() },
 }))
 
 async function mountView(userBook: UserBook) {
   const { plugins, router } = createTestEnvironment()
   vi.mocked(libraryApi.list).mockResolvedValue([userBook])
+  vi.mocked(libraryApi.logs).mockResolvedValue({ data: [], links: { next: null } })
   await router.push({ name: 'book', params: { id: userBook.id } })
 
   const wrapper = mount(BookView, { props: { id: userBook.id }, global: { plugins } })
@@ -66,6 +75,100 @@ describe('BookView', () => {
     expect(libraryApi.update).toHaveBeenCalledWith(1, { status: 'reading' })
     expect(library.find(1)?.status).toBe('reading')
     expect(wrapper.text()).toContain('Читаю')
+  })
+
+  it('moves the bookmark to the typed page and reloads the journal', async () => {
+    const { wrapper, library } = await mountView(
+      makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 100 }),
+    )
+    vi.mocked(libraryApi.progress).mockResolvedValue({
+      data: makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 150, progress_percent: 46 }),
+      meta: { pages: 50, reached_end: false },
+    })
+    expect(libraryApi.logs).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('#current-page').setValue('150')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(libraryApi.progress).toHaveBeenCalledWith(1, 150)
+    expect(library.find(1)?.current_page).toBe(150)
+    expect(wrapper.text()).toContain('150 з 320 стор.')
+    expect(libraryApi.logs).toHaveBeenCalledTimes(2)
+  })
+
+  it('starts reading a wanted book when its page is set, and says so', async () => {
+    const { wrapper } = await mountView(makeUserBook())
+
+    expect(wrapper.text()).toContain('Оновлення сторінки позначить книгу як «Читаю».')
+
+    vi.mocked(libraryApi.progress).mockResolvedValue({
+      data: makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 20 }),
+      meta: { pages: 20, reached_end: false },
+    })
+    await wrapper.get('#current-page').setValue('20')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Читаю')
+    expect(wrapper.text()).not.toContain('Оновлення сторінки позначить книгу як «Читаю».')
+  })
+
+  it('does not offer a page form for a finished book', async () => {
+    const { wrapper } = await mountView(
+      makeUserBook({ status: 'finished', allowed_statuses: ['reading'], current_page: 320 }),
+    )
+
+    expect(wrapper.find('#current-page').exists()).toBe(false)
+  })
+
+  it('does not offer a page form while the page count is unknown', async () => {
+    const { wrapper } = await mountView(makeUserBook({ total_pages: null }))
+
+    expect(wrapper.find('#current-page').exists()).toBe(false)
+  })
+
+  it('explains a rejected page in the reader\'s language', async () => {
+    const { wrapper } = await mountView(
+      makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 100 }),
+    )
+    vi.mocked(libraryApi.progress).mockRejectedValue(new ApiError(422, { errors: { page: ['library.page_above_total'] } }))
+    vi.mocked(libraryApi.get).mockResolvedValue(
+      makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 100 }),
+    )
+
+    await wrapper.get('#current-page').setValue('150')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('У книзі немає такої сторінки.')
+  })
+
+  it('shows the reading journal of a book that is being read', async () => {
+    const { plugins, router } = createTestEnvironment()
+    vi.mocked(libraryApi.list).mockResolvedValue([
+      makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 118 }),
+    ])
+    vi.mocked(libraryApi.logs).mockResolvedValue({
+      data: [{ id: 2, from_page: 100, to_page: 118, pages: 18, logged_on: '2026-10-05', created_at: '2026-10-05T10:00:00+00:00' }],
+      links: { next: null },
+    })
+    await router.push({ name: 'book', params: { id: 1 } })
+
+    const wrapper = mount(BookView, { props: { id: 1 }, global: { plugins } })
+    await flushPromises()
+
+    expect(libraryApi.logs).toHaveBeenCalledWith(1, 1)
+    expect(wrapper.text()).toContain('Історія читання')
+    expect(wrapper.text()).toContain('5 жовтня')
+    expect(wrapper.text()).toContain('+18 стор.')
+  })
+
+  it('has no journal for a book that is only wanted', async () => {
+    const { wrapper } = await mountView(makeUserBook())
+
+    expect(wrapper.text()).not.toContain('Історія читання')
+    expect(libraryApi.logs).not.toHaveBeenCalled()
   })
 
   it('will not start reading a book with an unknown page count', async () => {

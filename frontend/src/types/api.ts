@@ -51,6 +51,33 @@ export interface UserBook {
   book: Book
 }
 
+/** One move of the bookmark in a book's reading journal. */
+export interface ReadingLog {
+  id: number
+  from_page: number
+  to_page: number
+  /** Pages gained by this move; negative for a correction downwards. */
+  pages: number
+  /** The reader's own calendar day, as YYYY-MM-DD. */
+  logged_on: string
+  created_at: string
+}
+
+export interface ReadingLogsPage {
+  data: ReadingLog[]
+  links: { next: string | null }
+}
+
+export interface ProgressResult {
+  data: UserBook
+  meta: {
+    /** Pages this update was worth; 0 when the page did not change, negative for a correction. */
+    pages: number
+    /** The bookmark is on the last page, so the book can be marked as finished. */
+    reached_end: boolean
+  }
+}
+
 /** A search result from the Open Library catalog. */
 export interface CatalogEntry {
   work_key: string

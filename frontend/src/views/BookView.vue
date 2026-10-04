@@ -7,8 +7,10 @@ import { libraryApi } from '@/api/library'
 import BookCover from '@/components/BookCover.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PageJumpForm from '@/components/PageJumpForm.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import RatingStars from '@/components/RatingStars.vue'
+import ReadingJournal from '@/components/ReadingJournal.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLibraryStore } from '@/stores/library'
 import type { BookStatus, UserBook } from '@/types/api'
@@ -26,6 +28,8 @@ const error = ref('')
 const busy = ref(false)
 const pagesInput = ref('')
 const confirmingDelete = ref(false)
+/** Bumped whenever the reading journal may have a new entry. */
+const journalVersion = ref(0)
 
 const book = computed(() => userBook.value?.book ?? null)
 const needsPages = computed(() => userBook.value !== null && !userBook.value.total_pages)
@@ -73,6 +77,23 @@ async function save(payload: Parameters<typeof library.update>[1]) {
 
   try {
     userBook.value = await library.update(userBook.value.id, payload)
+    if (payload.status) journalVersion.value++
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function saveProgress(page: number) {
+  if (!userBook.value) return
+
+  busy.value = true
+  error.value = ''
+
+  try {
+    await library.setProgress(userBook.value.id, page)
+    journalVersion.value++
   } catch (e) {
     error.value = errorMessage(e)
   } finally {
@@ -152,6 +173,18 @@ function isDisabled(target: BookStatus): boolean {
       </p>
     </section>
 
+    <section v-if="userBook.total_pages && userBook.status !== 'finished'" class="flex flex-col gap-1.5">
+      <PageJumpForm
+        id="current-page"
+        :label="$t('progress.pageLabel')"
+        :current="userBook.current_page"
+        :total="userBook.total_pages"
+        :busy="busy"
+        @submit="saveProgress"
+      />
+      <p v-if="userBook.status !== 'reading'" class="text-sm text-ink-muted">{{ $t('progress.startHint') }}</p>
+    </section>
+
     <section v-if="userBook.allowed_statuses.length" class="flex flex-col gap-2">
       <button
         v-for="(target, index) in userBook.allowed_statuses"
@@ -199,6 +232,8 @@ function isDisabled(target: BookStatus): boolean {
         @update:model-value="save({ rating: $event })"
       />
     </section>
+
+    <ReadingJournal v-if="userBook.status !== 'want'" :book-id="userBook.id" :version="journalVersion" />
 
     <section class="border-t border-line pt-4">
       <button

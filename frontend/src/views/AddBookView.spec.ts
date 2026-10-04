@@ -7,7 +7,15 @@ import { createTestEnvironment } from '@/test/utils'
 import AddBookView from './AddBookView.vue'
 
 vi.mock('@/api/library', () => ({
-  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  libraryApi: {
+    list: vi.fn(),
+    get: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    progress: vi.fn(),
+    logs: vi.fn(),
+  },
   catalogApi: { search: vi.fn() },
 }))
 

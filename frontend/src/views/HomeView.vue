@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import BookCard from '@/components/BookCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ReadingCard from '@/components/ReadingCard.vue'
 import { useLibraryStore } from '@/stores/library'
 
 const library = useLibraryStore()
@@ -30,7 +30,7 @@ onMounted(() => load())
 
   <ul v-else-if="library.byStatus.reading.length" class="flex flex-col gap-3">
     <li v-for="userBook in library.byStatus.reading" :key="userBook.id">
-      <BookCard :user-book="userBook" />
+      <ReadingCard :user-book="userBook" />
     </li>
   </ul>
 

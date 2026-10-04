@@ -100,6 +100,13 @@ export default {
     remove: 'Видалити з бібліотеки',
     removeConfirm: 'Книга зникне з вашої бібліотеки разом із прогресом.',
     removeYes: 'Видалити',
+    journal: {
+      title: 'Історія читання',
+      empty: 'Записів поки немає. Вони з’являться, щойно ви оновите сторінку.',
+      range: 'з {from} до {to}',
+      pages: '{count} стор.',
+      more: 'Показати ще',
+    },
     actions: {
       want_reading: 'Почати читати',
       want_finished: 'Вже прочитана',
@@ -108,6 +115,15 @@ export default {
       abandoned_reading: 'Продовжити читати',
       finished_reading: 'Повернути в «Читаю»',
     },
+  },
+  progress: {
+    jump: 'Я на сторінці…',
+    pageLabel: 'Я на сторінці',
+    pageInvalid: 'Введіть номер сторінки від 0 до {total}.',
+    gained: '{count} стор.',
+    reachedEnd: 'Дочитали до кінця! Позначити книгу прочитаною?',
+    markFinished: 'Позначити прочитаною',
+    startHint: 'Оновлення сторінки позначить книгу як «Читаю».',
   },
   profile: {
     title: 'Профіль',
@@ -124,6 +140,8 @@ export default {
       invalid_transition: 'З поточного статусу не можна перейти до цього.',
       total_pages_required: 'Вкажіть кількість сторінок.',
       total_pages_below_current: 'Сторінок не може бути менше, ніж уже прочитано.',
+      progress_finished: 'Книга вже прочитана. Поверніть її в «Читаю», щоб оновлювати прогрес.',
+      page_above_total: 'У книзі немає такої сторінки.',
     },
     catalog: {
       unavailable: 'Каталог Open Library зараз недоступний. Додайте книгу вручну.',
