@@ -7,6 +7,12 @@ it('requires authentication', function () {
     $this->patchJson('/api/me', ['name' => 'Hacker'])->assertUnauthorized();
 });
 
+it('answers 401 JSON to a guest even when the client does not ask for JSON', function (string $accept) {
+    $this->get('/api/me', ['Accept' => $accept])
+        ->assertUnauthorized()
+        ->assertExactJson(['message' => 'Unauthenticated.']);
+})->with(['text/html', '*/*', 'text/markdown, text/html;q=0.9, */*;q=0.1']);
+
 it('returns the authenticated user', function () {
     $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
 

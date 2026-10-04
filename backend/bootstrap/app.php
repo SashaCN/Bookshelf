@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // and the per-address login throttle would lock everybody out together.
         $middleware->trustProxies(at: '*');
 
+        // Login is a screen of the SPA, so there is no "login" route to redirect guests to. Without this the
+        // framework's default tries route('login') and answers 500 to any request that does not ask for JSON.
+        $middleware->redirectGuestsTo(fn () => null);
+
         $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
