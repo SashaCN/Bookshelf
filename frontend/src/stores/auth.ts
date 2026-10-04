@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { authApi } from '@/api/auth'
 import { ApiError } from '@/api/http'
-import type { LoginPayload, RegisterPayload, User } from '@/types/api'
+import type { LoginPayload, RegisterPayload, UpdateProfilePayload, User } from '@/types/api'
+import { useLibraryStore } from './library'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -30,20 +31,28 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(payload: LoginPayload): Promise<void> {
     await authApi.login(payload)
+    // Whoever used this device before must not leave their books behind.
+    useLibraryStore().reset()
     user.value = await authApi.me()
     initialized.value = true
   }
 
   async function register(payload: RegisterPayload): Promise<void> {
     await authApi.register(payload)
+    useLibraryStore().reset()
     user.value = await authApi.me()
     initialized.value = true
+  }
+
+  async function updateProfile(payload: UpdateProfilePayload): Promise<void> {
+    user.value = await authApi.updateMe(payload)
   }
 
   async function logout(): Promise<void> {
     await authApi.logout()
     user.value = null
+    useLibraryStore().reset()
   }
 
-  return { user, initialized, isAuthenticated, init, login, register, logout }
+  return { user, initialized, isAuthenticated, init, login, register, updateProfile, logout }
 })

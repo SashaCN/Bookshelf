@@ -1,32 +1,45 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { onMounted, ref } from 'vue'
+import BookCard from '@/components/BookCard.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import ErrorNotice from '@/components/ErrorNotice.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import { useLibraryStore } from '@/stores/library'
 
-const auth = useAuthStore()
-const router = useRouter()
+const library = useLibraryStore()
+const failed = ref(false)
 
-async function logout() {
-  await auth.logout()
-  await router.push({ name: 'login' })
+async function load(force = false) {
+  failed.value = false
+  try {
+    await library.load(force)
+  } catch {
+    failed.value = true
+  }
 }
+
+onMounted(() => load())
 </script>
 
 <template>
-  <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-4 py-6">
-    <header class="flex items-center justify-between">
-      <h1 class="font-display text-3xl font-bold tracking-tight">{{ $t('home.title') }}</h1>
-      <button
-        type="button"
-        class="min-h-11 rounded-lg border border-line px-3 text-sm font-medium"
-        @click="logout"
-      >
-        {{ $t('home.logout') }}
-      </button>
-    </header>
+  <PageHeader :title="$t('home.title')" />
 
-    <section class="rounded-2xl border border-line bg-surface p-5">
-      <p class="font-semibold">{{ $t('home.greeting', { name: auth.user?.name }) }}</p>
-      <p class="mt-1 text-ink-muted">{{ $t('home.placeholder') }}</p>
-    </section>
-  </main>
+  <ErrorNotice v-if="failed" :message="$t('apiErrors.generic')" retryable @retry="load(true)" />
+
+  <p v-else-if="!library.loaded" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+
+  <ul v-else-if="library.byStatus.reading.length" class="flex flex-col gap-3">
+    <li v-for="userBook in library.byStatus.reading" :key="userBook.id">
+      <BookCard :user-book="userBook" />
+    </li>
+  </ul>
+
+  <EmptyState v-else :title="$t('home.emptyTitle')" :text="$t('home.emptyText')">
+    <RouterLink
+      :to="{ name: 'library' }"
+      class="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 font-semibold text-on-accent"
+    >
+      {{ $t('home.goToLibrary') }}
+    </RouterLink>
+  </EmptyState>
 </template>
