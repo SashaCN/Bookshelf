@@ -13,6 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // The app is only reachable through the reverse proxy in front of it (Caddy and nginx in
+        // production), never directly. Without this every reader would share the proxy's address,
+        // and the per-address login throttle would lock everybody out together.
+        $middleware->trustProxies(at: '*');
+
         $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
