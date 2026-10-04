@@ -1,0 +1,60 @@
+@import 'tailwindcss';
+
+/* Design tokens: light by default, dark follows the system setting. */
+:root {
+  --paper: #f3f5f8;
+  --surface: #ffffff;
+  --sunken: #e6eaf1;
+  --line: #d8dde6;
+  --ink: #141b2b;
+  --ink-muted: #5b6479;
+  --accent: #2d47c8;
+  --on-accent: #ffffff;
+  --danger: #b42318;
+  --danger-soft: #fbe2de;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e121a;
+    --surface: #161c27;
+    --sunken: #212938;
+    --line: #2a3243;
+    --ink: #e6e9f0;
+    --ink-muted: #a0a9bb;
+    --accent: #93a5ff;
+    --on-accent: #0b1020;
+    --danger: #f2837a;
+    --danger-soft: #3a1a17;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
