@@ -108,3 +108,40 @@ export interface UpdateBookPayload {
   rating?: number | null
   total_pages?: number
 }
+
+export type QuoteType = 'quote' | 'insight'
+
+/** A passage (or the reader's own insight) saved from a book. */
+export interface Quote {
+  id: number
+  type: QuoteType
+  content: string
+  /** The reader's own thought about it. */
+  note: string | null
+  page: number | null
+  is_favorite: boolean
+  created_at: string
+  user_book_id: number
+  book: { title: string; authors: string[]; cover_url: string | null }
+}
+
+/** What the reader enters for a quote; an update may send any subset of it. */
+export interface QuotePayload {
+  type?: QuoteType
+  content: string
+  note?: string | null
+  page?: number | null
+  is_favorite?: boolean
+}
+
+export interface QuoteFilters {
+  favorite?: boolean
+  /** The id of a library entry (user book). */
+  book?: number
+  type?: QuoteType
+}
+
+export interface QuotesPage {
+  data: Quote[]
+  links: { next: string | null }
+}

@@ -6,6 +6,7 @@ const route = useRoute()
 const tabs = [
   { name: 'home', labelKey: 'tabs.reading', icon: 'M3 5.5c2.5-1 5.5-1 9 1v13c-3.5-2-6.5-2-9-1zM21 5.5c-2.5-1-5.5-1-9 1v13c3.5-2 6.5-2 9-1z' },
   { name: 'library', labelKey: 'tabs.library', icon: 'M4 4h4v15H4zM10 7h4v12h-4zM15.6 7.4l3.3-.9 2.8 11.4-3.3.9zM3 21h18' },
+  { name: 'quotes', labelKey: 'tabs.quotes', icon: 'M10.7 9.5a3.2 3.2 0 1 1-3.2-3.2 3.2 3.2 0 0 1 3.2 3.2c0 4-2 6.7-5.7 8.2M19.7 9.5a3.2 3.2 0 1 1-3.2-3.2 3.2 3.2 0 0 1 3.2 3.2c0 4-2 6.7-5.7 8.2' },
 ] as const
 </script>
 
@@ -14,7 +15,7 @@ const tabs = [
     class="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
     :aria-label="$t('tabs.label')"
   >
-    <ul class="mx-auto grid max-w-md grid-cols-2">
+    <ul class="mx-auto grid max-w-md auto-cols-fr grid-flow-col">
       <li v-for="tab in tabs" :key="tab.name">
         <RouterLink
           :to="{ name: tab.name }"

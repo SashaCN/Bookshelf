@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apiErrorCode } from './errors'
+import { apiErrorCode, isApiErrorCode } from './errors'
 import { ApiError } from './http'
 
 describe('apiErrorCode', () => {
@@ -14,6 +14,24 @@ describe('apiErrorCode', () => {
     })
 
     expect(apiErrorCode(error)).toBe('library.total_pages_required')
+  })
+
+  it('recognises the codes of quotes', () => {
+    const error = new ApiError(422, {
+      message: 'The given data was invalid.',
+      errors: { page: ['quotes.page_above_total'] },
+    })
+
+    expect(apiErrorCode(error)).toBe('quotes.page_above_total')
+  })
+
+  it('does not take any dotted word for a code', () => {
+    const error = new ApiError(422, { message: 'Invalid', errors: { page: ['other.page_above_total', 'quotes.Bad'] } })
+
+    expect(apiErrorCode(error)).toBeNull()
+    expect(isApiErrorCode('goals.something_wrong')).toBe(true)
+    expect(isApiErrorCode('The page field is required.')).toBe(false)
+    expect(isApiErrorCode(42)).toBe(false)
   })
 
   it('ignores ordinary validation messages', () => {

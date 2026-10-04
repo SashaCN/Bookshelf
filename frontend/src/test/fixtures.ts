@@ -1,4 +1,4 @@
-import type { Book, CatalogEntry, UserBook } from '@/types/api'
+import type { Book, CatalogEntry, Quote, UserBook } from '@/types/api'
 
 export function makeBook(overrides: Partial<Book> = {}): Book {
   return {
@@ -45,6 +45,21 @@ export function makeEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
     subjects: [],
     isbn_13: null,
     in_library: false,
+    ...overrides,
+  }
+}
+
+export function makeQuote(overrides: Partial<Quote> = {}): Quote {
+  return {
+    id: 1,
+    type: 'quote',
+    content: 'You do not rise to the level of your goals.',
+    note: null,
+    page: null,
+    is_favorite: false,
+    created_at: '2026-10-05T10:00:00+00:00',
+    user_book_id: 1,
+    book: { title: 'Atomic Habits', authors: ['James Clear'], cover_url: null },
     ...overrides,
   }
 }

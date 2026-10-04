@@ -2,8 +2,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
+import { quotesApi } from '@/api/quotes'
 import { useLibraryStore } from '@/stores/library'
-import { makeUserBook } from '@/test/fixtures'
+import { makeQuote, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
 import type { UserBook } from '@/types/api'
 import BookView from './BookView.vue'
@@ -19,6 +20,10 @@ vi.mock('@/api/library', () => ({
     logs: vi.fn(),
   },
   catalogApi: { search: vi.fn() },
+}))
+
+vi.mock('@/api/quotes', () => ({
+  quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
 }))
 
 async function mountView(userBook: UserBook) {
@@ -42,6 +47,7 @@ function buttonWithText(wrapper: ReturnType<typeof mount>, text: string) {
 describe('BookView', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(quotesApi.list).mockResolvedValue({ data: [], links: { next: null } })
   })
 
   it('shows the book, its status and its progress', async () => {
@@ -240,6 +246,74 @@ describe('BookView', () => {
 
     expect(libraryApi.remove).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain('Книга зникне з вашої бібліотеки')
+  })
+
+  describe('quotes of the book', () => {
+    it('shows the newest three, with a way to see them all', async () => {
+      vi.mocked(quotesApi.list).mockResolvedValue({
+        data: [5, 4, 3, 2, 1].map((id) => makeQuote({ id, content: `Quote ${id}`, user_book_id: 1 })),
+        links: { next: '/api/quotes?book=1&page=2' },
+      })
+      const { wrapper } = await mountView(makeUserBook())
+
+      const list = wrapper.findAll('blockquote').map((quote) => quote.text())
+
+      expect(quotesApi.list).toHaveBeenCalledWith({ book: 1 })
+      expect(list).toEqual(['Quote 5', 'Quote 4', 'Quote 3'])
+      expect(wrapper.findAll('a').find((link) => link.text() === 'Усі цитати')?.attributes('href')).toBe('/quotes?book=1')
+    })
+
+    it('shows the page of a quote', async () => {
+      vi.mocked(quotesApi.list).mockResolvedValue({ data: [makeQuote({ page: 42 })], links: { next: null } })
+      const { wrapper } = await mountView(makeUserBook())
+
+      expect(wrapper.text()).toContain('с. 42')
+    })
+
+    it('offers adding a quote for this book, whatever its status', async () => {
+      const { wrapper } = await mountView(makeUserBook({ status: 'want' }))
+
+      const add = wrapper.findAll('a').find((link) => link.text() === 'Додати цитату')
+
+      expect(add?.attributes('href')).toBe('/quotes/new?book=1')
+    })
+
+    it('comes before the reading journal', async () => {
+      const { wrapper } = await mountView(
+        makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 100 }),
+      )
+
+      const text = wrapper.text()
+
+      expect(text.indexOf('Цитати')).toBeGreaterThan(-1)
+      expect(text.indexOf('Цитати')).toBeLessThan(text.indexOf('Історія читання'))
+    })
+
+    it('says there are none yet instead of showing an empty list', async () => {
+      const { wrapper } = await mountView(makeUserBook())
+
+      expect(wrapper.text()).toContain('У цій книзі ще немає цитат.')
+      expect(wrapper.find('blockquote').exists()).toBe(false)
+      expect(wrapper.findAll('a').some((link) => link.text() === 'Усі цитати')).toBe(false)
+    })
+
+    it('does not get in the way of the page when the quotes cannot be loaded, and can try again', async () => {
+      vi.mocked(quotesApi.list)
+        .mockRejectedValueOnce(new ApiError(500, null))
+        .mockResolvedValueOnce({ data: [makeQuote({ content: 'Back again' })], links: { next: null } })
+      const { wrapper } = await mountView(makeUserBook())
+
+      expect(wrapper.text()).toContain('Atomic Habits')
+      expect(wrapper.text()).toContain('Не вдалося завантажити цитати.')
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+      expect(wrapper.findAll('a').some((link) => link.text() === 'Додати цитату')).toBe(true)
+
+      await buttonWithText(wrapper, 'Повторити').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('blockquote').text()).toBe('Back again')
+      expect(wrapper.text()).not.toContain('Не вдалося завантажити цитати.')
+    })
   })
 
   it('says so when the book does not exist', async () => {

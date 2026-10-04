@@ -7,6 +7,9 @@ import HomeView from '@/views/HomeView.vue'
 import LibraryView from '@/views/LibraryView.vue'
 import LoginView from '@/views/LoginView.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import QuoteFormView from '@/views/QuoteFormView.vue'
+import QuoteShareView from '@/views/QuoteShareView.vue'
+import QuotesView from '@/views/QuotesView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 
 export const router = createRouter({
@@ -26,6 +29,22 @@ export const router = createRouter({
           component: BookView,
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'library' },
+        },
+        { path: 'quotes', name: 'quotes', component: QuotesView, meta: { tab: 'quotes' } },
+        { path: 'quotes/new', name: 'quote-new', component: QuoteFormView, meta: { tab: 'quotes' } },
+        {
+          path: 'quotes/:id(\\d+)/edit',
+          name: 'quote-edit',
+          component: QuoteFormView,
+          props: (route) => ({ id: Number(route.params.id) }),
+          meta: { tab: 'quotes' },
+        },
+        {
+          path: 'quotes/:id(\\d+)/share',
+          name: 'quote-share',
+          component: QuoteShareView,
+          props: (route) => ({ id: Number(route.params.id) }),
+          meta: { tab: 'quotes' },
         },
         { path: 'profile', name: 'profile', component: ProfileView },
       ],

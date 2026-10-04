@@ -2,8 +2,10 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '@/api/auth'
 import { ApiError } from '@/api/http'
+import { makeQuote } from '@/test/fixtures'
 import type { User } from '@/types/api'
 import { useAuthStore } from './auth'
+import { useQuotesStore } from './quotes'
 
 vi.mock('@/api/auth', () => ({
   authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() },
@@ -55,5 +57,26 @@ describe('auth store', () => {
 
     await auth.logout()
     expect(auth.user).toBeNull()
+  })
+
+  it('does not leave the previous reader\'s quotes behind', async () => {
+    vi.mocked(authApi.login).mockResolvedValue({})
+    vi.mocked(authApi.register).mockResolvedValue({})
+    vi.mocked(authApi.me).mockResolvedValue(user)
+    vi.mocked(authApi.logout).mockResolvedValue(null)
+    const auth = useAuthStore()
+    const quotes = useQuotesStore()
+
+    quotes.daily = makeQuote()
+    await auth.login({ email: user.email, password: 'secret-password' })
+    expect(quotes.daily).toBeNull()
+
+    quotes.daily = makeQuote()
+    await auth.register({ name: user.name, email: user.email, password: 'secret-password', timezone: user.timezone })
+    expect(quotes.daily).toBeNull()
+
+    quotes.daily = makeQuote()
+    await auth.logout()
+    expect(quotes.daily).toBeNull()
   })
 })

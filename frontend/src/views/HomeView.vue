@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import DailyQuoteCard from '@/components/DailyQuoteCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -42,4 +43,6 @@ onMounted(() => load())
       {{ $t('home.goToLibrary') }}
     </RouterLink>
   </EmptyState>
+
+  <DailyQuoteCard />
 </template>

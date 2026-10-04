@@ -17,6 +17,11 @@ export const useLibraryStore = defineStore('library', () => {
     return groups
   })
 
+  /** For pickers: alphabetical, where `items` follows recent activity. */
+  const byTitle = computed(() =>
+    [...items.value].sort((a, b) => a.book.title.localeCompare(b.book.title, 'uk')),
+  )
+
   function find(id: number): UserBook | undefined {
     return items.value.find((item) => item.id === id)
   }
@@ -138,5 +143,5 @@ export const useLibraryStore = defineStore('library', () => {
     loading.value = false
   }
 
-  return { items, loaded, loading, byStatus, find, upsert, load, add, update, remove, setProgress, reset }
+  return { items, loaded, loading, byStatus, byTitle, find, upsert, load, add, update, remove, setProgress, reset }
 })

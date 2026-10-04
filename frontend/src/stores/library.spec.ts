@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { libraryApi } from '@/api/library'
-import { makeUserBook } from '@/test/fixtures'
+import { makeBook, makeUserBook } from '@/test/fixtures'
 import { useLibraryStore } from './library'
 
 vi.mock('@/api/library', () => ({
@@ -38,6 +38,20 @@ describe('library store', () => {
     expect(library.byStatus.reading.map((item) => item.id)).toEqual([1, 3])
     expect(library.byStatus.want).toHaveLength(1)
     expect(library.byStatus.finished).toEqual([])
+  })
+
+  it('lists the books alphabetically for pickers, without touching their activity order', async () => {
+    vi.mocked(libraryApi.list).mockResolvedValue([
+      makeUserBook({ id: 1, book: makeBook({ title: 'Яблуко' }) }),
+      makeUserBook({ id: 2, book: makeBook({ title: 'Іван' }) }),
+      makeUserBook({ id: 3, book: makeBook({ title: 'арифметика' }) }),
+    ])
+    const library = useLibraryStore()
+
+    await library.load()
+
+    expect(library.byTitle.map((item) => item.id)).toEqual([3, 2, 1])
+    expect(library.items.map((item) => item.id)).toEqual([1, 2, 3])
   })
 
   it('reloads on demand', async () => {
