@@ -34,3 +34,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::put('/goals/{year}', [GoalController::class, 'update'])->whereNumber('year')->name('goals.update');
     Route::delete('/goals/{year}', [GoalController::class, 'destroy'])->whereNumber('year')->name('goals.destroy');
 });
+
+// Each area of the app keeps its routes in a file of its own.
+Route::middleware('auth:sanctum')->group(base_path('routes/social.php'));
+Route::middleware('auth:sanctum')->group(base_path('routes/reader.php'));

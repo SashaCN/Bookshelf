@@ -1,4 +1,10 @@
+import reader, { apiErrors as readerApiErrors } from './reader.uk'
+import social, { apiErrors as socialApiErrors } from './social.uk'
+
 export default {
+  // Strings of the larger areas live in files of their own.
+  social,
+  reader,
   app: {
     name: 'Bookshelf',
     tagline: 'Трекер читання і цитат',
@@ -284,6 +290,9 @@ export default {
     logout: 'Вийти',
   },
   apiErrors: {
+    // Messages of the business rules of the larger areas live in their own files.
+    social: socialApiErrors,
+    reader: readerApiErrors,
     generic: 'Не вдалося виконати запит. Спробуйте ще раз.',
     tooManyRequests: 'Забагато запитів. Спробуйте за хвилину.',
     offline: 'Немає зв’язку із сервером. Перевірте інтернет і спробуйте ще раз.',

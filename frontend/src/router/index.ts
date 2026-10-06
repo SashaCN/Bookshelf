@@ -15,6 +15,8 @@ import QuotesView from '@/views/QuotesView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import StatsView from '@/views/StatsView.vue'
 import { redirectFor } from './access'
+import { readerRoutes } from './reader'
+import { socialRoutes } from './social'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -57,10 +59,13 @@ export const router = createRouter({
         },
         { path: 'stats', name: 'stats', component: StatsView, meta: { tab: 'stats', title: 'stats.title' } },
         { path: 'profile', name: 'profile', component: ProfileView, meta: { title: 'profile.title' } },
+        ...socialRoutes,
         // Last: anything that matched nothing above. Inside the layout, so the reader keeps the tab bar.
         { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundView, meta: { title: 'notFound.title' } },
       ],
     },
+    // Full-screen screens, outside of the layout with the tab bar.
+    ...readerRoutes,
     { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true, title: 'auth.login.title' } },
     { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true, title: 'auth.register.title' } },
   ],
