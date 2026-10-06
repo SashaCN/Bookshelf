@@ -27,7 +27,7 @@ class UserBookController extends Controller
         $validated = $request->validate(['status' => ['nullable', Rule::enum(BookStatus::class)]]);
 
         $userBooks = $request->user()->userBooks()
-            ->with('book.authors')
+            ->with('book.authors', 'bookText')
             ->when($validated['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
             ->latest('updated_at')
             ->latest('id')
@@ -48,7 +48,7 @@ class UserBookController extends Controller
     {
         Gate::authorize('view', $userBook);
 
-        return new UserBookResource($userBook->load('book.authors'));
+        return new UserBookResource($userBook->load('book.authors', 'bookText'));
     }
 
     /**

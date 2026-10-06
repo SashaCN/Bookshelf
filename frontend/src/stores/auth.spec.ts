@@ -11,7 +11,7 @@ vi.mock('@/api/auth', () => ({
   authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() },
 }))
 
-const user: User = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv' }
+const user: User = { id: 1, name: 'Olena', email: 'olena@example.com', handle: 'olena', bio: null, timezone: 'Europe/Kyiv' }
 
 describe('auth store', () => {
   beforeEach(() => {

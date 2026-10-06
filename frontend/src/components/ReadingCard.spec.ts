@@ -59,6 +59,22 @@ describe('ReadingCard', () => {
     vi.useFakeTimers()
   })
 
+  describe('the shortcut to the reader', () => {
+    it('leads to the reader when the book has an uploaded text', async () => {
+      const { wrapper } = await mountCard(reading({ id: 4, has_text: true, text_progress: 0.3 }))
+
+      const link = wrapper.findAll('a').find((candidate) => candidate.text() === 'Читати')
+
+      expect(link?.attributes('href')).toBe('/read/4')
+    })
+
+    it('is not there for a book without one', async () => {
+      const { wrapper } = await mountCard(reading({ has_text: false }))
+
+      expect(wrapper.findAll('a').map((link) => link.text())).not.toContain('Читати')
+    })
+  })
+
   afterEach(() => {
     vi.useRealTimers()
   })

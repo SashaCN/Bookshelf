@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'user_id',
@@ -77,6 +78,16 @@ class UserBook extends Model
     public function quotes(): HasMany
     {
         return $this->hasMany(Quote::class);
+    }
+
+    /**
+     * The text the reader uploaded for this book, if any.
+     *
+     * @return HasOne<BookText, $this>
+     */
+    public function bookText(): HasOne
+    {
+        return $this->hasOne(BookText::class);
     }
 
     public function progressPercent(): ?int

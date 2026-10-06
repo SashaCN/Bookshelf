@@ -1,17 +1,27 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { isApiErrorCode } from '@/api/errors'
+import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import InstallCard from '@/components/InstallCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useAuthStore } from '@/stores/auth'
 
+const BIO_MAX = 280
+
+const { t, te } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const errorMessage = useApiErrorMessage()
 
 const name = ref(auth.user?.name ?? '')
+const handle = ref(auth.user?.handle ?? '')
+const bio = ref(auth.user?.bio ?? '')
+const handleError = ref('')
+const bioError = ref('')
 const timezone = ref(auth.user?.timezone ?? 'Europe/Kyiv')
 const saving = ref(false)
 const saved = ref(false)
@@ -23,16 +33,44 @@ const timezones = computed(() => {
   return all.includes(timezone.value) ? all : [timezone.value, ...all]
 })
 
+/** Show 422 answers next to the fields they are about. Returns false when no field is to blame. */
+function showFieldErrors(e: ApiError): boolean {
+  const handleMessages = e.fieldErrors.handle
+  const bioMessages = e.fieldErrors.bio
+
+  if (handleMessages?.length) {
+    const code = handleMessages.find(isApiErrorCode)
+    handleError.value = code && te(`apiErrors.${code}`) ? t(`apiErrors.${code}`) : t('social.errors.handle')
+  }
+
+  if (bioMessages?.length) {
+    bioError.value = t('social.errors.bio')
+  }
+
+  return Boolean(handleMessages?.length || bioMessages?.length)
+}
+
 async function save() {
   saving.value = true
   saved.value = false
   error.value = ''
+  handleError.value = ''
+  bioError.value = ''
 
   try {
-    await auth.updateProfile({ name: name.value.trim(), timezone: timezone.value })
+    await auth.updateProfile({
+      name: name.value.trim(),
+      timezone: timezone.value,
+      handle: handle.value.trim(),
+      bio: bio.value.trim() || null,
+    })
+    // The server keeps handles in lower case.
+    handle.value = auth.user?.handle ?? handle.value
     saved.value = true
   } catch (e) {
-    error.value = errorMessage(e)
+    if (!(e instanceof ApiError && e.status === 422 && showFieldErrors(e))) {
+      error.value = errorMessage(e)
+    }
   } finally {
     saving.value = false
   }
@@ -64,8 +102,50 @@ async function logout() {
     </div>
 
     <div class="flex flex-col gap-1.5">
+      <label for="profile-handle" class="text-sm font-medium">{{ $t('social.fields.handle') }}</label>
+      <div class="flex items-center gap-2">
+        <span class="text-ink-muted" aria-hidden="true">@</span>
+        <input
+          id="profile-handle"
+          v-model="handle"
+          type="text"
+          required
+          minlength="3"
+          maxlength="30"
+          autocapitalize="none"
+          autocomplete="off"
+          spellcheck="false"
+          :aria-invalid="handleError ? 'true' : undefined"
+          :aria-describedby="handleError ? 'profile-handle-error' : 'profile-handle-hint'"
+          class="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger"
+        >
+      </div>
+      <p v-if="handleError" id="profile-handle-error" class="text-sm text-danger">{{ handleError }}</p>
+      <p v-else id="profile-handle-hint" class="text-sm text-ink-muted">{{ $t('social.fields.handleHint') }}</p>
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <label for="profile-bio" class="text-sm font-medium">{{ $t('social.fields.bio') }}</label>
+      <textarea
+        id="profile-bio"
+        v-model="bio"
+        rows="3"
+        :maxlength="BIO_MAX"
+        :aria-invalid="bioError ? 'true' : undefined"
+        :aria-describedby="bioError ? 'profile-bio-error' : 'profile-bio-hint'"
+        class="rounded-lg border border-line bg-surface px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger"
+      />
+      <p v-if="bioError" id="profile-bio-error" class="text-sm text-danger">{{ bioError }}</p>
+      <p id="profile-bio-hint" class="flex justify-between gap-3 text-sm text-ink-muted">
+        <span>{{ $t('social.fields.bioHint') }}</span>
+        <span class="tabular-nums">{{ $t('social.fields.bioCounter', { count: bio.length, max: BIO_MAX }) }}</span>
+      </p>
+    </div>
+
+    <div class="flex flex-col gap-1.5">
       <p class="text-sm font-medium">{{ $t('auth.fields.email') }}</p>
       <p class="min-h-11 content-center text-ink-muted">{{ auth.user?.email }}</p>
+      <p class="text-sm text-ink-muted">{{ $t('social.fields.publicNote') }}</p>
     </div>
 
     <div class="flex flex-col gap-1.5">
@@ -90,6 +170,22 @@ async function logout() {
     </button>
     <p v-if="saved" role="status" class="text-sm text-ink-muted">{{ $t('profile.saved') }}</p>
   </form>
+
+  <nav class="mt-6 flex flex-col gap-1" :aria-label="$t('social.tab')">
+    <RouterLink
+      v-if="auth.user?.handle"
+      :to="{ name: 'reader', params: { handle: auth.user.handle } }"
+      class="inline-flex min-h-11 items-center font-medium text-accent underline underline-offset-2"
+    >
+      {{ $t('social.fields.viewPublic') }}
+    </RouterLink>
+    <RouterLink
+      :to="{ name: 'community-blocked' }"
+      class="inline-flex min-h-11 items-center font-medium text-accent underline underline-offset-2"
+    >
+      {{ $t('social.blocked.link') }}
+    </RouterLink>
+  </nav>
 
   <InstallCard class="mt-6" />
 

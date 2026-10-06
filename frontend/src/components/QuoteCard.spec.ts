@@ -85,6 +85,32 @@ describe('QuoteCard', () => {
     expect(hrefs['Редагувати']).toBe('/quotes/5/edit')
   })
 
+  it('links to publishing the quote in the community', async () => {
+    const { wrapper } = await mountCard(makeQuote({ id: 5 }))
+
+    const link = wrapper.findAll('a').find((candidate) => candidate.text() === 'Опублікувати')
+
+    expect(link?.attributes('href')).toBe('/community/new?quote=5')
+  })
+
+  describe('the place in the text of the book', () => {
+    it('leads to the reader at the quote when the quote was selected from the uploaded text', async () => {
+      const { wrapper } = await mountCard(
+        makeQuote({ id: 5, user_book_id: 7, anchor: { book_text_id: 10, chapter: 3, start: 6, end: 11 } }),
+      )
+
+      const link = wrapper.findAll('a').find((candidate) => candidate.text() === 'Відкрити в тексті')
+
+      expect(link?.attributes('href')).toBe('/read/7?chapter=3&highlight=5')
+    })
+
+    it('has no such link for a quote that was typed in', async () => {
+      const { wrapper } = await mountCard(makeQuote({ anchor: null }))
+
+      expect(wrapper.text()).not.toContain('Відкрити в тексті')
+    })
+  })
+
   describe('favorite star', () => {
     it('is a toggle that says whether the quote is a favorite', async () => {
       const { wrapper } = await mountCard(makeQuote({ is_favorite: true }))

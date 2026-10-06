@@ -25,6 +25,9 @@ class UserBookResource extends JsonResource
             'current_page' => $this->current_page,
             'total_pages' => $this->total_pages,
             'progress_percent' => $this->progressPercent(),
+            // Whether the reader uploaded the text of the book, and how far into it they are (from 0 to 1).
+            'has_text' => $this->bookText !== null,
+            'text_progress' => $this->bookText?->progress,
             'rating' => $this->rating,
             'started_at' => $this->started_at?->toIso8601String(),
             'finished_at' => $this->finished_at?->toIso8601String(),

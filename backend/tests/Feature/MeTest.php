@@ -22,6 +22,8 @@ it('returns the authenticated user', function () {
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'handle' => $user->handle,
+            'bio' => null,
             'timezone' => 'Europe/Kyiv',
         ]]);
 });

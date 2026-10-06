@@ -2,20 +2,32 @@
 
 namespace App\Actions\Quotes;
 
+use App\Actions\Reader\ResolveQuoteAnchor;
 use App\Models\Quote;
 use App\Models\UserBook;
 use Illuminate\Validation\ValidationException;
 
 class SaveQuote
 {
+    public function __construct(private readonly ResolveQuoteAnchor $resolveAnchor) {}
+
     /**
-     * @param  array{type?: string, content: string, note?: string|null, page?: int|null, is_favorite?: bool}  $data
+     * `anchor` says where in the uploaded text of the book the quote was selected; it is checked against that text.
+     *
+     * @param  array{type?: string, content: string, note?: string|null, page?: int|null, is_favorite?: bool, anchor?: array{chapter: int, start: int, end: int}|null}  $data
      *
      * @throws ValidationException
      */
     public function create(UserBook $userBook, array $data): Quote
     {
         $this->assertPageFitsBook($userBook, $data['page'] ?? null);
+
+        $anchor = $data['anchor'] ?? null;
+        unset($data['anchor']);
+
+        if ($anchor !== null) {
+            $data += $this->resolveAnchor->handle($userBook, $anchor, $data['content']);
+        }
 
         $quote = $userBook->quotes()->create($data + ['user_id' => $userBook->user_id]);
 

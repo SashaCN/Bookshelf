@@ -23,6 +23,8 @@ class QuoteResource extends JsonResource
             'note' => $this->note,
             'page' => $this->page,
             'is_favorite' => $this->is_favorite,
+            // Where in the uploaded text of the book the quote was selected, or null for one that was typed in.
+            'anchor' => $this->anchor(),
             'created_at' => $this->created_at?->toIso8601String(),
             // The library entry the quote belongs to, and enough of its book to show where the quote comes from.
             'user_book_id' => $this->user_book_id,

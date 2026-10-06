@@ -6,11 +6,13 @@ import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import BookCover from '@/components/BookCover.vue'
 import BookQuotes from '@/components/BookQuotes.vue'
+import BookReviews from '@/components/BookReviews.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PageJumpForm from '@/components/PageJumpForm.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import RatingStars from '@/components/RatingStars.vue'
+import BookTextBlock from '@/components/reader/BookTextBlock.vue'
 import ReadingJournal from '@/components/ReadingJournal.vue'
 import SkeletonList from '@/components/SkeletonList.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
@@ -187,6 +189,8 @@ function isDisabled(target: BookStatus): boolean {
       <p v-if="userBook.status !== 'reading'" class="text-sm text-ink-muted">{{ $t('progress.startHint') }}</p>
     </section>
 
+    <BookTextBlock :user-book="userBook" />
+
     <section v-if="userBook.allowed_statuses.length" class="flex flex-col gap-2">
       <button
         v-for="(target, index) in userBook.allowed_statuses"
@@ -236,6 +240,8 @@ function isDisabled(target: BookStatus): boolean {
     </section>
 
     <BookQuotes :book-id="userBook.id" />
+
+    <BookReviews :book-id="book.id" :user-book-id="userBook.id" />
 
     <ReadingJournal v-if="userBook.status !== 'want'" :book-id="userBook.id" :version="journalVersion" />
 

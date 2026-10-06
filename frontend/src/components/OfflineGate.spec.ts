@@ -33,7 +33,7 @@ describe('OfflineGate', () => {
 
   it('goes on once the server answers', async () => {
     const { wrapper, auth, router } = await mountGate()
-    vi.mocked(authApi.me).mockResolvedValue({ id: 1, name: 'Olena', email: 'o@example.com', timezone: 'Europe/Kyiv' })
+    vi.mocked(authApi.me).mockResolvedValue({ id: 1, name: 'Olena', email: 'o@example.com', handle: 'olena', bio: null, timezone: 'Europe/Kyiv' })
 
     await wrapper.get('button').trigger('click')
     await flushPromises()

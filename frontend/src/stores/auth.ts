@@ -5,10 +5,12 @@ import { ApiError, NetworkError } from '@/api/http'
 import type { LoginPayload, RegisterPayload, UpdateProfilePayload, User } from '@/types/api'
 import { useLibraryStore } from './library'
 import { useQuotesStore } from './quotes'
+import { resetSocialData } from './social'
 
 function resetReaderData(): void {
   useLibraryStore().reset()
   useQuotesStore().reset()
+  resetSocialData()
 }
 
 export const useAuthStore = defineStore('auth', () => {

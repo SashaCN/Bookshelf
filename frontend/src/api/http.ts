@@ -35,10 +35,13 @@ export function onUnauthorized(handler: (() => void) | null): void {
 /** How long to wait for an answer. A phone with one bar of signal may never get one, and waiting for ever helps nobody. */
 const TIMEOUT_MS = 20_000
 
+/** A book of several megabytes that is read and cleaned up on the server needs far longer than a JSON request does. */
+export const UPLOAD_TIMEOUT_MS = 120_000
+
 /** `fetch` that tells a missing network (or no answer in time) apart from an answer of the server. */
-async function send(input: string, init: RequestInit): Promise<Response> {
+async function send(input: string, init: RequestInit, timeoutMs = TIMEOUT_MS): Promise<Response> {
   try {
-    const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined
+    const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined
     return await fetch(input, { ...init, signal })
   } catch {
     throw new NetworkError()
@@ -62,8 +65,20 @@ async function ensureCsrfCookie(force = false): Promise<void> {
   })
 }
 
-async function request<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
+export interface RequestOptions {
+  /** How long to wait for an answer instead of the usual. */
+  timeoutMs?: number
+  /**
+   * Let the request finish although the page is being left (the phone is locked, the tab is closed). The browser allows
+   * only a small body for such a request (64 KB), which is for a few numbers and not for a form with a file.
+   */
+  keepalive?: boolean
+}
+
+async function request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}, retried = false): Promise<T> {
   const isWrite = method !== 'GET'
+  // A file goes as it is: the browser sets the content type of a form, with the boundary that tells its parts apart.
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData
 
   if (isWrite) {
     await ensureCsrfCookie()
@@ -74,7 +89,7 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
     'X-Requested-With': 'XMLHttpRequest',
   }
 
-  if (body !== undefined) {
+  if (body !== undefined && !isForm) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -83,17 +98,22 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
     headers['X-XSRF-TOKEN'] = csrfToken
   }
 
-  const response = await send(path, {
-    method,
-    headers,
-    credentials: 'same-origin',
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  const response = await send(
+    path,
+    {
+      method,
+      headers,
+      credentials: 'same-origin',
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
+      ...(options.keepalive ? { keepalive: true } : {}),
+    },
+    options.timeoutMs,
+  )
 
   // The CSRF token expired (e.g. the session was regenerated): fetch a fresh one and retry once.
   if (response.status === 419 && !retried) {
     await ensureCsrfCookie(true)
-    return request<T>(method, path, body, true)
+    return request<T>(method, path, body, options, true)
   }
 
   // Only parse real JSON: a redirected HTML page (e.g. "already signed in") must not crash the client.
@@ -112,9 +132,11 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
 }
 
 export const http = {
-  get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
-  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
-  put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
-  delete: <T>(path: string) => request<T>('DELETE', path),
+  get: <T>(path: string, options?: RequestOptions) => request<T>('GET', path, undefined, options),
+  post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, options),
+  patch: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, options),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, options),
+  delete: <T>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, options),
+  /** Send a file (a `FormData`) with a POST; waits longer for the answer than the other methods. */
+  upload: <T>(path: string, form: FormData, timeoutMs = UPLOAD_TIMEOUT_MS) => request<T>('POST', path, form, { timeoutMs }),
 }

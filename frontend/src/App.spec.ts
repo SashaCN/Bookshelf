@@ -27,7 +27,7 @@ describe('App', () => {
   })
 
   it('shows the screens once the question is answered', async () => {
-    vi.mocked(authApi.me).mockResolvedValue({ id: 1, name: 'Olena', email: 'o@example.com', timezone: 'Europe/Kyiv' })
+    vi.mocked(authApi.me).mockResolvedValue({ id: 1, name: 'Olena', email: 'o@example.com', handle: 'olena', bio: null, timezone: 'Europe/Kyiv' })
     const { wrapper, auth } = await mountApp()
 
     await auth.init()

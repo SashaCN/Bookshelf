@@ -9,7 +9,7 @@ declare module 'vue-router' {
     /** Redirect to the home page when the visitor is already signed in. */
     guestOnly?: boolean
     /** The bottom tab that stays highlighted on this page. */
-    tab?: 'home' | 'library' | 'quotes' | 'stats'
+    tab?: 'home' | 'library' | 'quotes' | 'stats' | 'community'
     /** The i18n key of the page title shown in the browser tab and the task switcher. */
     title?: string
   }

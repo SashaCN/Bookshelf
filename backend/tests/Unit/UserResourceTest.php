@@ -8,6 +8,8 @@ it('exposes only the public profile fields', function () {
     $user = new User([
         'name' => 'Olena',
         'email' => 'olena@example.com',
+        'handle' => 'olena',
+        'bio' => 'I read on trains.',
         'password' => 'secret-password',
         'timezone' => 'Europe/Kyiv',
     ]);
@@ -19,6 +21,8 @@ it('exposes only the public profile fields', function () {
         'id' => 7,
         'name' => 'Olena',
         'email' => 'olena@example.com',
+        'handle' => 'olena',
+        'bio' => 'I read on trains.',
         'timezone' => 'Europe/Kyiv',
     ]);
 });

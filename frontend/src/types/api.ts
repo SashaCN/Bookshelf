@@ -1,7 +1,12 @@
+import type { AnchorPayload, QuoteAnchor } from './reader'
+
 export interface User {
   id: number
   name: string
   email: string
+  /** The public name in the community: "@handle". */
+  handle: string
+  bio: string | null
   timezone: string
 }
 
@@ -18,6 +23,8 @@ export interface RegisterPayload extends LoginPayload {
 export interface UpdateProfilePayload {
   name?: string
   timezone?: string
+  handle?: string
+  bio?: string | null
 }
 
 export type BookStatus = 'want' | 'reading' | 'finished' | 'abandoned'
@@ -44,6 +51,9 @@ export interface UserBook {
   current_page: number
   total_pages: number | null
   progress_percent: number | null
+  /** Whether the reader uploaded the text of the book, and how far into it they are (0 to 1). */
+  has_text: boolean
+  text_progress: number | null
   rating: number | null
   started_at: string | null
   finished_at: string | null
@@ -122,6 +132,8 @@ export interface Quote {
   note: string | null
   page: number | null
   is_favorite: boolean
+  /** Where in the uploaded text of the book the quote was selected; null for one that was typed in. */
+  anchor: QuoteAnchor | null
   created_at: string
   user_book_id: number
   book: { title: string; authors: string[]; cover_url: string | null }
@@ -134,6 +146,8 @@ export interface QuotePayload {
   note?: string | null
   page?: number | null
   is_favorite?: boolean
+  /** Where in the uploaded text of the book the quote was selected (only when it is created). */
+  anchor?: AnchorPayload
 }
 
 export interface QuoteFilters {

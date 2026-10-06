@@ -7,7 +7,7 @@ import { router } from './index'
 
 vi.mock('@/api/auth', () => ({ authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() } }))
 
-const user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv' }
+const user = { id: 1, name: 'Olena', email: 'olena@example.com', handle: 'olena', bio: null, timezone: 'Europe/Kyiv' }
 
 describe('the app router', () => {
   beforeEach(async () => {

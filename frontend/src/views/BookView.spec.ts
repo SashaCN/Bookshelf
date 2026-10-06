@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
+import { socialApi } from '@/api/social'
 import { useLibraryStore } from '@/stores/library'
-import { makeQuote, makeUserBook } from '@/test/fixtures'
+import { makeBook, makeQuote, makeUserBook } from '@/test/fixtures'
+import { makeReview } from '@/test/socialFixtures'
 import { createTestEnvironment } from '@/test/utils'
 import type { UserBook } from '@/types/api'
 import BookView from './BookView.vue'
@@ -24,6 +26,10 @@ vi.mock('@/api/library', () => ({
 
 vi.mock('@/api/quotes', () => ({
   quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+}))
+
+vi.mock('@/api/social', () => ({
+  socialApi: { bookReviews: vi.fn(), like: vi.fn(), unlike: vi.fn(), deletePost: vi.fn(), report: vi.fn() },
 }))
 
 async function mountView(userBook: UserBook) {
@@ -48,6 +54,41 @@ describe('BookView', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(quotesApi.list).mockResolvedValue({ data: [], links: { next: null } })
+    vi.mocked(socialApi.bookReviews).mockResolvedValue({ data: [], links: { next: null }, meta: { my_review_id: null, reviews_count: 0, average_rating: null } })
+  })
+
+  describe('what readers write', () => {
+    it('shows the reviews of the book of the catalog, not of the library entry', async () => {
+      vi.mocked(socialApi.bookReviews).mockResolvedValue({
+        data: [makeReview({ id: 2, content: 'A fine book' })],
+        links: { next: null },
+        meta: { my_review_id: null, reviews_count: 1, average_rating: 4 },
+      })
+
+      const { wrapper } = await mountView(makeUserBook({ id: 7, book: makeBook({ id: 31 }) }))
+
+      expect(socialApi.bookReviews).toHaveBeenCalledWith(31, 1)
+      expect(wrapper.text()).toContain('Що пишуть читачі')
+      expect(wrapper.text()).toContain('A fine book')
+    })
+
+    it('offers to write a review, starting from the library entry', async () => {
+      const { wrapper } = await mountView(makeUserBook({ id: 7, book: makeBook({ id: 31 }) }))
+
+      const write = wrapper.findAll('a').find((link) => link.text() === 'Написати відгук')
+
+      expect(write?.attributes('href')).toBe('/community/new?book=7')
+    })
+
+    it('does not get in the way of the book when the reviews cannot be loaded', async () => {
+      vi.mocked(socialApi.bookReviews).mockRejectedValue(new ApiError(500, null))
+
+      const { wrapper } = await mountView(makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'] }))
+
+      expect(wrapper.text()).toContain('Не вдалося завантажити відгуки.')
+      expect(wrapper.text()).toContain('Atomic Habits')
+      expect(buttonWithText(wrapper, 'Прочитано').exists()).toBe(true)
+    })
   })
 
   it('shows the book, its status and its progress', async () => {
@@ -59,6 +100,16 @@ describe('BookView', () => {
     expect(wrapper.text()).toContain('James Clear')
     expect(wrapper.text()).toContain('160 з 320 стор.')
     expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
+  })
+
+  it('has a block for reading the book in the app: an upload, or the way to the reader', async () => {
+    const without = await mountView(makeUserBook({ has_text: false }))
+    expect(without.wrapper.text()).toContain('Читати в застосунку')
+    expect(buttonWithText(without.wrapper, 'Завантажити EPUB').exists()).toBe(true)
+
+    const withText = await mountView(makeUserBook({ has_text: true, text_progress: 0.25 }))
+    expect(withText.wrapper.find('a[href="/read/1"]').text()).toBe('Продовжити читати')
+    expect(withText.wrapper.text()).toContain('Прочитано 25%')
   })
 
   it('offers exactly the actions the server allows', async () => {

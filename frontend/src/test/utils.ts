@@ -19,6 +19,12 @@ export function createTestRouter() {
       { path: '/quotes/:id(\\d+)/share', name: 'quote-share', component: stub, meta: { tab: 'quotes' } },
       { path: '/stats', name: 'stats', component: stub, meta: { tab: 'stats' } },
       { path: '/profile', name: 'profile', component: stub },
+      { path: '/read/:id(\\d+)', name: 'read', component: stub },
+      { path: '/community', name: 'community', component: stub, meta: { tab: 'community' } },
+      { path: '/community/new', name: 'community-new', component: stub, meta: { tab: 'community' } },
+      { path: '/community/blocked', name: 'community-blocked', component: stub, meta: { tab: 'community' } },
+      { path: '/community/posts/:id(\\d+)', name: 'community-post', component: stub, meta: { tab: 'community' } },
+      { path: '/u/:handle', name: 'reader', component: stub, meta: { tab: 'community' } },
       { path: '/login', name: 'login', component: stub },
     ],
   })

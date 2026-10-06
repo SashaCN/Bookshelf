@@ -143,6 +143,13 @@ onBeforeUnmount(() => clearTimeout(feedbackTimer))
       >
         {{ t('progress.jump') }}
       </button>
+      <RouterLink
+        v-if="userBook.has_text"
+        :to="{ name: 'read', params: { id: userBook.id } }"
+        class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-3 font-medium active:bg-sunken"
+      >
+        {{ t('reader.read') }}
+      </RouterLink>
     </div>
   </article>
 </template>

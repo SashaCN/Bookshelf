@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class MeController extends Controller
 {
@@ -17,12 +19,22 @@ class MeController extends Controller
     }
 
     /**
-     * Update the authenticated user's profile (name and time zone).
+     * Update the authenticated user's profile (name, time zone, handle and bio).
      */
     public function update(UpdateProfileRequest $request): UserResource
     {
         $user = $request->user();
-        $user->update($request->validated());
+
+        try {
+            $user->update($request->validated());
+        } catch (UniqueConstraintViolationException $e) {
+            // Another reader took the handle between the check of the request and this update.
+            if (! str_contains($e->getMessage(), 'handle')) {
+                throw $e;
+            }
+
+            throw ValidationException::withMessages(['handle' => ['social.handle_taken']]);
+        }
 
         return new UserResource($user);
     }

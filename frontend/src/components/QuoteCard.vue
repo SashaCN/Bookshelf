@@ -4,6 +4,7 @@ import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useQuotesStore } from '@/stores/quotes'
 import type { Quote } from '@/types/api'
 import ErrorNotice from './ErrorNotice.vue'
+import PublishQuoteButton from './PublishQuoteButton.vue'
 import QuoteSource from './QuoteSource.vue'
 
 const props = defineProps<{ quote: Quote }>()
@@ -100,6 +101,14 @@ async function remove() {
       >
         {{ $t('quotes.edit') }}
       </RouterLink>
+      <RouterLink
+        v-if="quote.anchor"
+        :to="{ name: 'read', params: { id: quote.user_book_id }, query: { chapter: quote.anchor.chapter, highlight: quote.id } }"
+        class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium"
+      >
+        {{ $t('reader.openInText') }}
+      </RouterLink>
+      <PublishQuoteButton :quote-id="quote.id" />
       <button type="button" class="ml-auto min-h-11 px-2 text-sm font-medium text-danger" @click="confirmingDelete = true">
         {{ $t('quotes.remove') }}
       </button>
