@@ -50,7 +50,14 @@ async function submit() {
 <template>
   <AuthLayout :title="$t('auth.register.title')">
     <form class="flex flex-col gap-4" @submit.prevent="submit">
-      <FormField id="name" v-model="name" autocomplete="name" :label="$t('auth.fields.name')" :error="fieldErrors.name" />
+      <FormField
+        id="register-name"
+        v-model="name"
+        type="text"
+        autocomplete="name"
+        :label="$t('auth.fields.name')"
+        :error="fieldErrors.name"
+      />
       <FormField
         id="email"
         v-model="email"

@@ -88,8 +88,8 @@ describe('QuoteShareView', () => {
 
       expect(canvas.attributes('width')).toBe('1080')
       expect(canvas.attributes('height')).toBe('1350')
-      expect(canvas.attributes('role')).toBe('img')
-      expect(canvas.attributes('aria-label')).toBe('Попередній перегляд картки')
+      // A canvas counts as interactive, so the image role and the label sit on its wrapper.
+      expect(wrapper.get('[role="img"]').attributes('aria-label')).toBe('Попередній перегляд картки')
     })
 
     it('draws the quote with its book, its page and the name of the app', async () => {
