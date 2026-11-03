@@ -12,3 +12,7 @@
 /frontend/dist-demo/
 /frontend/coverage/
 *.tsbuildinfo
+
+# Coverage reports and scanner cache (SonarQube)
+/backend/coverage/
+/.scannerwork/
