@@ -1,0 +1,52 @@
+name: bookshelf
+type: php
+docroot: backend/public
+php_version: "8.4"
+webserver_type: nginx-fpm
+database:
+  type: mysql
+  version: "8.4"
+nodejs_version: "22"
+composer_root: backend
+composer_version: "2"
+use_dns_when_possible: true
+omit_containers: [ddev-ssh-agent]
+# Coverage driver for the SonarQube reports.
+webimage_extra_packages: ["php${DDEV_PHP_VERSION}-pcov"]
+
+# Same settings as x-backend-env in docker-compose.yml, adapted to ddev (host `db`, https://bookshelf.ddev.site).
+web_environment:
+  - APP_NAME=Bookshelf
+  - APP_ENV=local
+  - APP_KEY=base64:+RqiB/7EtNQDC7sdsV8ZM0cRYgVFUjwnR4YunZIDMlg=
+  - APP_DEBUG=true
+  - APP_URL=http://bookshelf.ddev.site
+  - LOG_CHANNEL=stderr
+  - DB_CONNECTION=mysql
+  - DB_HOST=db
+  - DB_PORT=3306
+  - DB_DATABASE=db
+  - DB_USERNAME=db
+  - DB_PASSWORD=db
+  - DB_CHARSET=utf8mb4
+  - DB_COLLATION=utf8mb4_0900_ai_ci
+  - SESSION_DRIVER=database
+  - SESSION_LIFETIME=43200
+  - SESSION_DOMAIN=null
+  - SANCTUM_STATEFUL_DOMAINS=bookshelf.ddev.site
+  - CACHE_STORE=database
+  - QUEUE_CONNECTION=database
+  - MAIL_MAILER=log
+  - WEB_PORT=443
+  - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.ddev.site
+
+web_extra_daemons:
+  - name: vite
+    command: "bash -c '[ -x node_modules/.bin/vite ] || npm ci; exec npm run dev'"
+    directory: /var/www/html/frontend
+
+hooks:
+  post-start:
+    - exec: "composer install -d backend --no-interaction --prefer-dist"
+      service: web
+    - exec-host: "ddev exec -s db mysql -uroot -proot -e \"CREATE DATABASE IF NOT EXISTS bookshelf_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; GRANT ALL ON bookshelf_testing.* TO 'db'@'%';\""
