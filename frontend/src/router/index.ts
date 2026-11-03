@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import AppLayout from '@/components/AppLayout.vue'
 import { useAuthStore } from '@/stores/auth'
 import AddBookView from '@/views/AddBookView.vue'
@@ -14,7 +14,8 @@ import RegisterView from '@/views/RegisterView.vue'
 import StatsView from '@/views/StatsView.vue'
 
 export const router = createRouter({
-  history: createWebHistory(),
+  // The standalone demo is opened from a file, where there is no server to answer deep links.
+  history: import.meta.env.VITE_DEMO ? createWebHashHistory() : createWebHistory(),
   routes: [
     {
       path: '/',

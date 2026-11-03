@@ -9,5 +9,6 @@
 # Frontend
 /frontend/node_modules/
 /frontend/dist/
+/frontend/dist-demo/
 /frontend/coverage/
 *.tsbuildinfo

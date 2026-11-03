@@ -1,4 +1,4 @@
-.PHONY: up down logs migrate fresh shell test test-backend test-frontend lint format stan build
+.PHONY: demo up down logs migrate fresh shell test test-backend test-frontend lint format stan build
 
 COMPOSE := docker compose
 APP := $(COMPOSE) exec app
@@ -30,6 +30,9 @@ test-backend:
 
 test-frontend:
 	$(FRONT) npm run test
+
+demo: ## Build a standalone offline demo (frontend/dist-demo/demo.html) with fake data
+	$(COMPOSE) run --rm --no-deps frontend npm run build:demo
 
 lint: stan ## Static checks for both apps
 	$(APP) vendor/bin/pint --test
