@@ -1,6 +1,7 @@
-.PHONY: demo up down logs migrate fresh shell test test-backend test-frontend lint format stan build
+.PHONY: demo coverage sonar-up sonar-down sonar up down logs migrate fresh shell test test-backend test-frontend lint format stan build
 
 COMPOSE := docker compose
+SONAR := docker compose -f docker-compose.sonar.yml
 APP := $(COMPOSE) exec app
 FRONT := $(COMPOSE) exec frontend
 
@@ -47,3 +48,18 @@ stan:
 
 build: ## Production build of the SPA
 	$(FRONT) npm run build
+
+coverage: ## Coverage reports (backend/coverage/clover.xml, frontend/coverage/lcov.info)
+	$(APP) vendor/bin/pest --coverage-clover=coverage/clover.xml
+	$(FRONT) npm run test:coverage
+	# lcov paths are relative to frontend/, SonarQube resolves them from the repository root.
+	sed -i 's|^SF:|SF:frontend/|' frontend/coverage/lcov.info
+
+sonar-up: ## Start the local SonarQube (http://localhost:9002)
+	$(SONAR) up -d
+
+sonar-down: ## Stop the local SonarQube (data is kept)
+	$(SONAR) down
+
+sonar: coverage ## Analyse the code in the local SonarQube (needs SONAR_TOKEN)
+	$(SONAR) run --rm scanner
