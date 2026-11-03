@@ -52,7 +52,7 @@ class OpenLibraryClient
      */
     private function cachedSearch(string $query, int $limit): array
     {
-        $cacheKey = 'openlibrary:search:'.sha1($query.'|'.$limit);
+        $cacheKey = 'openlibrary:search:'.hash('sha256', $query.'|'.$limit);
 
         /** @var list<array<string, mixed>> */
         return Cache::remember(

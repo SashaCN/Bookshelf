@@ -32,7 +32,7 @@ class CreateNewUser implements CreatesNewUsers
                 Rule::unique(User::class),
             ],
             'password' => $this->passwordRules(),
-            'timezone' => ['nullable', 'timezone:all'],
+            'timezone' => ['nullable', 'timezone:all_with_bc'],
         ])->validate();
 
         return User::create([

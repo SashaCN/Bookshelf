@@ -30,6 +30,17 @@ it('falls back to the default time zone', function () {
     expect(User::first()->timezone)->toBe(User::DEFAULT_TIMEZONE);
 });
 
+it('accepts a legacy time zone name that some browsers still report', function () {
+    $this->postJson('/api/auth/register', [
+        'name' => 'Olena',
+        'email' => 'olena@example.com',
+        'password' => 'secret-password',
+        'timezone' => 'Europe/Kiev',
+    ])->assertCreated();
+
+    expect(User::first()->timezone)->toBe('Europe/Kiev');
+});
+
 it('rejects invalid registration data', function (array $payload, string $field) {
     $this->postJson('/api/auth/register', $payload + [
         'name' => 'Olena',

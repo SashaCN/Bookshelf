@@ -15,7 +15,7 @@ class UpdateProfileRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'timezone' => ['sometimes', 'required', 'timezone:all'],
+            'timezone' => ['sometimes', 'required', 'timezone:all_with_bc'],
         ];
     }
 }
