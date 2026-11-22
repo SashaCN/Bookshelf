@@ -100,6 +100,13 @@ describe('demo mock API', () => {
     expect((await quotesApi.update(created.id, { content: 'Для всіх', visibility: 'private' })).visibility).toBe('private')
   })
 
+  it('searches fake readers by name or username', async () => {
+    expect((await socialApi.search('олен')).map((p) => p.username)).toEqual(['olena_reads'])
+    expect(await socialApi.search('OLENA')).toEqual([{ username: 'olena_reads', name: 'Олена Коваль', is_following: true }])
+    expect((await socialApi.search('zzz')).length).toBe(0)
+    await expect(socialApi.search('a')).rejects.toMatchObject({ status: 422 })
+  })
+
   it('shows profiles, follows and the feed of fake readers', async () => {
     expect(await socialApi.profile('olena_reads')).toMatchObject({ is_following: true, is_me: false, followers_count: 3 })
     expect((await socialApi.profile('demo_reader')).is_me).toBe(true)

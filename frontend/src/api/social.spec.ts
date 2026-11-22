@@ -35,6 +35,15 @@ describe('socialApi', () => {
     expect(http.get).toHaveBeenNthCalledWith(4, '/api/feed?page=4')
   })
 
+  it('searches people by an encoded query and unwraps the list', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: [{ username: 'olena', name: 'Олена', is_following: false }] })
+
+    const found = await socialApi.search('олена & co')
+
+    expect(http.get).toHaveBeenCalledWith(`/api/users?q=${encodeURIComponent('олена & co')}`)
+    expect(found).toEqual([{ username: 'olena', name: 'Олена', is_following: false }])
+  })
+
   it('follows and unfollows', async () => {
     vi.mocked(http.post).mockResolvedValue(null)
     vi.mocked(http.delete).mockResolvedValue(null)

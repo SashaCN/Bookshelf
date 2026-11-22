@@ -22,6 +22,7 @@ export function createTestRouter() {
       { path: '/stats', name: 'stats', component: stub, meta: { tab: 'stats' } },
       { path: '/profile', name: 'profile', component: stub },
       { path: '/feed', name: 'feed', component: stub },
+      { path: '/people', name: 'people-search', component: stub },
       { path: '/u/:username', name: 'public-profile', component: stub },
       { path: '/u/:username/followers', name: 'followers', component: stub },
       { path: '/u/:username/following', name: 'following', component: stub },

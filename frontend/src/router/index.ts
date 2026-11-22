@@ -9,6 +9,7 @@ import HomeView from '@/views/HomeView.vue'
 import LibraryView from '@/views/LibraryView.vue'
 import LoginView from '@/views/LoginView.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import PeopleSearchView from '@/views/PeopleSearchView.vue'
 import PeopleListView from '@/views/PeopleListView.vue'
 import PublicProfileView from '@/views/PublicProfileView.vue'
 import QuoteFormView from '@/views/QuoteFormView.vue'
@@ -55,6 +56,7 @@ export const router = createRouter({
           meta: { tab: 'quotes' },
         },
         { path: 'feed', name: 'feed', component: FeedView },
+        { path: 'people', name: 'people-search', component: PeopleSearchView },
         {
           path: 'u/:username',
           name: 'public-profile',

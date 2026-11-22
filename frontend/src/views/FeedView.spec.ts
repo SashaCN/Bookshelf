@@ -39,6 +39,12 @@ describe('FeedView', () => {
     expect(wrapper.text()).not.toContain('Редагувати')
   })
 
+  it('links to the people search from the header', async () => {
+    const { wrapper } = await mountView([makeFeedQuote()])
+
+    expect(wrapper.get('a[href="/people"]').text()).toBe('Знайти людей')
+  })
+
   it('puts the author first, then the quote, then the book', async () => {
     const { wrapper } = await mountView([makeFeedQuote({ content: 'Quote text', author: { username: 'ivan', name: 'Іван' } })])
 
@@ -53,6 +59,7 @@ describe('FeedView', () => {
 
     expect(wrapper.text()).toContain('Стрічка порожня')
     expect(wrapper.text()).toContain('публічні цитати читачів, на яких ви підписані')
+    expect(wrapper.findAll('a[href="/people"]').length).toBeGreaterThanOrEqual(2)
     expect(wrapper.findAll('a[href="/profile"]').map((link) => link.text())).toContain('Зробити свій профіль публічним')
   })
 

@@ -1,4 +1,4 @@
-import type { FeedPage, PeoplePage, PublicProfile, QuotesPage } from '@/types/api'
+import type { FeedPage, PeoplePage, PersonSearchResult, PublicProfile, QuotesPage } from '@/types/api'
 import { http } from './http'
 
 const user = (username: string) => `/api/users/${encodeURIComponent(username)}`
@@ -10,5 +10,7 @@ export const socialApi = {
   unfollow: (username: string) => http.delete<null>(`${user(username)}/follow`),
   followers: (username: string, page = 1) => http.get<PeoplePage>(`${user(username)}/followers?page=${page}`),
   following: (username: string, page = 1) => http.get<PeoplePage>(`${user(username)}/following?page=${page}`),
+  search: (q: string) =>
+    http.get<{ data: PersonSearchResult[] }>(`/api/users?q=${encodeURIComponent(q)}`).then((response) => response.data),
   feed: (page = 1) => http.get<FeedPage>(`/api/feed?page=${page}`),
 }

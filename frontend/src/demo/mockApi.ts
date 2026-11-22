@@ -756,6 +756,15 @@ route('DELETE', '/api/quotes/(\\d+)', ([id]) => {
 })
 
 // Social: the demo user's public quotes plus a few fake readers.
+route('GET', '/api/users', (_p, query) => {
+  const q = (query.get('q') ?? '').trim().toLowerCase()
+  if (q.length < 2 || q.length > 50) invalid('q', 'search.length')
+  const found = fakeReaders
+    .filter((r) => r.username.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))
+    .slice(0, 20)
+    .map((r) => ({ username: r.username, name: r.name, is_following: state.following.includes(r.username) }))
+  return ok(found)
+})
 route('GET', '/api/users/([^/]+)', ([username]) => ok(profile(decodeURIComponent(username))))
 route('GET', '/api/users/([^/]+)/quotes', ([username], query) => {
   const name = decodeURIComponent(username)

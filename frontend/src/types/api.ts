@@ -222,6 +222,11 @@ export interface PersonSummary {
   name: string
 }
 
+/** A person found by the people search, with whether the reader already follows them. */
+export interface PersonSearchResult extends PersonSummary {
+  is_following: boolean
+}
+
 export interface PeoplePage {
   data: PersonSummary[]
   links: { next: string | null }

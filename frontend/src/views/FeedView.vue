@@ -30,7 +30,16 @@ onMounted(load)
 </script>
 
 <template>
-  <PageHeader :title="$t('social.feed.title')" :back-to="{ name: 'home' }" />
+  <PageHeader :title="$t('social.feed.title')" :back-to="{ name: 'home' }">
+    <template #action>
+      <RouterLink
+        :to="{ name: 'people-search' }"
+        class="inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-sm font-medium text-accent underline underline-offset-2"
+      >
+        {{ $t('social.search.title') }}
+      </RouterLink>
+    </template>
+  </PageHeader>
 
   <ErrorNotice v-if="error" :message="error" retryable @retry="load" />
 
@@ -44,12 +53,20 @@ onMounted(load)
     </ul>
 
     <EmptyState v-else :title="$t('social.feed.empty.title')" :text="$t('social.feed.empty.text')">
+      <div class="flex flex-col items-center gap-2">
+      <RouterLink
+        :to="{ name: 'people-search' }"
+        class="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 font-semibold text-on-accent"
+      >
+        {{ $t('social.search.title') }}
+      </RouterLink>
       <RouterLink
         :to="{ name: 'profile' }"
-        class="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 font-semibold text-on-accent"
+        class="inline-flex min-h-11 items-center px-2 text-sm font-medium text-accent underline underline-offset-2"
       >
         {{ $t('social.feed.empty.action') }}
       </RouterLink>
+      </div>
     </EmptyState>
 
     <LoadMore :has-more="social.feed.hasMore" :loading="social.feed.loadingMore" :error="moreError" @more="loadMore" />
