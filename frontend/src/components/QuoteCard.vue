@@ -50,6 +50,21 @@ async function remove() {
 
 <template>
   <article class="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
+    <div v-if="'author' in quote" class="flex items-center gap-3">
+      <span class="grid size-9 shrink-0 place-items-center rounded-full bg-sunken text-sm font-semibold" aria-hidden="true">
+        {{ quote.author.name.trim().charAt(0).toUpperCase() }}
+      </span>
+      <p class="min-w-0 text-sm text-ink-muted">
+        <RouterLink
+          :to="{ name: 'public-profile', params: { username: quote.author.username } }"
+          class="inline-flex min-h-11 items-center font-medium text-ink underline-offset-2 hover:underline"
+        >
+          {{ quote.author.name }}
+        </RouterLink>
+        <span class="break-all"> @{{ quote.author.username }}</span>
+      </p>
+    </div>
+
     <div class="flex items-start gap-2">
       <div class="flex min-w-0 flex-1 flex-col gap-2">
         <span v-if="quote.type === 'insight'" class="self-start rounded-full bg-sunken px-2.5 py-0.5 text-xs font-medium">
@@ -86,16 +101,6 @@ async function remove() {
     <p v-if="quote.note" class="whitespace-pre-line break-words text-sm text-ink-muted">{{ quote.note }}</p>
 
     <QuoteSource :quote="quote" :plain="readonly" />
-
-    <p v-if="'author' in quote" class="text-sm text-ink-muted">
-      <RouterLink
-        :to="{ name: 'public-profile', params: { username: quote.author.username } }"
-        class="font-medium text-ink underline-offset-2 hover:underline"
-      >
-        {{ quote.author.name }}
-      </RouterLink>
-      <span> @{{ quote.author.username }}</span>
-    </p>
 
     <ErrorNotice v-if="error" :message="error" />
 

@@ -39,6 +39,15 @@ describe('FeedView', () => {
     expect(wrapper.text()).not.toContain('Редагувати')
   })
 
+  it('puts the author first, then the quote, then the book', async () => {
+    const { wrapper } = await mountView([makeFeedQuote({ content: 'Quote text', author: { username: 'ivan', name: 'Іван' } })])
+
+    const html = wrapper.html()
+    expect(html.indexOf('@ivan')).toBeLessThan(html.indexOf('Quote text'))
+    expect(html.indexOf('Quote text')).toBeLessThan(html.indexOf('Atomic Habits'))
+    expect(wrapper.get('article [aria-hidden="true"]').text()).toBe('І')
+  })
+
   it('shows the empty state', async () => {
     const { wrapper } = await mountView([])
 
