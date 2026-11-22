@@ -3,6 +3,7 @@
 namespace App\Actions\Social;
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class FollowUser
@@ -16,8 +17,12 @@ class FollowUser
             throw ValidationException::withMessages(['username' => ['follow.self']]);
         }
 
-        // Following twice changes nothing.
-        $follower->following()->syncWithoutDetaching([$target->id => ['created_at' => now()]]);
+        // One atomic statement: following twice, even at the same moment, changes nothing.
+        DB::table('follows')->insertOrIgnore([
+            'follower_id' => $follower->id,
+            'followed_id' => $target->id,
+            'created_at' => now(),
+        ]);
     }
 
     public function unfollow(User $follower, User $target): void

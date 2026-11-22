@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Social\FollowUser;
 use App\Models\Quote;
 use App\Models\User;
 use App\Models\UserBook;
@@ -208,6 +209,15 @@ describe('following', function () {
         $this->actingAs($this->me)->deleteJson('/api/users/alice/follow')->assertNoContent();
         $this->actingAs($this->me)->deleteJson('/api/users/alice/follow')->assertNoContent();
         expect($this->me->following()->count())->toBe(0);
+    });
+
+    it('does not fail when the follow is made at the same moment from two requests', function () {
+        // Two requests that both found "not following yet": the second insert meets the first one's row.
+        $action = new FollowUser;
+        $action->follow($this->me, $this->alice);
+        $action->follow(User::query()->findOrFail($this->me->id), User::query()->findOrFail($this->alice->id));
+
+        expect(DB::table('follows')->count())->toBe(1);
     });
 
     it('cannot follow yourself', function () {
