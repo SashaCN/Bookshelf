@@ -261,6 +261,8 @@ export interface ReaderDocument {
   chapters_count: number
   position: ReaderPosition
   progress: number
+  /** When the position was last saved; null for a book that has not been opened yet. */
+  last_read_at: string | null
   created_at: string
   /** Only in the response for a single book, not in the list. */
   toc?: ReaderTocEntry[]

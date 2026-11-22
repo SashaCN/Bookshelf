@@ -8,6 +8,7 @@ export function makeReaderDoc(overrides: Partial<ReaderDocument> = {}): ReaderDo
     chapters_count: 12,
     position: { chapter: 0, fraction: 0 },
     progress: 0,
+    last_read_at: null,
     created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }

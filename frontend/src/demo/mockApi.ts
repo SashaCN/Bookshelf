@@ -209,6 +209,7 @@ function seed(): State {
         chapters_count: demoBook.chapters.length,
         position: { chapter: 0, fraction: 0 },
         progress: 0,
+        last_read_at: daysAgo(1).toISOString(),
         created_at: daysAgo(2).toISOString(),
         toc: demoBook.chapters.map((c, index) => ({ index, title: c.title })),
       },
@@ -843,7 +844,13 @@ function findDocument(id: string): ReaderDocument {
   return found
 }
 
-route('GET', '/api/reader', () => ok([...state.documents].sort(newestFirst)))
+// Most recently read first, never-read books after them, like the real API.
+const recentlyRead = (a: ReaderDocument, b: ReaderDocument) =>
+  Number(a.last_read_at === null) - Number(b.last_read_at === null) ||
+  (b.last_read_at ?? '').localeCompare(a.last_read_at ?? '') ||
+  b.id - a.id
+
+route('GET', '/api/reader', () => ok([...state.documents].sort(recentlyRead)))
 route('POST', '/api/reader', () => invalid('file', 'reader.invalid_epub'))
 route('GET', '/api/reader/(\\d+)', ([id]) => ok(findDocument(id)))
 route('DELETE', '/api/reader/(\\d+)', ([id]) => {
@@ -858,6 +865,7 @@ route('PUT', '/api/reader/(\\d+)/position', ([id], _q, body) => {
   if (!Number.isInteger(chapter) || chapter < 0 || chapter >= doc.chapters_count) invalid('chapter', 'validation.invalid')
   if (!(fraction >= 0 && fraction <= 1)) invalid('fraction', 'validation.invalid')
   doc.position = { chapter, fraction }
+  doc.last_read_at = new Date().toISOString()
   doc.progress = Math.round(((chapter + fraction) / doc.chapters_count) * 100)
   return ok(doc)
 })

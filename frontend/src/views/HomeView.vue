@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import DailyQuoteCard from '@/components/DailyQuoteCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ProgressBar from '@/components/ProgressBar.vue'
 import ReadingCard from '@/components/ReadingCard.vue'
 import { useLibraryStore } from '@/stores/library'
+import { useReaderStore } from '@/stores/reader'
 
 const links = [
   { name: 'feed', title: 'home.feedLink', hint: 'home.feedHint' },
@@ -13,7 +15,11 @@ const links = [
 ]
 
 const library = useLibraryStore()
+const reader = useReaderStore()
 const failed = ref(false)
+
+// The list comes most recently read first, so the first read book is the one to continue.
+const continuing = computed(() => reader.items.find((doc) => doc.last_read_at !== null) ?? null)
 
 async function load(force = false) {
   failed.value = false
@@ -24,7 +30,19 @@ async function load(force = false) {
   }
 }
 
-onMounted(() => load())
+// A convenience card: it never blocks the screen and a failure just means no card.
+async function loadReader() {
+  try {
+    await reader.load()
+  } catch {
+    // Silent on purpose.
+  }
+}
+
+onMounted(() => {
+  void loadReader()
+  return load()
+})
 </script>
 
 <template>
@@ -50,6 +68,25 @@ onMounted(() => load())
   </EmptyState>
 
   <DailyQuoteCard />
+
+  <RouterLink
+    v-if="continuing"
+    :to="{ name: 'reader-view', params: { id: continuing.id } }"
+    class="mt-4 block rounded-2xl border border-line bg-surface p-4"
+  >
+    <p class="text-sm font-semibold text-ink-muted">{{ $t('home.continueReading') }}</p>
+    <p class="mt-1 font-display text-lg font-semibold">{{ continuing.title }}</p>
+    <p v-if="continuing.author" class="text-sm text-ink-muted">{{ continuing.author }}</p>
+    <div class="mt-3 flex items-center gap-3">
+      <div class="flex-1">
+        <ProgressBar :percent="continuing.progress" :label="$t('reader.progress')" />
+      </div>
+      <span class="text-sm tabular-nums text-ink-muted">{{ Math.round(continuing.progress) }}%</span>
+    </div>
+    <p class="mt-1 text-sm text-ink-muted">
+      {{ $t('reader.chapter', { n: Math.min(continuing.position.chapter + 1, continuing.chapters_count), total: continuing.chapters_count }) }}
+    </p>
+  </RouterLink>
 
   <div class="mt-4 grid grid-cols-2 gap-3">
     <RouterLink

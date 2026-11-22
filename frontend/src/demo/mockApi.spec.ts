@@ -147,6 +147,7 @@ describe('demo mock API', () => {
   it('serves the sample document, saves the position and refuses uploads', async () => {
     const [doc] = await readerApi.list()
     expect(doc.chapters_count).toBe(3)
+    expect(doc.last_read_at).not.toBeNull()
     expect((await readerApi.get(doc.id)).toc).toHaveLength(3)
 
     const chapter = await readerApi.chapter(doc.id, 1)
@@ -154,7 +155,9 @@ describe('demo mock API', () => {
     expect(chapter.html).toContain('<p>')
     await expect(readerApi.chapter(doc.id, 3)).rejects.toMatchObject({ status: 404 })
 
-    expect((await readerApi.savePosition(doc.id, { chapter: 1, fraction: 0.5 })).progress).toBe(50)
+    const saved = await readerApi.savePosition(doc.id, { chapter: 1, fraction: 0.5 })
+    expect(saved.progress).toBe(50)
+    expect(Date.parse(saved.last_read_at as string)).toBeGreaterThan(Date.parse(doc.last_read_at as string))
     expect((await readerApi.get(doc.id)).position).toEqual({ chapter: 1, fraction: 0.5 })
 
     await expect(readerApi.upload(new File(['x'], 'a.epub'))).rejects.toMatchObject({ status: 422 })

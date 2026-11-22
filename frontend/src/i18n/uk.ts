@@ -60,6 +60,7 @@ export default {
     goToLibrary: 'До бібліотеки',
     readerLink: 'Читалка EPUB',
     readerHint: 'Читайте EPUB прямо в застосунку',
+    continueReading: 'Продовжити читання',
     feedLink: 'Стрічка друзів',
     feedHint: 'Цитати людей, на яких ви підписані',
   },
