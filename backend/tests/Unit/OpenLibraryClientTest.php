@@ -111,3 +111,39 @@ it('reports an unavailable catalog for an unexpected response shape', function (
     expect(fn () => app(OpenLibraryClient::class)->search('atomic habits'))
         ->toThrow(CatalogUnavailableException::class);
 });
+
+it('trims what the catalog gives us to what a library entry can hold', function () {
+    fakeOpenLibrary([openLibraryDoc([
+        'title' => str_repeat('Я', 300),
+        'subtitle' => str_repeat('s', 300),
+        'author_name' => array_map(fn (int $i) => "Author {$i}", range(1, 300)),
+        'number_of_pages_median' => 90000,
+        'first_publish_year' => 70000,
+    ])]);
+
+    $entry = app(OpenLibraryClient::class)->search('anthology')[0];
+
+    expect(mb_strlen($entry->title))->toBe(255)
+        ->and(mb_strlen($entry->subtitle))->toBe(255)
+        ->and($entry->authors)->toHaveCount(10)
+        ->and($entry->pageCount)->toBeNull()
+        ->and($entry->publishedYear)->toBeNull();
+});
+
+it('skips works whose key is not a plain work id', function () {
+    fakeOpenLibrary([
+        openLibraryDoc(['key' => '/works/'.str_repeat('X', 400)]),
+        openLibraryDoc(['key' => '/works/OL1W/../../x']),
+    ]);
+
+    expect(app(OpenLibraryClient::class)->search('weird'))->toBe([]);
+});
+
+it('does not retry a request the catalog rejected as wrong', function () {
+    Http::fake(['openlibrary.org/search.json*' => Http::response('', 422)]);
+
+    expect(fn () => app(OpenLibraryClient::class)->search('atomic habits'))
+        ->toThrow(CatalogUnavailableException::class);
+
+    Http::assertSentCount(1);
+});
