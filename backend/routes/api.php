@@ -7,6 +7,7 @@ use App\Http\Controllers\GoalController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\ReaderDocumentController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\UserBookController;
@@ -29,6 +30,14 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // Before the {quote} routes, or "daily" would be taken for a quote id.
     Route::get('/quotes/daily', [QuoteController::class, 'daily'])->name('quotes.daily');
     Route::apiResource('quotes', QuoteController::class)->except('store');
+
+    Route::apiResource('reader', ReaderDocumentController::class)
+        ->parameters(['reader' => 'readerDocument'])
+        ->except('update');
+    Route::put('/reader/{readerDocument}/position', [ReaderDocumentController::class, 'position'])->name('reader.position');
+    Route::get('/reader/{readerDocument}/chapters/{n}', [ReaderDocumentController::class, 'chapter'])
+        ->whereNumber('n')
+        ->name('reader.chapter');
 
     Route::get('/feed', FeedController::class)->name('feed');
     Route::get('/users/{username}', [ProfileController::class, 'show'])->name('users.show');

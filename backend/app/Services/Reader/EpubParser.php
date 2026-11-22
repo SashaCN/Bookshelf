@@ -1,0 +1,297 @@
+<?php
+
+namespace App\Services\Reader;
+
+use DOMDocument;
+use DOMElement;
+use DOMXPath;
+use Illuminate\Validation\ValidationException;
+use ZipArchive;
+
+/**
+ * Reads an EPUB straight out of the zip, without extracting anything to disk.
+ * The file is untrusted: limits are checked before an entry is read, and no read goes past its limit.
+ */
+class EpubParser
+{
+    public const MAX_ENTRIES = 2000;
+
+    public const MAX_TOTAL_SIZE = 200 * 1024 * 1024;
+
+    public const MAX_ENTRY_SIZE = 50 * 1024 * 1024;
+
+    public const MAX_RATIO = 100;
+
+    private const RATIO_CHECKED_FROM = 1024 * 1024;
+
+    private const MAX_XML_SIZE = 2 * 1024 * 1024;
+
+    public const MAX_CHAPTER_SIZE = 5 * 1024 * 1024;
+
+    private const CHAPTER_TYPES = ['application/xhtml+xml', 'text/html'];
+
+    private const REMOVED_ELEMENTS = ['script', 'iframe', 'object', 'embed', 'link', 'style', 'base', 'meta', 'form'];
+
+    /**
+     * @return array{title: string, author: string|null, chapters: list<string>}
+     *
+     * @throws ValidationException
+     */
+    public function parse(string $path, string $fallbackTitle): array
+    {
+        $zip = $this->open($path);
+
+        try {
+            $this->assertNotABomb($zip);
+
+            $mimetype = $this->read($zip, 'mimetype', 256);
+            if ($mimetype === null || trim($mimetype) !== 'application/epub+zip') {
+                $this->fail('reader.not_epub');
+            }
+
+            $container = $this->loadXml($this->read($zip, 'META-INF/container.xml', self::MAX_XML_SIZE));
+            $rootfile = (new DOMXPath($container))->query('//*[local-name()="rootfile"]/@full-path')->item(0)?->nodeValue;
+            if ($rootfile === null || trim($rootfile) === '') {
+                $this->fail('reader.invalid_epub');
+            }
+            $opfPath = $this->normalize(trim($rootfile));
+
+            $opf = $this->loadXml($this->read($zip, $opfPath, self::MAX_XML_SIZE));
+            $xpath = new DOMXPath($opf);
+
+            $title = $this->text($xpath, '//*[local-name()="metadata"]/*[local-name()="title"]');
+            $author = $this->text($xpath, '//*[local-name()="metadata"]/*[local-name()="creator"]');
+
+            $chapters = $this->spine($xpath, dirname($opfPath));
+            if ($chapters === []) {
+                $this->fail('reader.invalid_epub');
+            }
+
+            return [
+                'title' => mb_substr($title ?? $fallbackTitle, 0, 255),
+                'author' => $author !== null ? mb_substr($author, 0, 255) : null,
+                'chapters' => $chapters,
+            ];
+        } finally {
+            $zip->close();
+        }
+    }
+
+    /**
+     * The HTML of one chapter: the inside of its body, with active content removed.
+     * Null when the chapter is not in the file. The client still treats the result as untrusted.
+     *
+     * @return array{title: string|null, html: string}|null
+     */
+    public function chapter(string $path, string $entry): ?array
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($path, ZipArchive::RDONLY) !== true) {
+            return null;
+        }
+
+        try {
+            $raw = $this->read($zip, $entry, self::MAX_CHAPTER_SIZE);
+        } finally {
+            $zip->close();
+        }
+
+        if ($raw === null) {
+            return null;
+        }
+
+        return $this->sanitize($raw);
+    }
+
+    /**
+     * @return array{title: string|null, html: string}
+     */
+    private function sanitize(string $raw): array
+    {
+        $dom = new DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="utf-8"?>'.$raw, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        $xpath = new DOMXPath($dom);
+
+        $heading = $xpath->query('//h1|//h2')->item(0)?->textContent;
+        $heading ??= $xpath->query('//title')->item(0)?->textContent;
+        $title = $heading !== null ? trim((string) preg_replace('/\s+/u', ' ', $heading)) : null;
+
+        foreach (self::REMOVED_ELEMENTS as $tag) {
+            foreach (iterator_to_array($dom->getElementsByTagName($tag)) as $element) {
+                $element->parentNode?->removeChild($element);
+            }
+        }
+
+        foreach ($xpath->query('//*') ?: [] as $element) {
+            if (! $element instanceof DOMElement) {
+                continue;
+            }
+            foreach (iterator_to_array($element->attributes) as $attribute) {
+                $name = strtolower($attribute->nodeName);
+                $value = strtolower(preg_replace('/[\x00-\x20]+/', '', $attribute->nodeValue ?? '') ?? '');
+                if (str_starts_with($name, 'on') || (in_array($name, ['href', 'src', 'xlink:href', 'action', 'formaction'], true) && str_starts_with($value, 'javascript:'))) {
+                    $element->removeAttributeNode($attribute);
+                }
+            }
+        }
+
+        $body = $dom->getElementsByTagName('body')->item(0);
+        $html = '';
+        if ($body !== null) {
+            foreach ($body->childNodes as $child) {
+                $html .= $dom->saveHTML($child);
+            }
+        }
+
+        return ['title' => $title === '' ? null : $title, 'html' => $html];
+    }
+
+    private function open(string $path): ZipArchive
+    {
+        $handle = @fopen($path, 'rb');
+        $magic = $handle ? fread($handle, 4) : false;
+        if ($handle) {
+            fclose($handle);
+        }
+
+        $zip = new ZipArchive;
+        if ($magic !== "PK\x03\x04" || $zip->open($path, ZipArchive::RDONLY) !== true) {
+            $this->fail('reader.not_epub');
+        }
+
+        return $zip;
+    }
+
+    /**
+     * Judged from the sizes the archive declares; reads are capped on top of that.
+     */
+    private function assertNotABomb(ZipArchive $zip): void
+    {
+        if ($zip->numFiles > self::MAX_ENTRIES) {
+            $this->fail('reader.zip_bomb');
+        }
+
+        $total = 0;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $stat = $zip->statIndex($i);
+            if ($stat === false) {
+                $this->fail('reader.not_epub');
+            }
+
+            $size = $stat['size'];
+            $total += $size;
+
+            $suspiciousRatio = $size > self::RATIO_CHECKED_FROM
+                && ($stat['comp_size'] <= 0 || $size / $stat['comp_size'] > self::MAX_RATIO);
+
+            if ($size > self::MAX_ENTRY_SIZE || $total > self::MAX_TOTAL_SIZE || $suspiciousRatio) {
+                $this->fail('reader.zip_bomb');
+            }
+        }
+    }
+
+    /**
+     * Never reads more than $limit bytes of an entry. Null when there is no such entry.
+     */
+    private function read(ZipArchive $zip, string $name, int $limit): ?string
+    {
+        $stream = $zip->getStream($name);
+        if ($stream === false) {
+            return null;
+        }
+
+        $content = stream_get_contents($stream, $limit);
+        fclose($stream);
+
+        return $content === false ? null : $content;
+    }
+
+    private function loadXml(?string $xml): DOMDocument
+    {
+        if ($xml === null || trim($xml) === '') {
+            $this->fail('reader.invalid_epub');
+        }
+
+        $dom = new DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        // No LIBXML_NOENT (entities stay unexpanded) and no network: nothing external is ever fetched.
+        $loaded = $dom->loadXML($xml, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        if (! $loaded) {
+            $this->fail('reader.invalid_epub');
+        }
+
+        return $dom;
+    }
+
+    private function text(DOMXPath $xpath, string $query): ?string
+    {
+        $value = $xpath->query($query)->item(0)?->textContent;
+        $value = $value !== null ? trim($value) : null;
+
+        return $value === '' ? null : $value;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function spine(DOMXPath $xpath, string $baseDir): array
+    {
+        $items = [];
+        foreach ($xpath->query('//*[local-name()="manifest"]/*[local-name()="item"]') ?: [] as $item) {
+            if ($item instanceof DOMElement) {
+                $items[$item->getAttribute('id')] = $item;
+            }
+        }
+
+        $chapters = [];
+        foreach ($xpath->query('//*[local-name()="spine"]/*[local-name()="itemref"]') ?: [] as $itemref) {
+            $item = $itemref instanceof DOMElement ? ($items[$itemref->getAttribute('idref')] ?? null) : null;
+            $href = $item?->getAttribute('href');
+
+            if ($item === null || $href === null || $href === ''
+                || ! in_array(strtolower($item->getAttribute('media-type')), self::CHAPTER_TYPES, true)) {
+                continue;
+            }
+
+            $chapters[] = $this->normalize(($baseDir === '.' ? '' : $baseDir.'/').rawurldecode(strtok($href, '#') ?: ''));
+        }
+
+        return $chapters;
+    }
+
+    /**
+     * A zip-internal path without "." and ".." parts.
+     */
+    private function normalize(string $path): string
+    {
+        $parts = [];
+        foreach (explode('/', str_replace('\\', '/', $path)) as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+            if ($part === '..') {
+                array_pop($parts);
+
+                continue;
+            }
+            $parts[] = $part;
+        }
+
+        return implode('/', $parts);
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function fail(string $code): never
+    {
+        throw ValidationException::withMessages(['file' => [$code]]);
+    }
+}

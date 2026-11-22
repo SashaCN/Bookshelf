@@ -54,6 +54,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<ReaderDocument, $this>
+     */
+    public function readerDocuments(): HasMany
+    {
+        return $this->hasMany(ReaderDocument::class);
+    }
+
+    /**
      * @return BelongsToMany<User, $this>
      */
     public function following(): BelongsToMany

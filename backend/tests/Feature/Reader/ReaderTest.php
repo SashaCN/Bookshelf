@@ -1,0 +1,266 @@
+<?php
+
+use App\Models\ReaderDocument;
+use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+/**
+ * Builds an EPUB in a temp file. Each option can break one part of it.
+ *
+ * @param  array<string, string>  $chapters  zip path => body of the chapter
+ * @param  array<string, mixed>  $options
+ */
+function makeEpub(array $chapters = [], array $options = []): UploadedFile
+{
+    $chapters = $chapters ?: [
+        'OEBPS/ch1.xhtml' => '<h1>One</h1><p>First chapter.</p>',
+        'OEBPS/ch2.xhtml' => '<h2>Two</h2><p>Second chapter.</p>',
+    ];
+
+    $path = tempnam(sys_get_temp_dir(), 'epub');
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::OVERWRITE);
+
+    if (($options['mimetype'] ?? true) !== false) {
+        $zip->addFromString('mimetype', $options['mimetype'] ?? 'application/epub+zip');
+    }
+
+    if (! ($options['no_container'] ?? false)) {
+        $zip->addFromString('META-INF/container.xml', '<?xml version="1.0"?>'
+            .'<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>'
+            .'<rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+    }
+
+    $manifest = '';
+    $spine = '';
+    $i = 0;
+    foreach ($chapters as $name => $body) {
+        $i++;
+        $manifest .= '<item id="c'.$i.'" href="'.basename($name).'" media-type="application/xhtml+xml"/>';
+        $spine .= '<itemref idref="c'.$i.'"/>';
+        $zip->addFromString($name, '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>T'.$i.'</title></head><body>'.$body.'</body></html>');
+    }
+    $manifest .= '<item id="img" href="cover.png" media-type="image/png"/>';
+    if ($options['empty_spine'] ?? false) {
+        $spine = '';
+    }
+
+    $title = array_key_exists('title', $options) ? $options['title'] : 'A Test Book';
+    $opf = '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        .($title !== null ? "<dc:title>{$title}</dc:title>" : '')
+        .'<dc:creator>Jane Author</dc:creator></metadata>'
+        ."<manifest>{$manifest}</manifest><spine>{$spine}</spine></package>";
+    $zip->addFromString('OEBPS/content.opf', $options['broken_opf'] ?? false ? '<package><metadata>' : $opf);
+
+    for ($j = 0; $j < ($options['extra_entries'] ?? 0); $j++) {
+        $zip->addFromString("extra/{$j}.txt", 'x');
+    }
+
+    $zip->close();
+
+    return new UploadedFile($path, $options['name'] ?? 'book.epub', 'application/epub+zip', null, true);
+}
+
+beforeEach(function () {
+    Storage::fake('local');
+    $this->user = User::factory()->create();
+    $this->stranger = User::factory()->create();
+});
+
+it('requires authentication for every endpoint', function (string $method, string $uri) {
+    $this->json($method, $uri)->assertUnauthorized();
+})->with([
+    ['GET', '/api/reader'],
+    ['POST', '/api/reader'],
+    ['GET', '/api/reader/1'],
+    ['DELETE', '/api/reader/1'],
+    ['PUT', '/api/reader/1/position'],
+    ['GET', '/api/reader/1/chapters/0'],
+]);
+
+describe('uploading', function () {
+    it('imports an EPUB and keeps the file', function () {
+        $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub()], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.title', 'A Test Book')
+            ->assertJsonPath('data.author', 'Jane Author')
+            ->assertJsonPath('data.chapters_count', 2)
+            ->assertJsonPath('data.position.chapter', 0)
+            ->assertJsonPath('data.progress', 0);
+
+        $document = ReaderDocument::query()->sole();
+        expect($document->user_id)->toBe($this->user->id)
+            ->and($document->chapters)->toBe(['OEBPS/ch1.xhtml', 'OEBPS/ch2.xhtml'])
+            ->and($document->path)->toStartWith("reader/{$this->user->id}/")->toEndWith('.epub');
+        Storage::disk('local')->assertExists($document->path);
+    });
+
+    it('keeps the spine order, not the manifest order', function () {
+        $chapters = ['OEBPS/b.xhtml' => '<p>B</p>', 'OEBPS/a.xhtml' => '<p>A</p>', 'OEBPS/c.xhtml' => '<p>C</p>'];
+
+        $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub($chapters)], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.chapters_count', 3);
+
+        expect(ReaderDocument::query()->sole()->chapters)->toBe(['OEBPS/b.xhtml', 'OEBPS/a.xhtml', 'OEBPS/c.xhtml']);
+    });
+
+    it('falls back to the file name when the book has no title', function () {
+        $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub([], ['title' => null, 'name' => 'my-novel.epub'])], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.title', 'my-novel');
+    });
+
+    it('rejects a hostile or broken file with a code and stores nothing', function (array $options, string $code) {
+        $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub([], $options)], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.file.0', $code);
+
+        expect(ReaderDocument::query()->count())->toBe(0)
+            ->and(Storage::disk('local')->allFiles())->toBe([]);
+    })->with([
+        'no mimetype entry' => [['mimetype' => false], 'reader.not_epub'],
+        'wrong mimetype' => [['mimetype' => 'application/zip'], 'reader.not_epub'],
+        'no container.xml' => [['no_container' => true], 'reader.invalid_epub'],
+        'broken OPF' => [['broken_opf' => true], 'reader.invalid_epub'],
+        'empty spine' => [['empty_spine' => true], 'reader.invalid_epub'],
+        'too many entries' => [['extra_entries' => 2001], 'reader.zip_bomb'],
+    ]);
+
+    it('rejects a text file renamed to .epub', function () {
+        $file = UploadedFile::fake()->createWithContent('book.epub', 'this is not a zip file');
+
+        $this->actingAs($this->user)->post('/api/reader', ['file' => $file], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.file.0', 'reader.not_epub');
+    });
+
+    it('rejects a file that is too large', function () {
+        $this->actingAs($this->user)->post('/api/reader', ['file' => UploadedFile::fake()->create('a.epub', 21000)], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.file.0', 'reader.too_large');
+    });
+
+    it('rejects another extension and a missing file', function () {
+        $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub([], ['name' => 'book.pdf'])], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('file');
+
+        $this->actingAs($this->user)->postJson('/api/reader')->assertUnprocessable()->assertJsonValidationErrors('file');
+    });
+});
+
+describe('reading the library of books', function () {
+    it('lists only own books, newest first, with progress', function () {
+        $older = ReaderDocument::factory()->for($this->user)->create(['position_chapter' => 1, 'position_fraction' => 0.5]);
+        $newer = ReaderDocument::factory()->for($this->user)->create();
+        ReaderDocument::factory()->for($this->stranger)->create();
+
+        $response = $this->actingAs($this->user)->getJson('/api/reader')->assertOk();
+
+        $response->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $newer->id)
+            ->assertJsonPath('data.1.id', $older->id)
+            ->assertJsonPath('data.1.position.chapter', 1)
+            ->assertJsonPath('data.1.position.fraction', 0.5)
+            // (1 + 0.5) / 3 chapters
+            ->assertJsonPath('data.1.progress', 50);
+    });
+
+    it('shows one book', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create(['title' => 'Dune']);
+
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}")
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Dune')
+            ->assertJsonPath('data.chapters_count', 3);
+    });
+
+    it('deletes the book and its file', function () {
+        $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub()], ['Accept' => 'application/json'])->assertCreated();
+        $document = ReaderDocument::query()->sole();
+
+        $this->actingAs($this->user)->deleteJson("/api/reader/{$document->id}")->assertNoContent();
+
+        expect(ReaderDocument::query()->count())->toBe(0);
+        Storage::disk('local')->assertMissing($document->path);
+    });
+});
+
+describe('position', function () {
+    it('saves the position', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+
+        $this->actingAs($this->user)->putJson("/api/reader/{$document->id}/position", ['chapter' => 2, 'fraction' => 0.25])
+            ->assertOk()
+            ->assertJsonPath('data.position.chapter', 2)
+            ->assertJsonPath('data.position.fraction', 0.25)
+            ->assertJsonPath('data.progress', 75);
+
+        expect($document->refresh()->position_chapter)->toBe(2);
+    });
+
+    it('validates the position', function (array $body, string $field) {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+
+        $this->actingAs($this->user)->putJson("/api/reader/{$document->id}/position", $body)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+    })->with([
+        'chapter past the end' => [['chapter' => 3, 'fraction' => 0], 'chapter'],
+        'negative chapter' => [['chapter' => -1, 'fraction' => 0], 'chapter'],
+        'fraction above 1' => [['chapter' => 0, 'fraction' => 1.5], 'fraction'],
+        'missing fraction' => [['chapter' => 0], 'fraction'],
+    ]);
+});
+
+describe('chapters', function () {
+    it('returns the chapter body without active content', function () {
+        $chapters = [
+            'OEBPS/ch1.xhtml' => '<h1>Evil</h1><p onclick="steal()">Text <b>bold</b></p><script>alert(1)</script>'
+                .'<iframe src="http://x"></iframe><a href="javascript:alert(1)">x</a><style>p{}</style>',
+            'OEBPS/ch2.xhtml' => '<p>Second</p>',
+        ];
+        $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub($chapters)], ['Accept' => 'application/json'])->assertCreated();
+        $document = ReaderDocument::query()->sole();
+
+        $response = $this->actingAs($this->user)->getJson("/api/reader/{$document->id}/chapters/0")
+            ->assertOk()
+            ->assertJsonPath('data.index', 0)
+            ->assertJsonPath('data.count', 2)
+            ->assertJsonPath('data.title', 'Evil');
+
+        $html = $response->json('data.html');
+        expect($html)->toContain('Text <b>bold</b>')
+            ->not->toContain('<script')->not->toContain('alert(1)')->not->toContain('onclick')
+            ->not->toContain('<iframe')->not->toContain('javascript:')->not->toContain('<style')
+            ->not->toContain('<body');
+
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}/chapters/1")
+            ->assertOk()
+            ->assertJsonPath('data.title', 'T2')
+            ->assertJsonPath('data.html', '<p>Second</p>');
+    });
+
+    it('answers 404 for a chapter out of range', function (string $n) {
+        $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub()], ['Accept' => 'application/json'])->assertCreated();
+        $document = ReaderDocument::query()->sole();
+
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}/chapters/{$n}")->assertNotFound();
+    })->with(['2', '99', '-1', 'abc']);
+});
+
+it('answers 404 for somebody else\'s book on every route', function (string $method, string $uri, array $body) {
+    $document = ReaderDocument::factory()->for($this->stranger)->create();
+
+    $this->actingAs($this->user)->json($method, str_replace('{id}', (string) $document->id, $uri), $body)->assertNotFound();
+
+    expect(ReaderDocument::query()->count())->toBe(1);
+})->with([
+    ['GET', '/api/reader/{id}', []],
+    ['DELETE', '/api/reader/{id}', []],
+    ['PUT', '/api/reader/{id}/position', ['chapter' => 0, 'fraction' => 0]],
+    ['PUT', '/api/reader/{id}/position', ['chapter' => 99, 'fraction' => 9]],
+    ['GET', '/api/reader/{id}/chapters/0', []],
+]);
