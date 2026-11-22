@@ -8,6 +8,8 @@ export const useLibraryStore = defineStore('library', () => {
   const items = ref<UserBook[]>([])
   const loaded = ref(false)
   const loading = ref(false)
+  /** Bumped by reset, so a list that was requested for somebody who has since signed out is dropped on arrival. */
+  let generation = 0
 
   const byStatus = computed(() => {
     const groups: Record<BookStatus, UserBook[]> = { want: [], reading: [], finished: [], abandoned: [] }
@@ -44,12 +46,17 @@ export const useLibraryStore = defineStore('library', () => {
       return
     }
 
+    const current = generation
     loading.value = true
     try {
-      items.value = await libraryApi.list()
+      const list = await libraryApi.list()
+      if (current !== generation) return
+      items.value = list
       loaded.value = true
     } finally {
-      loading.value = false
+      if (current === generation) {
+        loading.value = false
+      }
     }
   }
 
@@ -138,6 +145,7 @@ export const useLibraryStore = defineStore('library', () => {
 
   /** Forget everything, e.g. when somebody else signs in on the same device. */
   function reset(): void {
+    generation++
     items.value = []
     loaded.value = false
     loading.value = false

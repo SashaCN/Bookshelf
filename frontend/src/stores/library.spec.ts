@@ -274,4 +274,23 @@ describe('library store', () => {
     expect(library.items).toEqual([])
     expect(library.loaded).toBe(false)
   })
+
+  it('drops a list that arrives after the reader signed out, and loads again for the next one', async () => {
+    let answer: (books: ReturnType<typeof makeUserBook>[]) => void = () => undefined
+    vi.mocked(libraryApi.list).mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    const library = useLibraryStore()
+
+    const pending = library.load()
+    library.reset()
+    answer([makeUserBook({ id: 9 })])
+    await pending
+
+    expect(library.items).toEqual([])
+    expect(library.loaded).toBe(false)
+
+    vi.mocked(libraryApi.list).mockResolvedValueOnce([makeUserBook({ id: 10 })])
+    await library.load()
+
+    expect(library.items.map((item) => item.id)).toEqual([10])
+  })
 })
