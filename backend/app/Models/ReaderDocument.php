@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'chapters_count',
     'position_chapter',
     'position_fraction',
+    'last_read_at',
 ])]
 class ReaderDocument extends Model
 {
@@ -40,6 +41,7 @@ class ReaderDocument extends Model
             'chapters_count' => 'integer',
             'position_chapter' => 'integer',
             'position_fraction' => 'float',
+            'last_read_at' => 'datetime',
         ];
     }
 

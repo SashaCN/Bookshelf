@@ -18,11 +18,15 @@ use Illuminate\Support\Facades\Storage;
 class ReaderDocumentController extends Controller
 {
     /**
-     * The reader's uploaded books, newest first.
+     * The reader's uploaded books: most recently read first, never-read ones after them, newest first.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        return ReaderDocumentResource::collection($request->user()->readerDocuments()->latest('id')->get());
+        return ReaderDocumentResource::collection($request->user()->readerDocuments()
+            ->orderByRaw('last_read_at IS NULL')
+            ->orderByDesc('last_read_at')
+            ->orderByDesc('id')
+            ->get());
     }
 
     public function store(StoreReaderDocumentRequest $request, ImportEpub $import): JsonResponse
@@ -55,6 +59,7 @@ class ReaderDocumentController extends Controller
         $readerDocument->update([
             'position_chapter' => $request->integer('chapter'),
             'position_fraction' => $request->float('fraction'),
+            'last_read_at' => now(),
         ]);
 
         return new ReaderDocumentResource($readerDocument);

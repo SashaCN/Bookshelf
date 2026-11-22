@@ -39,6 +39,7 @@ class ReaderDocumentResource extends JsonResource
                 'fraction' => $this->position_fraction,
             ],
             'progress' => $this->progress(),
+            'last_read_at' => $this->last_read_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
 

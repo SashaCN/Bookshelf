@@ -199,6 +199,20 @@ describe('reading the library of books', function () {
             ->assertJsonPath('data.1.progress', 50);
     });
 
+    it('lists the most recently read book first, then unread ones newest first', function () {
+        $unreadOld = ReaderDocument::factory()->for($this->user)->create();
+        $readEarlier = ReaderDocument::factory()->for($this->user)->create(['last_read_at' => now()->subDay()]);
+        $unreadNew = ReaderDocument::factory()->for($this->user)->create();
+        $readLately = ReaderDocument::factory()->for($this->user)->create(['last_read_at' => now()]);
+
+        $this->actingAs($this->user)->getJson('/api/reader')->assertOk()
+            ->assertJsonPath('data.0.id', $readLately->id)
+            ->assertJsonPath('data.1.id', $readEarlier->id)
+            ->assertJsonPath('data.2.id', $unreadNew->id)
+            ->assertJsonPath('data.3.id', $unreadOld->id)
+            ->assertJsonPath('data.3.last_read_at', null);
+    });
+
     it('shows one book', function () {
         $document = ReaderDocument::factory()->for($this->user)->create(['title' => 'Dune']);
 
@@ -230,6 +244,18 @@ describe('position', function () {
             ->assertJsonPath('data.progress', 75);
 
         expect($document->refresh()->position_chapter)->toBe(2);
+    });
+
+    it('marks the book as read now when the position is saved', function () {
+        $this->freezeTime();
+        $document = ReaderDocument::factory()->for($this->user)->create();
+        expect($document->last_read_at)->toBeNull();
+
+        $this->actingAs($this->user)->putJson("/api/reader/{$document->id}/position", ['chapter' => 1, 'fraction' => 0])
+            ->assertOk()
+            ->assertJsonPath('data.last_read_at', now()->toIso8601String());
+
+        expect($document->refresh()->last_read_at?->toIso8601String())->toBe(now()->toIso8601String());
     });
 
     it('validates the position', function (array $body, string $field) {
