@@ -10,6 +10,8 @@ it('exposes only the public profile fields', function () {
         'email' => 'olena@example.com',
         'password' => 'secret-password',
         'timezone' => 'Europe/Kyiv',
+        'username' => null,
+        'is_public' => false,
     ]);
     $user->id = 7;
 
@@ -20,5 +22,7 @@ it('exposes only the public profile fields', function () {
         'name' => 'Olena',
         'email' => 'olena@example.com',
         'timezone' => 'Europe/Kyiv',
+        'username' => null,
+        'is_public' => false,
     ]);
 });

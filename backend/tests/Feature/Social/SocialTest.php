@@ -1,0 +1,300 @@
+<?php
+
+use App\Models\Quote;
+use App\Models\User;
+use App\Models\UserBook;
+use Illuminate\Support\Facades\DB;
+
+beforeEach(function () {
+    $this->me = User::factory()->create();
+    $this->alice = User::factory()->public()->create(['username' => 'alice', 'name' => 'Alice']);
+    $this->hidden = User::factory()->create(['username' => 'hidden', 'is_public' => false]);
+});
+
+function quoteOf(User $user, bool $public = true, array $attributes = []): Quote
+{
+    $userBook = UserBook::factory()->for($user)->reading(10)->create();
+    $factory = Quote::factory()->for($userBook);
+
+    return ($public ? $factory->public() : $factory)->create($attributes);
+}
+
+it('requires authentication for every endpoint', function (string $method, string $uri) {
+    $this->json($method, $uri)->assertUnauthorized();
+})->with([
+    ['GET', '/api/feed'],
+    ['GET', '/api/users/alice'],
+    ['GET', '/api/users/alice/quotes'],
+    ['GET', '/api/users/alice/followers'],
+    ['GET', '/api/users/alice/following'],
+    ['POST', '/api/users/alice/follow'],
+    ['DELETE', '/api/users/alice/follow'],
+]);
+
+describe('profile settings', function () {
+    it('returns the new fields from /api/me', function () {
+        $this->actingAs($this->alice)->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonPath('data.username', 'alice')
+            ->assertJsonPath('data.is_public', true);
+
+        $this->actingAs($this->me)->getJson('/api/me')
+            ->assertJsonPath('data.username', null)
+            ->assertJsonPath('data.is_public', false);
+    });
+
+    it('sets a username and goes public, lowercasing the handle', function () {
+        $this->actingAs($this->me)->patchJson('/api/me', ['username' => 'Bob_42', 'is_public' => true])
+            ->assertOk()
+            ->assertJsonPath('data.username', 'bob_42')
+            ->assertJsonPath('data.is_public', true);
+
+        expect($this->me->refresh()->username)->toBe('bob_42');
+    });
+
+    it('can go public when the username was set earlier', function () {
+        $this->actingAs($this->hidden)->patchJson('/api/me', ['is_public' => true])->assertOk();
+        expect($this->hidden->refresh()->is_public)->toBeTrue();
+    });
+
+    it('keeps the own username when it is sent again', function () {
+        $this->actingAs($this->alice)->patchJson('/api/me', ['username' => 'alice'])->assertOk();
+    });
+
+    it('rejects a public profile without a username', function () {
+        $this->actingAs($this->me)->patchJson('/api/me', ['is_public' => true])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.is_public.0', 'profile.username_required');
+
+        expect($this->me->refresh()->is_public)->toBeFalse();
+    });
+
+    it('rejects removing the username of a public profile', function () {
+        $this->actingAs($this->alice)->patchJson('/api/me', ['username' => null])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.is_public.0', 'profile.username_required');
+    });
+
+    it('rejects a malformed username', function (string $username) {
+        $this->actingAs($this->me)->patchJson('/api/me', ['username' => $username])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('username');
+    })->with(['ab', 'has space', 'dash-ed', 'кирилиця', str_repeat('a', 31)]);
+
+    it('rejects a taken username in any case', function () {
+        $this->actingAs($this->me)->patchJson('/api/me', ['username' => 'ALICE'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('username');
+    });
+
+    it('rejects a non-boolean is_public', function () {
+        $this->actingAs($this->me)->patchJson('/api/me', ['is_public' => 'maybe'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('is_public');
+    });
+});
+
+describe('quote visibility', function () {
+    beforeEach(function () {
+        $this->userBook = UserBook::factory()->for($this->me)->reading(10)->create();
+    });
+
+    it('is private by default', function () {
+        $this->actingAs($this->me)->postJson("/api/library/{$this->userBook->id}/quotes", ['content' => 'Hello'])
+            ->assertCreated()
+            ->assertJsonPath('data.visibility', 'private');
+    });
+
+    it('can be public from the start and changed later', function () {
+        $id = $this->actingAs($this->me)->postJson("/api/library/{$this->userBook->id}/quotes", [
+            'content' => 'Hello',
+            'visibility' => 'public',
+        ])->assertCreated()->assertJsonPath('data.visibility', 'public')->json('data.id');
+
+        $this->actingAs($this->me)->patchJson("/api/quotes/{$id}", ['visibility' => 'private'])
+            ->assertOk()
+            ->assertJsonPath('data.visibility', 'private');
+    });
+
+    it('rejects an unknown visibility', function () {
+        $this->actingAs($this->me)->postJson("/api/library/{$this->userBook->id}/quotes", [
+            'content' => 'Hello',
+            'visibility' => 'friends',
+        ])->assertUnprocessable()->assertJsonValidationErrors('visibility');
+
+        $quote = quoteOf($this->me);
+        $this->actingAs($this->me)->patchJson("/api/quotes/{$quote->id}", ['visibility' => 'friends'])
+            ->assertUnprocessable()->assertJsonValidationErrors('visibility');
+    });
+});
+
+describe('profile', function () {
+    it('shows a public profile', function () {
+        $fan = User::factory()->public()->create();
+        $fan->following()->attach($this->alice->id);
+        $this->alice->following()->attach($fan->id);
+        $this->me->following()->attach($this->alice->id);
+        UserBook::factory()->for($this->alice)->finished()->create();
+        UserBook::factory()->for($this->alice)->finished()->create(['finished_at' => now()->subYears(2)]);
+        UserBook::factory()->for($this->alice)->reading()->create();
+
+        $this->actingAs($this->me)->getJson('/api/users/Alice')
+            ->assertOk()
+            ->assertExactJson(['data' => [
+                'username' => 'alice',
+                'name' => 'Alice',
+                'books_finished_this_year' => 1,
+                'followers_count' => 1,
+                'following_count' => 1,
+                'is_following' => true,
+                'is_me' => false,
+            ]]);
+    });
+
+    it('lets the owner see their own private profile', function () {
+        $this->actingAs($this->hidden)->getJson('/api/users/hidden')
+            ->assertOk()
+            ->assertJsonPath('data.is_me', true)
+            ->assertJsonPath('data.is_following', false);
+    });
+
+    it('answers 404 for private and missing profiles on every endpoint', function (string $method, string $suffix) {
+        $this->actingAs($this->me)->json($method, "/api/users/hidden{$suffix}")->assertNotFound();
+        $this->actingAs($this->me)->json($method, "/api/users/nobody{$suffix}")->assertNotFound();
+    })->with([
+        ['GET', ''],
+        ['GET', '/quotes'],
+        ['GET', '/followers'],
+        ['GET', '/following'],
+        ['POST', '/follow'],
+        ['DELETE', '/follow'],
+    ]);
+});
+
+describe('profile quotes', function () {
+    it('lists only public quotes, newest first, with the book', function () {
+        $old = quoteOf($this->alice);
+        quoteOf($this->alice, false);
+        $new = quoteOf($this->alice);
+        quoteOf($this->me);
+
+        $this->actingAs($this->me)->getJson('/api/users/alice/quotes')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $new->id)
+            ->assertJsonPath('data.1.id', $old->id)
+            ->assertJsonPath('data.0.visibility', 'public')
+            ->assertJsonPath('data.0.book.title', $new->userBook->book->title);
+    });
+
+    it('is paginated like the own quotes', function () {
+        foreach (range(1, 21) as $i) {
+            quoteOf($this->alice);
+        }
+
+        $this->actingAs($this->me)->getJson('/api/users/alice/quotes')
+            ->assertJsonCount(20, 'data')
+            ->assertJsonStructure(['data', 'links', 'meta']);
+        $this->actingAs($this->me)->getJson('/api/users/alice/quotes?page=2')->assertJsonCount(1, 'data');
+    });
+});
+
+describe('following', function () {
+    it('follows and unfollows idempotently', function () {
+        $this->actingAs($this->me)->postJson('/api/users/alice/follow')->assertNoContent();
+        $this->actingAs($this->me)->postJson('/api/users/alice/follow')->assertNoContent();
+        expect($this->me->following()->count())->toBe(1);
+
+        $this->actingAs($this->me)->deleteJson('/api/users/alice/follow')->assertNoContent();
+        $this->actingAs($this->me)->deleteJson('/api/users/alice/follow')->assertNoContent();
+        expect($this->me->following()->count())->toBe(0);
+    });
+
+    it('cannot follow yourself', function () {
+        $this->actingAs($this->alice)->postJson('/api/users/alice/follow')
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.username.0', 'follow.self');
+    });
+
+    it('cannot follow yourself even with a private profile', function () {
+        $this->actingAs($this->hidden)->postJson('/api/users/hidden/follow')
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.username.0', 'follow.self');
+    });
+
+    it('lists followers and following, public readers only', function () {
+        $bob = User::factory()->public()->create(['username' => 'bob', 'name' => 'Bob']);
+        $bob->following()->attach($this->alice->id);
+        $this->hidden->following()->attach($this->alice->id);
+        $this->alice->following()->attach([$bob->id, $this->hidden->id]);
+
+        $this->actingAs($this->me)->getJson('/api/users/alice/followers')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0', ['username' => 'bob', 'name' => 'Bob']);
+
+        $this->actingAs($this->me)->getJson('/api/users/alice/following')
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.username', 'bob');
+    });
+});
+
+describe('feed', function () {
+    it('shows public quotes of followed readers with their author', function () {
+        $bob = User::factory()->public()->create(['username' => 'bob', 'name' => 'Bob']);
+        $this->me->following()->attach([$this->alice->id, $bob->id]);
+
+        $first = quoteOf($this->alice);
+        $second = quoteOf($bob);
+
+        $this->actingAs($this->me)->getJson('/api/feed')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $second->id)
+            ->assertJsonPath('data.0.author', ['username' => 'bob', 'name' => 'Bob'])
+            ->assertJsonPath('data.1.id', $first->id)
+            ->assertJsonPath('data.1.author.username', 'alice')
+            ->assertJsonPath('data.1.book.title', $first->userBook->book->title);
+    });
+
+    it('leaves out private quotes, readers not followed and readers who went private', function () {
+        $stranger = User::factory()->public()->create();
+        $gone = User::factory()->public()->create();
+        $this->me->following()->attach([$this->alice->id, $gone->id]);
+
+        $shown = quoteOf($this->alice);
+        quoteOf($this->alice, false);
+        quoteOf($stranger);
+        quoteOf($gone);
+        $gone->update(['is_public' => false]);
+        quoteOf($this->me);
+
+        $this->actingAs($this->me)->getJson('/api/feed')
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $shown->id);
+    });
+
+    it('is empty without follows and paginated otherwise', function () {
+        $this->actingAs($this->me)->getJson('/api/feed')->assertOk()->assertJsonCount(0, 'data');
+
+        $this->me->following()->attach($this->alice->id);
+        foreach (range(1, 21) as $i) {
+            quoteOf($this->alice);
+        }
+        $this->actingAs($this->me)->getJson('/api/feed')->assertJsonCount(20, 'data');
+        $this->actingAs($this->me)->getJson('/api/feed?page=2')->assertJsonCount(1, 'data');
+    });
+
+    it('does not run a query per quote', function () {
+        $this->me->following()->attach($this->alice->id);
+        foreach (range(1, 10) as $i) {
+            quoteOf($this->alice);
+        }
+
+        $this->actingAs($this->me);
+        DB::enableQueryLog();
+        $this->getJson('/api/feed')->assertOk();
+
+        expect(count(DB::getQueryLog()))->toBeLessThan(12);
+    });
+});

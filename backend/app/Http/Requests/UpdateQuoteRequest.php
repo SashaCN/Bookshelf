@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\QuoteType;
+use App\Enums\QuoteVisibility;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -29,6 +30,7 @@ class UpdateQuoteRequest extends FormRequest
             'note' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             'is_favorite' => ['sometimes', 'boolean'],
+            'visibility' => ['sometimes', 'required', Rule::enum(QuoteVisibility::class)],
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Social\UpdateProfile;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
@@ -19,11 +20,8 @@ class MeController extends Controller
     /**
      * Update the authenticated user's profile (name and time zone).
      */
-    public function update(UpdateProfileRequest $request): UserResource
+    public function update(UpdateProfileRequest $request, UpdateProfile $updateProfile): UserResource
     {
-        $user = $request->user();
-        $user->update($request->validated());
-
-        return new UserResource($user);
+        return new UserResource($updateProfile->handle($request->user(), $request->validated()));
     }
 }

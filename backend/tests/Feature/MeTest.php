@@ -23,6 +23,8 @@ it('returns the authenticated user', function () {
             'name' => $user->name,
             'email' => $user->email,
             'timezone' => 'Europe/Kyiv',
+            'username' => null,
+            'is_public' => false,
         ]]);
 });
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\QuoteType;
+use App\Enums\QuoteVisibility;
 use Database\Factories\QuoteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'note',
     'page',
     'is_favorite',
+    'visibility',
 ])]
 class Quote extends Model
 {
@@ -31,6 +33,7 @@ class Quote extends Model
     protected $attributes = [
         'type' => 'quote',
         'is_favorite' => false,
+        'visibility' => 'private',
     ];
 
     protected function casts(): array
@@ -39,6 +42,7 @@ class Quote extends Model
             'type' => QuoteType::class,
             'page' => 'integer',
             'is_favorite' => 'boolean',
+            'visibility' => QuoteVisibility::class,
         ];
     }
 

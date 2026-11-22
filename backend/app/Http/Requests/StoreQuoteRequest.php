@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\QuoteType;
+use App\Enums\QuoteVisibility;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -30,6 +31,7 @@ class StoreQuoteRequest extends FormRequest
             // Whether it fits the book is checked against the reader's page count by the action.
             'page' => ['nullable', 'integer', 'min:1', 'max:20000'],
             'is_favorite' => ['sometimes', 'boolean'],
+            'visibility' => ['sometimes', 'required', Rule::enum(QuoteVisibility::class)],
         ];
     }
 }

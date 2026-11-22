@@ -1,8 +1,11 @@
 <?php
 
 use App\Http\Controllers\CatalogSearchController;
+use App\Http\Controllers\FeedController;
+use App\Http\Controllers\FollowController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\MeController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\StatsController;
@@ -26,6 +29,14 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // Before the {quote} routes, or "daily" would be taken for a quote id.
     Route::get('/quotes/daily', [QuoteController::class, 'daily'])->name('quotes.daily');
     Route::apiResource('quotes', QuoteController::class)->except('store');
+
+    Route::get('/feed', FeedController::class)->name('feed');
+    Route::get('/users/{username}', [ProfileController::class, 'show'])->name('users.show');
+    Route::get('/users/{username}/quotes', [ProfileController::class, 'quotes'])->name('users.quotes');
+    Route::get('/users/{username}/followers', [ProfileController::class, 'followers'])->name('users.followers');
+    Route::get('/users/{username}/following', [ProfileController::class, 'following'])->name('users.following');
+    Route::post('/users/{username}/follow', [FollowController::class, 'store'])->name('users.follow');
+    Route::delete('/users/{username}/follow', [FollowController::class, 'destroy'])->name('users.unfollow');
 
     Route::get('/stats/summary', [StatsController::class, 'summary'])->name('stats.summary');
     Route::get('/stats/daily', [StatsController::class, 'daily'])->name('stats.daily');
