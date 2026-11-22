@@ -112,4 +112,25 @@ describe('ReadingJournal', () => {
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(wrapper.findAll('li')).toHaveLength(1)
   })
+
+  it('keeps the newest answer when an older request finishes last, and drops the old book\'s entries', async () => {
+    let answerFirst: (value: { data: ReadingLog[]; links: { next: null } }) => void = () => undefined
+    vi.mocked(libraryApi.logs)
+      .mockImplementationOnce(() => new Promise((resolve) => (answerFirst = resolve)))
+      .mockResolvedValueOnce({ data: [makeLog({ id: 5, pages: 33 })], links: { next: null } })
+
+    const wrapper = mountJournal(0)
+    await wrapper.setProps({ version: 1 })
+    await flushPromises()
+    answerFirst({ data: [makeLog({ id: 1, pages: 11 })], links: { next: null } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('33')
+    expect(wrapper.text()).not.toContain('11')
+
+    vi.mocked(libraryApi.logs).mockReturnValueOnce(new Promise(() => undefined))
+    await wrapper.setProps({ bookId: 8 })
+
+    expect(wrapper.text()).not.toContain('33')
+  })
 })

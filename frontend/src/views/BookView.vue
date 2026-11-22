@@ -35,14 +35,26 @@ const journalVersion = ref(0)
 const book = computed(() => userBook.value?.book ?? null)
 const needsPages = computed(() => userBook.value !== null && !userBook.value.total_pages)
 
+let loadRequest = 0
+
 async function load() {
+  const request = ++loadRequest
   notFound.value = false
   error.value = ''
 
+  // Moving to another book must not keep showing (and editing) the previous one while this one loads.
+  if (userBook.value && userBook.value.id !== props.id) {
+    userBook.value = null
+    confirmingDelete.value = false
+  }
+
   try {
     await library.load()
-    userBook.value = library.find(props.id) ?? (await libraryApi.get(props.id))
+    const found = library.find(props.id) ?? (await libraryApi.get(props.id))
+    if (request === loadRequest) userBook.value = found
   } catch (e) {
+    if (request !== loadRequest) return
+
     if (e instanceof ApiError && e.status === 404) {
       notFound.value = true
     } else {
@@ -230,6 +242,7 @@ function isDisabled(target: BookStatus): boolean {
       <RatingStars
         :model-value="userBook.rating"
         :label="$t('book.rating')"
+        :disabled="busy"
         @update:model-value="save({ rating: $event })"
       />
     </section>

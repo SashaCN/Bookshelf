@@ -4,7 +4,7 @@ import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
 import { useLibraryStore } from '@/stores/library'
-import { makeQuote, makeUserBook } from '@/test/fixtures'
+import { makeBook, makeQuote, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
 import type { UserBook } from '@/types/api'
 import BookView from './BookView.vue'
@@ -238,6 +238,34 @@ describe('BookView', () => {
     expect(router.currentRoute.value.name).toBe('library')
   })
 
+  it('keeps the book and says so when removing fails', async () => {
+    const { wrapper, router } = await mountView(makeUserBook())
+    vi.mocked(libraryApi.remove).mockRejectedValue(new ApiError(500, null))
+
+    await buttonWithText(wrapper, 'Видалити з бібліотеки').trigger('click')
+    await buttonWithText(wrapper, 'Видалити').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+    expect(wrapper.text()).toContain('Atomic Habits')
+    expect(router.currentRoute.value.name).toBe('book')
+  })
+
+  it('offers a retry when the book cannot be loaded', async () => {
+    const { plugins, router } = createTestEnvironment()
+    vi.mocked(libraryApi.list).mockResolvedValue([])
+    vi.mocked(libraryApi.get).mockRejectedValueOnce(new ApiError(500, null)).mockResolvedValueOnce(makeUserBook({ id: 5 }))
+    vi.mocked(libraryApi.logs).mockResolvedValue({ data: [], links: { next: null } })
+    await router.push({ name: 'book', params: { id: 5 } })
+
+    const wrapper = mount(BookView, { props: { id: 5 }, global: { plugins } })
+    await flushPromises()
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Atomic Habits')
+  })
+
   it('lets the reader back out of removing', async () => {
     const { wrapper } = await mountView(makeUserBook())
 
@@ -326,5 +354,37 @@ describe('BookView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Цієї книги немає у вашій бібліотеці.')
+  })
+
+  it('does not let a second rating tap through while the first one is being saved', async () => {
+    const { wrapper } = await mountView(makeUserBook({ status: 'finished', allowed_statuses: ['reading'] }))
+    let finish: (book: UserBook) => void = () => undefined
+    vi.mocked(libraryApi.update).mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+
+    await wrapper.findAll('[aria-label="4 / 5"]')[0]!.trigger('click')
+
+    expect(wrapper.findAll('[aria-label="5 / 5"]')[0]!.attributes('disabled')).toBeDefined()
+
+    finish(makeUserBook({ status: 'finished', rating: 4 }))
+    await flushPromises()
+
+    expect(wrapper.findAll('[aria-label="5 / 5"]')[0]!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('stops showing the previous book while the next one loads, and ignores a late answer for it', async () => {
+    const { wrapper } = await mountView(makeUserBook({ id: 1, status: 'finished', allowed_statuses: [] }))
+    let late: (book: UserBook) => void = () => undefined
+    vi.mocked(libraryApi.get).mockImplementationOnce(() => new Promise((resolve) => (late = resolve)))
+
+    await wrapper.setProps({ id: 2 })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Atomic Habits')
+    expect(wrapper.text()).toContain('Завантаження…')
+
+    late(makeUserBook({ id: 2, book: makeBook({ title: 'Deep Work' }), status: 'finished', allowed_statuses: [] }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Deep Work')
   })
 })
