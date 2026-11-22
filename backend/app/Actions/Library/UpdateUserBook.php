@@ -3,8 +3,9 @@
 namespace App\Actions\Library;
 
 use App\Enums\BookStatus;
+use App\Models\User;
 use App\Models\UserBook;
-use Illuminate\Support\Carbon;
+use App\Rules\ReaderDate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -25,6 +26,11 @@ class UpdateUserBook
     public function handle(UserBook $userBook, array $data): UserBook
     {
         DB::transaction(function () use ($userBook, $data): void {
+            // Another request (a progress tap, a second tab) may have changed the entry since it was loaded;
+            // decide on what is stored now, and make the next writer wait for this one.
+            UserBook::query()->whereKey($userBook->getKey())->lockForUpdate()->firstOrFail();
+            $userBook->refresh();
+
             $wasReading = $userBook->status === BookStatus::Reading;
             $pageBefore = $userBook->current_page;
 
@@ -41,8 +47,8 @@ class UpdateUserBook
                 $this->changeStatus->apply(
                     $userBook,
                     BookStatus::from($data['status']),
-                    isset($data['started_at']) ? Carbon::parse($data['started_at']) : null,
-                    isset($data['finished_at']) ? Carbon::parse($data['finished_at']) : null,
+                    isset($data['started_at']) ? ReaderDate::parse($data['started_at'], $this->timezoneOf($userBook)) : null,
+                    isset($data['finished_at']) ? ReaderDate::parse($data['finished_at'], $this->timezoneOf($userBook)) : null,
                 );
             }
 
@@ -56,6 +62,11 @@ class UpdateUserBook
         });
 
         return $userBook->refresh()->load('book.authors');
+    }
+
+    private function timezoneOf(UserBook $userBook): string
+    {
+        return $userBook->user->timezone ?: User::DEFAULT_TIMEZONE;
     }
 
     /**
