@@ -30,7 +30,12 @@ class EpubParser
 
     private const CHAPTER_TYPES = ['application/xhtml+xml', 'text/html'];
 
-    private const REMOVED_ELEMENTS = ['script', 'iframe', 'object', 'embed', 'link', 'style', 'base', 'meta', 'form'];
+    private const REMOVED_ELEMENTS = ['script', 'iframe', 'object', 'embed', 'link', 'style', 'base', 'meta', 'form',
+        'svg', 'math', 'template', 'frame', 'frameset', 'applet'];
+
+    private const URL_ATTRIBUTES = ['href', 'src', 'xlink:href', 'action', 'formaction', 'poster', 'background', 'data', 'srcset', 'cite'];
+
+    private const UNSAFE_SCHEMES = ['javascript:', 'vbscript:', 'data:'];
 
     /**
      * @return array{title: string, author: string|null, chapters: list<string>}
@@ -62,7 +67,7 @@ class EpubParser
             $title = $this->text($xpath, '//*[local-name()="metadata"]/*[local-name()="title"]');
             $author = $this->text($xpath, '//*[local-name()="metadata"]/*[local-name()="creator"]');
 
-            $chapters = $this->spine($xpath, dirname($opfPath));
+            $chapters = $this->spine($zip, $xpath, dirname($opfPath));
             if ($chapters === []) {
                 $this->fail('reader.invalid_epub');
             }
@@ -110,7 +115,7 @@ class EpubParser
     {
         $dom = new DOMDocument;
         $previous = libxml_use_internal_errors(true);
-        $dom->loadHTML('<?xml encoding="utf-8"?>'.$raw, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        $dom->loadHTML('<?xml encoding="utf-8"?>'.$this->toUtf8($raw), LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
 
@@ -133,7 +138,7 @@ class EpubParser
             foreach (iterator_to_array($element->attributes) as $attribute) {
                 $name = strtolower($attribute->nodeName);
                 $value = strtolower(preg_replace('/[\x00-\x20]+/', '', $attribute->nodeValue ?? '') ?? '');
-                if (str_starts_with($name, 'on') || (in_array($name, ['href', 'src', 'xlink:href', 'action', 'formaction'], true) && str_starts_with($value, 'javascript:'))) {
+                if (str_starts_with($name, 'on') || $name === 'srcdoc' || ($this->isUrlAttribute($name) && $this->hasUnsafeScheme($value))) {
                     $element->removeAttributeNode($attribute);
                 }
             }
@@ -148,6 +153,49 @@ class EpubParser
         }
 
         return ['title' => $title === '' ? null : $title, 'html' => $html];
+    }
+
+    /**
+     * Chapters may declare another encoding (windows-1251 is common for Cyrillic books), or have a byte order mark.
+     * The result is always valid UTF-8.
+     */
+    private function toUtf8(string $raw): string
+    {
+        $encoding = 'UTF-8';
+        if (str_starts_with($raw, "\xFF\xFE")) {
+            $encoding = 'UTF-16LE';
+        } elseif (str_starts_with($raw, "\xFE\xFF")) {
+            $encoding = 'UTF-16BE';
+        } elseif (preg_match('/^\s*<\?xml[^>]*encoding\s*=\s*["\']([A-Za-z0-9._-]+)["\']/i', $raw, $matches) === 1
+            && in_array(strtoupper($matches[1]), array_map('strtoupper', mb_list_encodings()), true)) {
+            $encoding = $matches[1];
+        }
+
+        return ltrim(mb_convert_encoding($raw, 'UTF-8', $encoding), "\u{FEFF}");
+    }
+
+    private function isUrlAttribute(string $name): bool
+    {
+        return in_array($name, self::URL_ATTRIBUTES, true);
+    }
+
+    /**
+     * The value is already lowercase and free of whitespace and control characters, which browsers ignore in schemes.
+     * Embedded images of a book are the only data URL that is harmless.
+     */
+    private function hasUnsafeScheme(string $value): bool
+    {
+        if (preg_match('#^data:image/(png|jpe?g|gif|webp);#', $value) === 1) {
+            return false;
+        }
+
+        foreach (self::UNSAFE_SCHEMES as $scheme) {
+            if (str_starts_with($value, $scheme)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function open(string $path): ZipArchive
@@ -212,7 +260,8 @@ class EpubParser
 
     private function loadXml(?string $xml): DOMDocument
     {
-        if ($xml === null || trim($xml) === '') {
+        // Metadata has no use for entities, and declaring them is how XML bombs are built.
+        if ($xml === null || trim($xml) === '' || stripos($xml, '<!ENTITY') !== false) {
             $this->fail('reader.invalid_epub');
         }
 
@@ -241,7 +290,7 @@ class EpubParser
     /**
      * @return list<string>
      */
-    private function spine(DOMXPath $xpath, string $baseDir): array
+    private function spine(ZipArchive $zip, DOMXPath $xpath, string $baseDir): array
     {
         $items = [];
         foreach ($xpath->query('//*[local-name()="manifest"]/*[local-name()="item"]') ?: [] as $item) {
@@ -260,7 +309,18 @@ class EpubParser
                 continue;
             }
 
-            $chapters[] = $this->normalize(($baseDir === '.' ? '' : $baseDir.'/').rawurldecode(strtok($href, '#') ?: ''));
+            // A reference to a part of a file (#fragment) or a query is still that file; "/x" is relative to the archive root.
+            $target = rawurldecode(explode('#', explode('?', $href)[0])[0]);
+            if ($target === '' || preg_match('#^[a-z][a-z0-9+.-]*:#i', $target) === 1) {
+                continue;
+            }
+
+            $entry = $this->normalize(str_starts_with($target, '/') || $baseDir === '.' ? $target : $baseDir.'/'.$target);
+
+            // A book may list a file twice, and a manifest may name a file the archive does not have.
+            if (! in_array($entry, $chapters, true) && $zip->locateName($entry) !== false) {
+                $chapters[] = $entry;
+            }
         }
 
         return $chapters;
