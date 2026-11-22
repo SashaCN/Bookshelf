@@ -28,6 +28,12 @@ class EpubParser
 
     public const MAX_CHAPTER_SIZE = 5 * 1024 * 1024;
 
+    public const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+
+    public const MAX_CHAPTER_IMAGES = 8 * 1024 * 1024;
+
+    private const IMAGE_TYPES = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp'];
+
     private const CHAPTER_TYPES = ['application/xhtml+xml', 'text/html'];
 
     private const REMOVED_ELEMENTS = ['script', 'iframe', 'object', 'embed', 'link', 'style', 'base', 'meta', 'form',
@@ -97,21 +103,17 @@ class EpubParser
 
         try {
             $raw = $this->read($zip, $entry, self::MAX_CHAPTER_SIZE);
+
+            return $raw === null ? null : $this->sanitize($raw, $zip, $entry);
         } finally {
             $zip->close();
         }
-
-        if ($raw === null) {
-            return null;
-        }
-
-        return $this->sanitize($raw);
     }
 
     /**
      * @return array{title: string|null, html: string}
      */
-    private function sanitize(string $raw): array
+    private function sanitize(string $raw, ZipArchive $zip, string $entry): array
     {
         $dom = new DOMDocument;
         $previous = libxml_use_internal_errors(true);
@@ -130,6 +132,8 @@ class EpubParser
                 $element->parentNode?->removeChild($element);
             }
         }
+
+        $this->embedImages($dom, $zip, $entry);
 
         foreach ($xpath->query('//*') ?: [] as $element) {
             if (! $element instanceof DOMElement) {
@@ -153,6 +157,89 @@ class EpubParser
         }
 
         return ['title' => $title === '' ? null : $title, 'html' => $html];
+    }
+
+    /**
+     * Replaces the src of every <img> with a data: URI of the image from the archive, or removes the image.
+     * Nothing is written to disk.
+     */
+    private function embedImages(DOMDocument $dom, ZipArchive $zip, string $chapterEntry): void
+    {
+        $budget = self::MAX_CHAPTER_IMAGES;
+
+        foreach (iterator_to_array($dom->getElementsByTagName('img')) as $img) {
+            $img->removeAttribute('srcset');
+            $img->removeAttribute('style');
+
+            $uri = $this->imageDataUri($zip, $chapterEntry, $img->getAttribute('src'), $budget);
+            if ($uri !== null) {
+                $img->setAttribute('src', $uri);
+
+                continue;
+            }
+
+            $alt = trim($img->getAttribute('alt'));
+            if ($alt !== '') {
+                $img->parentNode?->replaceChild($dom->createTextNode($alt), $img);
+            } else {
+                $img->parentNode?->removeChild($img);
+            }
+        }
+    }
+
+    private function imageDataUri(ZipArchive $zip, string $chapterEntry, string $src, int &$budget): ?string
+    {
+        $src = trim($src);
+        // Absolute paths, protocol-relative and scheme URLs (http:, data:, ...) are never fetched.
+        if ($src === '' || str_starts_with($src, '/') || str_starts_with($src, '\\')
+            || preg_match('#^[a-z][a-z0-9+.-]*:#i', $src) === 1) {
+            return null;
+        }
+
+        $target = rawurldecode(explode('#', explode('?', $src)[0])[0]);
+        if ($target === '' || str_contains($target, "\0")) {
+            return null;
+        }
+
+        $parts = [];
+        foreach (explode('/', dirname($chapterEntry) === '.' ? $target : dirname($chapterEntry).'/'.$target) as $part) {
+            if ($part === '..') {
+                // Going above the root of the archive.
+                if ($parts === []) {
+                    return null;
+                }
+                array_pop($parts);
+            } elseif ($part !== '' && $part !== '.') {
+                $parts[] = $part;
+            }
+        }
+        $name = implode('/', $parts);
+
+        $mime = self::IMAGE_TYPES[strtolower(pathinfo($name, PATHINFO_EXTENSION))] ?? null;
+        $stat = $mime !== null ? $zip->statName($name) : false;
+        if ($stat === false || $stat['size'] > self::MAX_IMAGE_SIZE || $stat['size'] > $budget) {
+            return null;
+        }
+
+        $data = $this->read($zip, $name, self::MAX_IMAGE_SIZE + 1);
+        if ($data === null || strlen($data) > self::MAX_IMAGE_SIZE || strlen($data) > $budget || ! $this->matchesType($data, $mime)) {
+            return null;
+        }
+
+        $budget -= strlen($data);
+
+        return 'data:'.$mime.';base64,'.base64_encode($data);
+    }
+
+    private function matchesType(string $data, string $mime): bool
+    {
+        return match ($mime) {
+            'image/png' => str_starts_with($data, "\x89PNG\r\n\x1a\n"),
+            'image/jpeg' => str_starts_with($data, "\xFF\xD8\xFF"),
+            'image/gif' => str_starts_with($data, 'GIF87a') || str_starts_with($data, 'GIF89a'),
+            'image/webp' => str_starts_with($data, 'RIFF') && substr($data, 8, 4) === 'WEBP',
+            default => false,
+        };
     }
 
     /**

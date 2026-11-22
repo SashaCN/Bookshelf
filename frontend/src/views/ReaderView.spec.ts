@@ -49,6 +49,7 @@ describe('ReaderView', () => {
     expect(frame.attributes('sandbox')).toBe('')
     expect(frame.attributes('srcdoc')).toContain('http-equiv="Content-Security-Policy"')
     expect(frame.attributes('srcdoc')).toContain("default-src 'none'")
+    expect(frame.attributes('srcdoc')).toContain('img-src data:')
     expect(frame.attributes('srcdoc')).toContain('<p>Розділ-2</p>')
     expect(wrapper.text()).toContain('Розділ 3 з 12')
   })

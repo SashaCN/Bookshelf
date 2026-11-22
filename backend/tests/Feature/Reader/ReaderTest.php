@@ -274,6 +274,81 @@ describe('chapters', function () {
             ->assertJsonPath('data.html', '<p>Second</p>');
     });
 
+    describe('images', function () {
+        $png = "\x89PNG\r\n\x1a\n".str_repeat('p', 20);
+        $jpeg = "\xFF\xD8\xFF\xE0".str_repeat('j', 20);
+
+        /** Uploads a one-chapter book (OEBPS/text/ch.xhtml) with the given extra files and returns its html. */
+        $chapterHtml = function ($test, string $body, array $files = []) {
+            $file = makeEpubWith(['OEBPS/text/ch.xhtml' => '<html><body>'.$body.'</body></html>'] + $files, ['text/ch.xhtml']);
+            $test->actingAs($test->user)->post('/api/reader', ['file' => $file], ['Accept' => 'application/json'])->assertCreated();
+            $id = ReaderDocument::query()->latest('id')->firstOrFail()->id;
+
+            return $test->actingAs($test->user)->getJson("/api/reader/{$id}/chapters/0")->assertOk()->json('data.html');
+        };
+
+        it('embeds png and jpeg as data URIs, resolving ../ and encoding', function () use ($chapterHtml, $png, $jpeg) {
+            $html = $chapterHtml(
+                $this,
+                '<img src="../images/a%20b.png?x=1#f" alt="A" srcset="x.png 2x" style="width:9999px" width="10" height="5"><img src="../images/c.jpeg">',
+                ['OEBPS/images/a b.png' => $png, 'OEBPS/images/c.jpeg' => $jpeg],
+            );
+
+            expect($html)->toContain('src="data:image/png;base64,'.base64_encode($png).'"')
+                ->toContain('data:image/jpeg;base64,'.base64_encode($jpeg))
+                ->toContain('width="10"')->toContain('height="5"')
+                ->not->toContain('srcset')->not->toContain('style=');
+        });
+
+        it('removes a missing image and keeps its alt text', function () use ($chapterHtml) {
+            $html = $chapterHtml($this, '<p>x<img src="nope.png" alt="Lost picture">y<img src="nope2.png"></p>');
+
+            expect($html)->toContain('Lost picture')->not->toContain('<img');
+        });
+
+        it('removes an image over 2 MB', function () use ($chapterHtml, $png) {
+            $html = $chapterHtml($this, '<img src="big.png" alt="Big">', ['OEBPS/text/big.png' => $png.random_bytes(2 * 1024 * 1024)]);
+
+            expect($html)->not->toContain('<img')->not->toContain('data:')->toContain('Big');
+        });
+
+        it('removes an image whose bytes do not match its type', function () use ($chapterHtml, $jpeg) {
+            $html = $chapterHtml($this, '<img src="fake.png" alt="Fake">', ['OEBPS/text/fake.png' => $jpeg]);
+
+            expect($html)->not->toContain('<img')->not->toContain('data:');
+        });
+
+        it('rejects paths that leave the archive and files of other types', function () use ($chapterHtml, $png) {
+            $html = $chapterHtml(
+                $this,
+                '<img src="../../../secret.png"><img src="../../../../mimetype"><img src="/OEBPS/images/a.png"><img src="doc.txt">',
+                ['secret.png' => $png, 'OEBPS/images/a.png' => $png, 'OEBPS/text/doc.txt' => $png],
+            );
+
+            expect($html)->not->toContain('<img')->not->toContain('data:');
+        });
+
+        it('removes images with an external or scheme source', function () use ($chapterHtml) {
+            $html = $chapterHtml($this, '<img src="http://example.com/a.png"><img src="//example.com/a.png"><img src="data:image/png;base64,AAAA"><img src="file:///etc/passwd">');
+
+            expect($html)->not->toContain('<img');
+        });
+
+        it('stops embedding at 8 MB per chapter', function () use ($chapterHtml, $png) {
+            $big = $png.random_bytes(1_900_000);
+            $files = [];
+            $body = '';
+            foreach (range(1, 5) as $i) {
+                $files["OEBPS/text/i{$i}.png"] = $big.$i;
+                $body .= "<img src=\"i{$i}.png\" alt=\"n{$i}\">";
+            }
+            $html = $chapterHtml($this, $body, $files);
+
+            expect(substr_count($html, 'data:image/png'))->toBe(4)
+                ->and($html)->toContain('n5')->not->toContain('alt="n5"');
+        });
+    });
+
     it('answers 404 for a chapter out of range', function (string $n) {
         $this->actingAs($this->user)->post('/api/reader', ['file' => makeEpub()], ['Accept' => 'application/json'])->assertCreated();
         $document = ReaderDocument::query()->sole();
@@ -370,10 +445,10 @@ describe('chapter sanitising', function () {
         'form action' => ['<p>kept</p><form action="javascript:a()"><button formaction="javascript:b()">x</button></form>', ['javascript']],
     ]);
 
-    it('keeps embedded raster images and ordinary links', function () {
+    it('keeps ordinary links and drops images that are not in the archive', function () {
         $html = importedChapter($this, '<p>kept <a href="ch2.xhtml#x">next</a><img src="data:image/png;base64,iVBORw0KGgo="></p>');
 
-        expect($html)->toContain('href="ch2.xhtml#x"')->toContain('data:image/png;base64');
+        expect($html)->toContain('href="ch2.xhtml#x"')->not->toContain('<img');
     });
 
     it('reads a chapter in the encoding it declares', function () {

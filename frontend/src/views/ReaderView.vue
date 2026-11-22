@@ -58,7 +58,7 @@ const srcdoc = computed(() => {
   if (!chapter.value) return ''
   return `<!doctype html>
 <html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root { color-scheme: light; --bg: #ffffff; --fg: #141b2b; }
