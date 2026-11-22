@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { apiErrorCode } from '@/api/errors'
+import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useAuthStore } from '@/stores/auth'
 
+const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/
+
+const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const errorMessage = useApiErrorMessage()
@@ -17,6 +23,7 @@ const timezone = ref(auth.user?.timezone ?? 'Europe/Kyiv')
 const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
+const usernameError = ref('')
 
 // The reader's day boundary decides which day a page counts for, so the time zone is editable.
 const timezones = computed(() => {
@@ -24,21 +31,49 @@ const timezones = computed(() => {
   return all.includes(timezone.value) ? all : [timezone.value, ...all]
 })
 
+/** What the reader typed, in the form it is saved. */
+const cleanUsername = computed(() => username.value.trim().toLowerCase())
+
+/** Shown as soon as the reader has typed something, before any request is made. */
+const formatError = computed(() =>
+  cleanUsername.value && !USERNAME_PATTERN.test(cleanUsername.value) ? t('profile.usernameInvalid') : '',
+)
+const shownUsernameError = computed(() => formatError.value || usernameError.value)
+
+/** Server answers about the username go next to its field; returns false when something else is to blame. */
+function showUsernameError(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return false
+
+  if (apiErrorCode(e) === 'profile.username_required') {
+    usernameError.value = t('apiErrors.profile.username_required')
+  } else if (e.status === 422 && e.fieldErrors.username?.length) {
+    // The format is checked before sending, so what the server still refuses is a name somebody else has.
+    usernameError.value = t('profile.usernameTaken')
+  } else {
+    return false
+  }
+
+  return true
+}
+
 async function save() {
+  if (formatError.value) return
+
   saving.value = true
   saved.value = false
   error.value = ''
+  usernameError.value = ''
 
   try {
     await auth.updateProfile({
       name: name.value.trim(),
       timezone: timezone.value,
-      username: username.value.trim().toLowerCase() || null,
+      username: cleanUsername.value || null,
       is_public: isPublic.value,
     })
     saved.value = true
   } catch (e) {
-    error.value = errorMessage(e)
+    if (!showUsernameError(e)) error.value = errorMessage(e)
   } finally {
     saving.value = false
   }
@@ -93,15 +128,17 @@ async function logout() {
         id="profile-username"
         v-model="username"
         type="text"
-        minlength="3"
         maxlength="30"
-        pattern="[a-z0-9_]{3,30}"
         autocapitalize="none"
         autocomplete="username"
-        aria-describedby="profile-username-hint"
-        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+        spellcheck="false"
+        :aria-invalid="shownUsernameError ? 'true' : undefined"
+        :aria-describedby="shownUsernameError ? 'profile-username-error' : 'profile-username-hint'"
+        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger"
+        @input="usernameError = ''"
       >
-      <p id="profile-username-hint" class="text-sm text-ink-muted">{{ $t('profile.usernameHint') }}</p>
+      <p v-if="shownUsernameError" id="profile-username-error" class="text-sm text-danger">{{ shownUsernameError }}</p>
+      <p v-else id="profile-username-hint" class="text-sm text-ink-muted">{{ $t('profile.usernameHint') }}</p>
     </div>
 
     <div class="flex items-start gap-3">

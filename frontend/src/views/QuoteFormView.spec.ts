@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
+import { useAuthStore } from '@/stores/auth'
 import { useQuotesStore } from '@/stores/quotes'
 import { makeBook, makeQuote, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
@@ -138,6 +139,23 @@ describe('QuoteFormView', () => {
 
       expect(buttonWithText(wrapper, 'Цитата').attributes('aria-pressed')).toBe('false')
       expect(buttonWithText(wrapper, 'Інсайт').attributes('aria-pressed')).toBe('true')
+    })
+
+    it('warns that a public quote stays hidden while the profile is private', async () => {
+      const { wrapper } = await mountCreate({ book: '1' })
+      const auth = useAuthStore()
+      auth.user = { id: 1, name: 'Olena', email: 'o@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false }
+
+      expect(wrapper.text()).toContain('лише якщо ваш профіль публічний')
+      expect(wrapper.text()).not.toContain('приватний, тож')
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      expect(wrapper.text()).toContain('Ваш профіль зараз приватний')
+      expect(wrapper.findAll('a[href="/profile"]').map((link) => link.text())).toContain('Налаштувати профіль')
+
+      auth.user = { ...auth.user, is_public: true }
+      await wrapper.vm.$nextTick()
+      expect(wrapper.text()).not.toContain('Ваш профіль зараз приватний')
     })
 
     it('makes a quote public when asked to', async () => {

@@ -127,5 +127,80 @@ describe('ProfileView', () => {
 
       expect(wrapper.text()).toContain('вкажіть імʼя користувача')
     })
+
+    it('hints at the username format before anything is sent', async () => {
+      const { wrapper, auth } = mountView()
+      const update = vi.spyOn(auth, 'updateProfile').mockResolvedValue()
+
+      expect(wrapper.find('#profile-username-error').exists()).toBe(false)
+      await wrapper.get('#profile-username').setValue('ab')
+
+      expect(wrapper.get('#profile-username-error').text()).toContain('від 3 до 30 символів')
+      expect(wrapper.get('#profile-username').attributes('aria-invalid')).toBe('true')
+      expect(wrapper.get('#profile-username').attributes('aria-describedby')).toBe('profile-username-error')
+
+      await wrapper.get('form').trigger('submit')
+      expect(update).not.toHaveBeenCalled()
+
+      await wrapper.get('#profile-username').setValue('Olena_1')
+      expect(wrapper.find('#profile-username-error').exists()).toBe(false)
+    })
+
+    it('says what a public profile shows', () => {
+      const { wrapper } = mountView()
+
+      expect(wrapper.get('#profile-public-hint').text()).toContain('публічні цитати')
+      expect(wrapper.get('#profile-public-hint').text()).toContain('Пошта, бібліотека й нотатки лишаються приватними')
+    })
+
+    it('shows next to the field that the username is taken', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'updateProfile').mockRejectedValue(
+        new ApiError(422, { message: 'Invalid', errors: { username: ['The username has already been taken.'] } }),
+      )
+
+      await wrapper.get('#profile-username').setValue('olena')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(wrapper.get('#profile-username-error').text()).toBe('Це імʼя вже зайняте. Оберіть інше.')
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+      await wrapper.get('#profile-username').setValue('olena2')
+      expect(wrapper.find('#profile-username-error').exists()).toBe(false)
+    })
+
+    it('shows the missing username next to the field', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'updateProfile').mockRejectedValue(
+        new ApiError(422, { message: 'Invalid', errors: { username: ['profile.username_required'] } }),
+      )
+
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(wrapper.get('#profile-username-error').text()).toContain('вкажіть імʼя користувача')
+    })
+
+    it('blames the name being taken when the server rejects a well-formed username', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'updateProfile').mockRejectedValue(
+        new ApiError(422, { message: 'Invalid', errors: { username: ['The username format is invalid.'] } }),
+      )
+      await wrapper.get('#profile-username').setValue('valid_name')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(wrapper.get('#profile-username-error').text()).toContain('вже зайняте')
+    })
+
+    it('disables saving while the request is on its way', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'updateProfile').mockReturnValue(new Promise(() => undefined))
+
+      await wrapper.get('form').trigger('submit')
+
+      expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    })
   })
 })

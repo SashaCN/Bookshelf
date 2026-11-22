@@ -8,6 +8,7 @@ import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
 import { useQuotesStore } from '@/stores/quotes'
 import type { Quote, QuoteType, QuoteVisibility } from '@/types/api'
@@ -25,6 +26,7 @@ const props = defineProps<{ id?: number }>()
 const { t, te } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const library = useLibraryStore()
 const quotes = useQuotesStore()
 const errorMessage = useApiErrorMessage()
@@ -213,6 +215,10 @@ async function submit() {
     <div class="flex flex-col gap-1.5">
       <SegmentedControl v-model="form.visibility" :label="$t('quotes.visibility.label')" :options="visibilityOptions" />
       <p class="text-sm text-ink-muted">{{ $t('quotes.visibility.hint') }}</p>
+      <p v-if="form.visibility === 'public' && auth.user && !auth.user.is_public" role="status" class="text-sm text-danger">
+        {{ $t('quotes.visibility.profilePrivate') }}
+        <RouterLink :to="{ name: 'profile' }" class="font-medium underline underline-offset-2">{{ $t('quotes.visibility.toProfile') }}</RouterLink>
+      </p>
     </div>
 
     <div class="flex flex-col gap-1.5">
