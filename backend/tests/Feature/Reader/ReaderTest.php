@@ -62,6 +62,37 @@ function makeEpub(array $chapters = [], array $options = []): UploadedFile
     return new UploadedFile($path, $options['name'] ?? 'book.epub', 'application/epub+zip', null, true);
 }
 
+/**
+ * An EPUB whose package is written by hand, to test how the references of the spine are read.
+ *
+ * @param  array<string, string>  $files  zip path => content, added as they are
+ * @param  list<string>  $hrefs  manifest hrefs, in spine order
+ */
+function makeEpubWith(array $files, array $hrefs, string $opfPath = 'OEBPS/content.opf'): UploadedFile
+{
+    $path = tempnam(sys_get_temp_dir(), 'epub');
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::OVERWRITE);
+    $zip->addFromString('mimetype', 'application/epub+zip');
+    $zip->addFromString('META-INF/container.xml', '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>'
+        .'<rootfile full-path="'.$opfPath.'" media-type="application/oebps-package+xml"/></rootfiles></container>');
+
+    $manifest = '';
+    $spine = '';
+    foreach ($hrefs as $i => $href) {
+        $manifest .= '<item id="c'.$i.'" href="'.htmlspecialchars($href).'" media-type="application/xhtml+xml"/>';
+        $spine .= '<itemref idref="c'.$i.'"/>';
+    }
+    $zip->addFromString($opfPath, '<package><metadata><title>Hand made</title></metadata>'
+        ."<manifest>{$manifest}</manifest><spine>{$spine}</spine></package>");
+    foreach ($files as $name => $content) {
+        $zip->addFromString($name, $content);
+    }
+    $zip->close();
+
+    return new UploadedFile($path, 'hand.epub', 'application/epub+zip', null, true);
+}
+
 beforeEach(function () {
     Storage::fake('local');
     $this->user = User::factory()->create();
@@ -264,3 +295,156 @@ it('answers 404 for somebody else\'s book on every route', function (string $met
     ['PUT', '/api/reader/{id}/position', ['chapter' => 99, 'fraction' => 9]],
     ['GET', '/api/reader/{id}/chapters/0', []],
 ]);
+
+describe('references of the spine', function () {
+    it('resolves encoded, fragment, absolute and parent references to archive entries once each', function () {
+        $files = [
+            'OEBPS/Text/one two.xhtml' => '<p>one</p>',
+            'OEBPS/two.xhtml' => '<p>two</p>',
+            'three.xhtml' => '<p>three</p>',
+        ];
+        $file = makeEpubWith($files, [
+            'Text/one%20two.xhtml#part',
+            'Text/../two.xhtml?x=1',
+            'two.xhtml',
+            '/three.xhtml',
+            '../../../three.xhtml',
+            '#only-fragment',
+            'https://example.com/x.xhtml',
+            'missing.xhtml',
+        ]);
+
+        $this->actingAs($this->user)->postJson('/api/reader', ['file' => $file])->assertCreated()->assertJsonPath('data.chapters_count', 3);
+
+        expect(ReaderDocument::query()->sole()->chapters)
+            ->toBe(['OEBPS/Text/one two.xhtml', 'OEBPS/two.xhtml', 'three.xhtml']);
+    });
+
+    it('finds the package when it sits in the archive root', function () {
+        $file = makeEpubWith(['a.xhtml' => '<p>a</p>'], ['a.xhtml'], 'content.opf');
+
+        $this->actingAs($this->user)->postJson('/api/reader', ['file' => $file])->assertCreated();
+
+        expect(ReaderDocument::query()->sole()->chapters)->toBe(['a.xhtml']);
+    });
+
+    it('rejects a package that declares entities', function () {
+        $file = makeEpubWith(['OEBPS/a.xhtml' => '<p>a</p>'], ['a.xhtml']);
+        $zip = new ZipArchive;
+        $zip->open($file->getRealPath());
+        $opf = (string) $zip->getFromName('OEBPS/content.opf');
+        $zip->addFromString('OEBPS/content.opf', '<?xml version="1.0"?><!DOCTYPE package [<!ENTITY a "aaaa">]>'.$opf);
+        $zip->close();
+
+        $this->actingAs($this->user)->postJson('/api/reader', ['file' => $file])
+            ->assertUnprocessable()->assertJsonValidationErrors(['file' => 'reader.invalid_epub']);
+    });
+});
+
+describe('chapter sanitising', function () {
+    function importedChapter(mixed $test, string $body): string
+    {
+        $test->actingAs($test->user)->postJson('/api/reader', ['file' => makeEpub(['OEBPS/ch1.xhtml' => $body])])->assertCreated();
+        $document = ReaderDocument::query()->latest('id')->firstOrFail();
+
+        return (string) $test->actingAs($test->user)->getJson("/api/reader/{$document->id}/chapters/0")->assertOk()->json('data.html');
+    }
+
+    it('removes script vectors in any spelling', function (string $body, array $gone) {
+        $html = strtolower(importedChapter($this, $body));
+
+        foreach ($gone as $needle) {
+            expect($html)->not->toContain($needle);
+        }
+        expect($html)->toContain('kept');
+    })->with([
+        'uppercase handlers' => ['<p ONCLICK="a()" OnMouseOver="b()">kept</p>', ['onclick', 'onmouseover', 'a()']],
+        'svg script and handler' => ['<p>kept</p><svg onload="a()"><script>a()</script><animate attributeName="href" values="javascript:a()"/></svg>', ['<svg', 'script', 'onload', 'javascript']],
+        'math link' => ['<p>kept</p><math><mtext href="javascript:a()">x</mtext></math>', ['<math', 'javascript']],
+        'data url in a link' => ['<a href="data:text/html;base64,PHNjcmlwdD4=">kept</a>', ['data:']],
+        'data url in a frame source' => ['<p>kept</p><img src="DATA:image/svg+xml;base64,PHN2Zz4=">', ['data:']],
+        'obfuscated scheme' => ["<a href=\" \tjava\nscript:a()\">kept</a>", ['script:']],
+        'entity-encoded scheme' => ['<a href="&#106;avascript:a()">kept</a>', ['avascript']],
+        'srcdoc' => ['<p>kept</p><iframe srcdoc="<script>a()</script>"></iframe><div SRCDOC="x">y</div>', ['srcdoc', 'iframe']],
+        'meta refresh and base' => ['<p>kept</p><meta http-equiv="refresh" content="0;url=javascript:a()"><base href="http://evil/">', ['<meta', '<base']],
+        'form action' => ['<p>kept</p><form action="javascript:a()"><button formaction="javascript:b()">x</button></form>', ['javascript']],
+    ]);
+
+    it('keeps embedded raster images and ordinary links', function () {
+        $html = importedChapter($this, '<p>kept <a href="ch2.xhtml#x">next</a><img src="data:image/png;base64,iVBORw0KGgo="></p>');
+
+        expect($html)->toContain('href="ch2.xhtml#x"')->toContain('data:image/png;base64');
+    });
+
+    it('reads a chapter in the encoding it declares', function () {
+        $cyrillic = '<?xml version="1.0" encoding="windows-1251"?><html><head><title>t</title></head><body><h1>'
+            .mb_convert_encoding('Привіт', 'Windows-1251', 'UTF-8').'</h1><p>kept</p></body></html>';
+        $file = makeEpubWith(['OEBPS/a.xhtml' => $cyrillic], ['a.xhtml']);
+        $this->actingAs($this->user)->postJson('/api/reader', ['file' => $file])->assertCreated();
+        $document = ReaderDocument::query()->sole();
+
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}/chapters/0")
+            ->assertOk()->assertJsonPath('data.title', 'Привіт');
+    });
+
+    it('survives invalid UTF-8 and UTF-16 chapters', function () {
+        $files = [
+            'OEBPS/a.xhtml' => "<p>kept \xC3\x28 bad</p>",
+            'OEBPS/b.xhtml' => "\xFF\xFE".mb_convert_encoding('<p>wide</p>', 'UTF-16LE', 'UTF-8'),
+        ];
+        $this->actingAs($this->user)->postJson('/api/reader', ['file' => makeEpubWith($files, ['a.xhtml', 'b.xhtml'])])->assertCreated();
+        $document = ReaderDocument::query()->sole();
+
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}/chapters/0")->assertOk();
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}/chapters/1")->assertOk()->assertJsonPath('data.html', '<p>wide</p>');
+    });
+
+    it('answers 404 for a missing archive and for a huge chapter number', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+        Storage::disk('local')->put($document->path, 'not a zip');
+
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}/chapters/0")->assertNotFound();
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}/chapters/99999999999999999999")->assertNotFound();
+    });
+});
+
+describe('failures while storing', function () {
+    it('removes the file when the row cannot be saved', function () {
+        ReaderDocument::creating(fn () => throw new RuntimeException('database down'));
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->user)->postJson('/api/reader', ['file' => makeEpub()]);
+        } catch (RuntimeException) {
+        }
+
+        expect(Storage::disk('local')->allFiles())->toBe([]);
+        ReaderDocument::flushEventListeners();
+    });
+
+    it('keeps the file when the row cannot be deleted', function () {
+        $this->actingAs($this->user)->postJson('/api/reader', ['file' => makeEpub()])->assertCreated();
+        $document = ReaderDocument::query()->sole();
+        ReaderDocument::deleting(fn () => throw new RuntimeException('database down'));
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->user)->deleteJson("/api/reader/{$document->id}");
+        } catch (RuntimeException) {
+        }
+
+        expect(Storage::disk('local')->exists($document->path))->toBeTrue();
+        ReaderDocument::flushEventListeners();
+    });
+
+    it('throttles uploads per reader', function () {
+        $this->actingAs($this->user);
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson('/api/reader', [])->assertUnprocessable();
+        }
+
+        $this->postJson('/api/reader', [])->assertTooManyRequests();
+        $this->actingAs($this->stranger)->postJson('/api/reader', [])->assertUnprocessable();
+    });
+});

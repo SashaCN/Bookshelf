@@ -43,8 +43,9 @@ class ReaderDocumentController extends Controller
     {
         Gate::authorize('delete', $readerDocument);
 
-        Storage::disk('local')->delete($readerDocument->path);
+        // The row first: if it cannot be deleted, the book must still have its file.
         $readerDocument->delete();
+        Storage::disk('local')->delete($readerDocument->path);
 
         return response()->noContent();
     }

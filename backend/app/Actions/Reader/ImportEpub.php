@@ -9,6 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ImportEpub
 {
@@ -28,12 +29,19 @@ class ImportEpub
 
         $path = Storage::disk('local')->putFileAs('reader/'.$user->id, $file, Str::uuid().'.epub');
 
-        return $user->readerDocuments()->create([
-            'title' => $parsed['title'],
-            'author' => $parsed['author'],
-            'path' => $path,
-            'chapters' => $parsed['chapters'],
-            'chapters_count' => count($parsed['chapters']),
-        ])->refresh();
+        try {
+            return $user->readerDocuments()->create([
+                'title' => $parsed['title'],
+                'author' => $parsed['author'],
+                'path' => $path,
+                'chapters' => $parsed['chapters'],
+                'chapters_count' => count($parsed['chapters']),
+            ]);
+        } catch (Throwable $exception) {
+            // No row, no use for the file.
+            Storage::disk('local')->delete($path);
+
+            throw $exception;
+        }
     }
 }

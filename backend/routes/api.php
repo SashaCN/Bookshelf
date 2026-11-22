@@ -31,12 +31,15 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/quotes/daily', [QuoteController::class, 'daily'])->name('quotes.daily');
     Route::apiResource('quotes', QuoteController::class)->except('store');
 
+    Route::post('/reader', [ReaderDocumentController::class, 'store'])
+        ->middleware('throttle:uploads')
+        ->name('reader.store');
     Route::apiResource('reader', ReaderDocumentController::class)
         ->parameters(['reader' => 'readerDocument'])
-        ->except('update');
+        ->except('update', 'store');
     Route::put('/reader/{readerDocument}/position', [ReaderDocumentController::class, 'position'])->name('reader.position');
     Route::get('/reader/{readerDocument}/chapters/{n}', [ReaderDocumentController::class, 'chapter'])
-        ->whereNumber('n')
+        ->where('n', '[0-9]{1,6}')
         ->name('reader.chapter');
 
     Route::get('/feed', FeedController::class)->name('feed');
