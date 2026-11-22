@@ -76,18 +76,7 @@ onMounted(load)
 </script>
 
 <template>
-  <PageHeader :title="$t('reader.title')" :back-to="{ name: 'home' }">
-    <template #action>
-      <button
-        type="button"
-        :disabled="uploading"
-        class="inline-flex min-h-10 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent disabled:opacity-60"
-        @click="pick"
-      >
-        {{ uploading ? $t('reader.uploading') : $t('reader.upload') }}
-      </button>
-    </template>
-  </PageHeader>
+  <PageHeader :title="$t('reader.title')" :back-to="{ name: 'home' }" />
 
   <input
     ref="input"
@@ -97,6 +86,16 @@ onMounted(load)
     data-testid="epub-input"
     @change="onFile"
   >
+
+  <button
+    v-if="reader.loaded && !error && reader.items.length"
+    type="button"
+    :disabled="uploading"
+    class="mb-4 flex min-h-11 w-full items-center justify-center rounded-2xl border border-dashed border-line bg-surface px-4 font-semibold text-accent disabled:opacity-60"
+    @click="pick"
+  >
+    {{ uploading ? $t('reader.uploading') : $t('reader.upload') }}
+  </button>
 
   <p v-if="uploading" role="status" class="mb-4 text-sm text-ink-muted">{{ $t('reader.uploading') }}</p>
   <ErrorNotice v-if="uploadError" :message="uploadError" class="mb-4" />
@@ -109,7 +108,7 @@ onMounted(load)
       <li v-for="doc in reader.items" :key="doc.id" class="rounded-2xl border border-line bg-surface p-4">
         <RouterLink :to="{ name: 'reader-view', params: { id: doc.id } }" class="block">
           <p class="font-display text-lg font-semibold">{{ doc.title }}</p>
-          <p v-if="doc.author" class="text-sm text-ink-muted">{{ $t('reader.author', { name: doc.author }) }}</p>
+          <p v-if="doc.author" class="text-sm text-ink-muted">{{ doc.author }}</p>
         </RouterLink>
 
         <div class="mt-3 flex items-center gap-3">
@@ -118,8 +117,11 @@ onMounted(load)
           </div>
           <span class="text-sm tabular-nums text-ink-muted">{{ Math.round(doc.progress) }}%</span>
         </div>
+        <p class="mt-1 text-sm text-ink-muted">
+          {{ $t('reader.chapter', { n: Math.min(doc.position.chapter + 1, doc.chapters_count), total: doc.chapters_count }) }}
+        </p>
 
-        <div class="mt-3 flex items-center justify-end gap-2">
+        <div class="mt-3 flex items-center gap-2">
           <template v-if="confirmingId === doc.id">
             <span class="mr-auto text-sm">{{ $t('reader.confirmRemove') }}</span>
             <button type="button" :disabled="removingId === doc.id" class="min-h-11 rounded-lg border border-line px-3 text-sm disabled:opacity-60" @click="confirmingId = null">
@@ -129,9 +131,17 @@ onMounted(load)
               {{ removingId === doc.id ? $t('reader.removing') : $t('reader.confirmYes') }}
             </button>
           </template>
-          <button v-else type="button" :aria-label="$t('reader.removeNamed', { title: doc.title })" class="min-h-11 rounded-lg px-3 text-sm text-danger" @click="confirmingId = doc.id">
-            {{ $t('reader.remove') }}
-          </button>
+          <template v-else>
+            <RouterLink
+              :to="{ name: 'reader-view', params: { id: doc.id } }"
+              class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-accent px-4 font-semibold text-on-accent"
+            >
+              {{ doc.progress > 0 ? $t('reader.continue') : $t('reader.read') }}
+            </RouterLink>
+            <button type="button" :aria-label="$t('reader.removeNamed', { title: doc.title })" class="min-h-11 rounded-lg px-3 text-sm text-ink-muted" @click="confirmingId = doc.id">
+              {{ $t('reader.remove') }}
+            </button>
+          </template>
         </div>
       </li>
     </ul>

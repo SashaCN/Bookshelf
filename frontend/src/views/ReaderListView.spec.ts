@@ -47,6 +47,39 @@ describe('ReaderListView', () => {
     expect(wrapper.get('input[type="file"]').attributes('accept')).toBe('.epub,application/epub+zip')
   })
 
+  it('keeps the upload out of the header, as a full-width button under it', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([makeReaderDoc()])
+    const wrapper = await mountView()
+
+    expect(wrapper.get('header').text()).not.toContain('Завантажити EPUB')
+    expect(buttonWithText(wrapper, 'Завантажити EPUB').classes()).toContain('w-full')
+  })
+
+  it('shows just the author name and the chapter', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([
+      makeReaderDoc({ position: { chapter: 2, fraction: 0.1 }, chapters_count: 12, progress: 20 }),
+    ])
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).toContain('Тарас Шевченко')
+    expect(wrapper.text()).not.toContain('Автор:')
+    expect(wrapper.text()).toContain('Розділ 3 з 12')
+  })
+
+  it('offers to read a new book and to continue a started one', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([
+      makeReaderDoc({ id: 1, progress: 0 }),
+      makeReaderDoc({ id: 2, progress: 30 }),
+    ])
+    const wrapper = await mountView()
+
+    const links = wrapper.findAll('a').filter((a) => ['Читати', 'Продовжити'].includes(a.text()))
+    expect(links.map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Читати', '/reader/1'],
+      ['Продовжити', '/reader/2'],
+    ])
+  })
+
   it('shows an empty state', async () => {
     vi.mocked(readerApi.list).mockResolvedValue([])
 
@@ -95,13 +128,13 @@ describe('ReaderListView', () => {
     const click = vi.spyOn(wrapper.get('[data-testid="epub-input"]').element as HTMLInputElement, 'click')
 
     const buttons = wrapper.findAll('button').filter((button) => button.text() === 'Завантажити EPUB')
-    expect(buttons).toHaveLength(2)
-    await buttons[1].trigger('click')
+    expect(buttons).toHaveLength(1)
+    await buttons[0].trigger('click')
 
     expect(click).toHaveBeenCalled()
   })
 
-  it('shows progress and disables both upload buttons while uploading', async () => {
+  it('shows progress and disables the upload button while uploading', async () => {
     vi.mocked(readerApi.list).mockResolvedValue([])
     let finish: (doc: ReturnType<typeof makeReaderDoc>) => void = () => undefined
     vi.mocked(readerApi.upload).mockReturnValue(new Promise((resolve) => { finish = resolve }))
@@ -111,7 +144,7 @@ describe('ReaderListView', () => {
 
     expect(wrapper.get('[role="status"]').text()).toBe('Завантажуємо…')
     const buttons = wrapper.findAll('button').filter((button) => button.text() === 'Завантажуємо…')
-    expect(buttons).toHaveLength(2)
+    expect(buttons).toHaveLength(1)
     buttons.forEach((button) => expect(button.attributes('disabled')).toBeDefined())
 
     finish(makeReaderDoc({ id: 7, title: 'Нова' }))
