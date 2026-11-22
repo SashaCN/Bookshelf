@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\UserBook;
 use App\Services\OpenLibrary\CatalogEntry;
 use App\Services\OpenLibrary\OpenLibraryClient;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -37,6 +38,22 @@ class AddBookToLibrary
         $knownBook = $workKey !== null ? Book::where('openlibrary_work_key', $workKey)->first() : null;
         $entry = $workKey !== null && $knownBook === null ? $this->lookUp($workKey) : null;
 
+        try {
+            return $this->store($user, $data, $knownBook, $entry);
+        } catch (UniqueConstraintViolationException $e) {
+            // Another request stored the same work (or added it to this library) while we were waiting for the
+            // catalog. Start over: this time the book is known and a repeat becomes a normal "already added".
+            $stored = $workKey !== null ? Book::where('openlibrary_work_key', $workKey)->first() : null;
+
+            return $this->store($user, $data, $stored ?? throw $e, null);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function store(User $user, array $data, ?Book $knownBook, ?CatalogEntry $entry): UserBook
+    {
         return DB::transaction(function () use ($user, $data, $knownBook, $entry): UserBook {
             $book = $knownBook
                 ?? ($entry !== null ? $this->storeCatalogBook($entry) : $this->createManualBook($user, $data));

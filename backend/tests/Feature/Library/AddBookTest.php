@@ -226,3 +226,34 @@ describe('with a starting status', function () {
         ])->assertUnprocessable()->assertJsonValidationErrors('finished_at');
     });
 });
+
+describe('concurrent requests', function () {
+    it('uses the book another request stored while this one was waiting for the catalog', function () {
+        Http::fake(['openlibrary.org/search.json*' => function () {
+            Book::factory()->create(['openlibrary_work_key' => '/works/OL17930368W', 'title' => 'Atomic Habits']);
+
+            return Http::response(['docs' => [openLibraryDoc()]]);
+        }]);
+
+        $this->actingAs($this->user)->postJson('/api/library', ['openlibrary_work_key' => 'OL17930368W'])
+            ->assertCreated()
+            ->assertJsonPath('data.book.title', 'Atomic Habits');
+
+        expect(Book::count())->toBe(1)->and($this->user->userBooks()->count())->toBe(1);
+    });
+
+    it('answers "already added" when the same request got there first', function () {
+        Http::fake(['openlibrary.org/search.json*' => function () {
+            $book = Book::factory()->create(['openlibrary_work_key' => '/works/OL17930368W']);
+            UserBook::factory()->for($this->user)->for($book)->create();
+
+            return Http::response(['docs' => [openLibraryDoc()]]);
+        }]);
+
+        $this->actingAs($this->user)->postJson('/api/library', ['openlibrary_work_key' => 'OL17930368W'])
+            ->assertConflict()
+            ->assertJsonPath('message', 'library.already_added');
+
+        expect(Book::count())->toBe(1);
+    });
+});
