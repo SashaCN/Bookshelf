@@ -50,7 +50,18 @@ describe('HomeView', () => {
   it('links to the feed', async () => {
     const { wrapper } = await mountView([reading(1, 'Дюна')], null)
 
-    expect(wrapper.get('a[href="/feed"]').text()).toBe('Стрічка друзів')
+    expect(wrapper.get('a[href="/feed"]').text()).toContain('Стрічка друзів')
+    expect(wrapper.get('a[href="/feed"]').text()).toContain('Цитати людей, на яких ви підписані')
+  })
+
+  it('shows the feed and the reader as two matching cards', async () => {
+    const { wrapper } = await mountView([reading(1, 'Дюна')], null)
+
+    const feed = wrapper.get('a[href="/feed"]')
+    const reader = wrapper.get('a[href="/reader"]')
+    expect(reader.text()).toContain('Читалка EPUB')
+    expect(reader.text()).toContain('Читайте EPUB прямо в застосунку')
+    expect(reader.classes()).toEqual(feed.classes())
   })
 
   it('shows a card for each book being read', async () => {

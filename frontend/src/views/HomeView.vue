@@ -7,6 +7,11 @@ import PageHeader from '@/components/PageHeader.vue'
 import ReadingCard from '@/components/ReadingCard.vue'
 import { useLibraryStore } from '@/stores/library'
 
+const links = [
+  { name: 'feed', title: 'home.feedLink', hint: 'home.feedHint' },
+  { name: 'reader', title: 'home.readerLink', hint: 'home.readerHint' },
+]
+
 const library = useLibraryStore()
 const failed = ref(false)
 
@@ -46,14 +51,15 @@ onMounted(() => load())
 
   <DailyQuoteCard />
 
-  <RouterLink
-    :to="{ name: 'feed' }"
-    class="mt-4 flex min-h-11 items-center rounded-2xl border border-line bg-surface px-4 text-sm font-medium"
-  >
-    {{ $t('home.feedLink') }}
-  </RouterLink>
-
-  <RouterLink :to="{ name: 'reader' }" class="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-accent underline underline-offset-2">
-    {{ $t('home.readerLink') }}
-  </RouterLink>
+  <div class="mt-4 grid grid-cols-2 gap-3">
+    <RouterLink
+      v-for="link in links"
+      :key="link.name"
+      :to="{ name: link.name }"
+      class="flex min-h-11 flex-col gap-1 rounded-2xl border border-line bg-surface p-4"
+    >
+      <span class="font-semibold">{{ $t(link.title) }}</span>
+      <span class="text-sm text-ink-muted">{{ $t(link.hint) }}</span>
+    </RouterLink>
+  </div>
 </template>
