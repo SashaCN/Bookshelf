@@ -53,7 +53,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/stats/summary', [StatsController::class, 'summary'])->name('stats.summary');
     Route::get('/stats/daily', [StatsController::class, 'daily'])->name('stats.daily');
 
-    Route::get('/goals/{year}', [GoalController::class, 'show'])->whereNumber('year')->name('goals.show');
-    Route::put('/goals/{year}', [GoalController::class, 'update'])->whereNumber('year')->name('goals.update');
-    Route::delete('/goals/{year}', [GoalController::class, 'destroy'])->whereNumber('year')->name('goals.destroy');
+    Route::get('/goals/{year}', [GoalController::class, 'show'])->where('year', '[0-9]{4}')->name('goals.show');
+    Route::put('/goals/{year}', [GoalController::class, 'update'])->where('year', '[0-9]{4}')->name('goals.update');
+    Route::delete('/goals/{year}', [GoalController::class, 'destroy'])->where('year', '[0-9]{4}')->name('goals.destroy');
 });

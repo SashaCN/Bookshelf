@@ -109,3 +109,9 @@ it('rejects dates it cannot read and ranges that run backwards', function (strin
     'bad to' => ['to=15.10.2026', 'to'],
     'backwards' => ['from=2026-10-10&to=2026-10-01', 'to'],
 ]);
+
+it('refuses a start in the future when no end is given', function () {
+    $this->actingAs($this->user)->getJson('/api/stats/daily?from=2099-01-01')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('from');
+});

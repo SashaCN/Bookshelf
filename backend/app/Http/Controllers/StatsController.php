@@ -6,6 +6,7 @@ use App\Services\Stats\ReadingStatistics;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class StatsController extends Controller
 {
@@ -56,6 +57,10 @@ class StatsController extends Controller
         $from = isset($validated['from'])
             ? CarbonImmutable::parse($validated['from'])
             : $to->subDays(((int) ($validated['days'] ?? 30)) - 1);
+
+        if ($from->gt($to)) {
+            throw ValidationException::withMessages(['from' => ['stats.range_invalid']]);
+        }
 
         if ($from->diffInDays($to) > 365) {
             return response()->json([
