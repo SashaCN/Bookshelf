@@ -24,6 +24,7 @@ it('requires authentication for every endpoint', function (string $method, strin
     $this->json($method, $uri)->assertUnauthorized();
 })->with([
     ['GET', '/api/feed'],
+    ['GET', '/api/users?q=al'],
     ['GET', '/api/users/alice'],
     ['GET', '/api/users/alice/quotes'],
     ['GET', '/api/users/alice/followers'],
@@ -306,5 +307,92 @@ describe('feed', function () {
         $this->getJson('/api/feed')->assertOk();
 
         expect(count(DB::getQueryLog()))->toBeLessThan(12);
+    });
+});
+
+describe('people search', function () {
+    function publicUser(string $username, string $name = 'Someone'): User
+    {
+        return User::factory()->public()->create(['username' => $username, 'name' => $name]);
+    }
+
+    function searchUsernames($test, string $q): array
+    {
+        return collect($test->actingAs($test->me)->getJson('/api/users?'.http_build_query(['q' => $q]))
+            ->assertOk()->json('data'))->pluck('username')->all();
+    }
+
+    it('requires authentication', function () {
+        $this->getJson('/api/users?q=al')->assertUnauthorized();
+    });
+
+    it('validates q', function (array $query) {
+        $this->actingAs($this->me)->getJson('/api/users?'.http_build_query($query))
+            ->assertUnprocessable()->assertJsonValidationErrors('q');
+    })->with([
+        'missing' => [[]],
+        'one char' => [['q' => 'a']],
+        'blank' => [['q' => '   ']],
+        'too long' => [['q' => str_repeat('a', 51)]],
+    ]);
+
+    it('matches by username prefix and by name substring, case-insensitively', function () {
+        publicUser('zed', 'Marcus Aurelius');
+        publicUser('bobby', 'Bob');
+
+        expect(searchUsernames($this, 'ALI'))->toBe(['alice']);
+        expect(searchUsernames($this, 'aurel'))->toBe(['zed']);
+        expect(searchUsernames($this, 'obb'))->toBe([]);
+    });
+
+    it('strips a leading @', function () {
+        expect(searchUsernames($this, '@alice'))->toBe(['alice']);
+    });
+
+    it('leaves out private readers, readers without a username and the viewer', function () {
+        User::factory()->create(['username' => 'alpha', 'name' => 'Alpha', 'is_public' => false]);
+        User::factory()->create(['username' => null, 'name' => 'Alice Nameless', 'is_public' => true]);
+        $this->me->update(['username' => 'alicia', 'is_public' => true]);
+
+        expect(searchUsernames($this, 'al'))->toBe(['alice']);
+    });
+
+    it('treats wildcards literally', function () {
+        publicUser('a_b', 'Under');
+        publicUser('axb', 'Plain');
+
+        expect(searchUsernames($this, '__'))->toBe([]);
+        expect(searchUsernames($this, '%%'))->toBe([]);
+        expect(searchUsernames($this, 'a_'))->toBe(['a_b']);
+        expect(searchUsernames($this, '\\\\'))->toBe([]);
+    });
+
+    it('orders exact handle, then prefix, then name matches', function () {
+        publicUser('zzz', 'Carl Bobson');
+        publicUser('bobby', 'Zed');
+        publicUser('bob', 'Yan');
+        publicUser('bobcat', 'Adam');
+
+        expect(searchUsernames($this, 'bob'))->toBe(['bob', 'bobcat', 'bobby', 'zzz']);
+    });
+
+    it('returns at most 20 readers', function () {
+        foreach (range(1, 25) as $i) {
+            publicUser(sprintf('many%02d', $i));
+        }
+
+        expect(searchUsernames($this, 'many'))->toHaveCount(20);
+    });
+
+    it('flags the readers the viewer follows', function () {
+        $bob = publicUser('alan', 'Alan');
+        app(FollowUser::class)->follow($this->me, $bob);
+
+        $this->actingAs($this->me)->getJson('/api/users?q=al')
+            ->assertOk()
+            ->assertExactJson(['data' => [
+                ['username' => 'alan', 'name' => 'Alan', 'is_following' => true],
+                ['username' => 'alice', 'name' => 'Alice', 'is_following' => false],
+            ]]);
     });
 });

@@ -11,6 +11,7 @@ use App\Http\Controllers\ReaderDocumentController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\UserBookController;
+use App\Http\Controllers\UserSearchController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->group(function (): void {
@@ -43,6 +44,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->name('reader.chapter');
 
     Route::get('/feed', FeedController::class)->name('feed');
+    Route::get('/users', UserSearchController::class)->name('users.search');
     Route::get('/users/{username}', [ProfileController::class, 'show'])->name('users.show');
     Route::get('/users/{username}/quotes', [ProfileController::class, 'quotes'])->name('users.quotes');
     Route::get('/users/{username}/followers', [ProfileController::class, 'followers'])->name('users.followers');
