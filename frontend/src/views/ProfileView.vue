@@ -57,7 +57,7 @@ function showUsernameError(e: unknown): boolean {
 }
 
 async function save() {
-  if (formatError.value) return
+  if (formatError.value || saving.value) return
 
   saving.value = true
   saved.value = false
@@ -79,16 +79,31 @@ async function save() {
   }
 }
 
+const loggingOut = ref(false)
+const logoutError = ref('')
+
 async function logout() {
-  await auth.logout()
-  await router.push({ name: 'login' })
+  if (loggingOut.value) return
+
+  loggingOut.value = true
+  logoutError.value = ''
+
+  try {
+    await auth.logout()
+    await router.push({ name: 'login' })
+  } catch (e) {
+    // Still signed in: say so, instead of leaving the reader with a button that did nothing.
+    logoutError.value = errorMessage(e)
+  } finally {
+    loggingOut.value = false
+  }
 }
 </script>
 
 <template>
   <PageHeader :title="$t('profile.title')" :back-to="{ name: 'home' }" />
 
-  <form class="flex flex-col gap-4" @submit.prevent="save">
+  <form class="flex flex-col gap-4" @submit.prevent="save" @input="saved = false" @change="saved = false">
     <ErrorNotice v-if="error" :message="error" />
 
     <div class="flex flex-col gap-1.5">
@@ -174,9 +189,11 @@ async function logout() {
   </form>
 
   <div class="mt-8 border-t border-line pt-4">
+    <ErrorNotice v-if="logoutError" :message="logoutError" class="mb-3" />
     <button
       type="button"
-      class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium"
+      :disabled="loggingOut"
+      class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
       @click="logout"
     >
       {{ $t('profile.logout') }}

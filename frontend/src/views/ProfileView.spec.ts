@@ -85,6 +85,42 @@ describe('ProfileView', () => {
     expect(router.currentRoute.value.name).toBe('login')
   })
 
+  it('reports a failed logout instead of failing silently, and stays on the page', async () => {
+    const { wrapper, router, auth } = mountView()
+    vi.spyOn(auth, 'logout').mockRejectedValue(new ApiError(500, null))
+    await router.isReady()
+
+    await wrapper.get('button[type="button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося')
+    expect(router.currentRoute.value.name).not.toBe('login')
+    expect(wrapper.get('button[type="button"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('logs out only once when tapped twice', async () => {
+    const { wrapper, auth } = mountView()
+    const logout = vi.spyOn(auth, 'logout').mockReturnValue(new Promise(() => undefined))
+
+    await wrapper.get('button[type="button"]').trigger('click')
+    await wrapper.get('button[type="button"]').trigger('click')
+
+    expect(logout).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes the "saved" note away as soon as the reader edits again', async () => {
+    const { wrapper, auth } = mountView()
+    vi.spyOn(auth, 'updateProfile').mockResolvedValue()
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.find('[role="status"]').exists()).toBe(true)
+
+    await wrapper.get('#profile-name').setValue('Olena K')
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+
   describe('public profile', () => {
     it('shows the saved username and the toggle', () => {
       const { wrapper } = mountView('Europe/Kyiv', { username: 'olena', is_public: true })
