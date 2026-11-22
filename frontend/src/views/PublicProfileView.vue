@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import LoadMore from '@/components/LoadMore.vue'
@@ -7,12 +7,17 @@ import PageHeader from '@/components/PageHeader.vue'
 import QuoteCard from '@/components/QuoteCard.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLoadMore } from '@/composables/useLoadMore'
+import { useAuthStore } from '@/stores/auth'
 import { useSocialStore } from '@/stores/social'
 
 const props = defineProps<{ username: string }>()
 
 const social = useSocialStore()
+const auth = useAuthStore()
 const errorMessage = useApiErrorMessage()
+
+// A guest can read the page, but follows and the people lists need an account.
+const loginTarget = computed(() => ({ name: 'login', query: { redirect: `/u/${encodeURIComponent(props.username)}` } }))
 
 const notFound = ref(false)
 const { moreError, loadMore } = useLoadMore(() => social.profileQuotes.loadMore())
@@ -57,7 +62,7 @@ watch(() => props.username, load, { immediate: true })
 </script>
 
 <template>
-  <PageHeader :title="social.profile?.name ?? '@' + username" :back-to="{ name: 'home' }" />
+  <PageHeader :title="social.profile?.name ?? '@' + username" :back-to="auth.isAuthenticated ? { name: 'home' } : undefined" />
 
   <p v-if="notFound" class="py-10 text-center text-ink-muted">{{ $t('social.profile.notFound') }}</p>
 
@@ -74,25 +79,43 @@ watch(() => props.username, load, { immediate: true })
         <p class="text-xs text-ink-muted">{{ $t('social.profile.finishedThisYear') }}</p>
       </div>
       <RouterLink
+        v-if="auth.isAuthenticated"
         :to="{ name: 'followers', params: { username: social.profile.username } }"
         class="flex min-h-11 flex-col rounded-2xl border border-line bg-surface px-2 py-3"
       >
         <span class="font-display text-2xl font-bold tabular-nums">{{ social.profile.followers_count }}</span>
         <span class="text-xs text-ink-muted">{{ $t('social.profile.followers', social.profile.followers_count) }}</span>
       </RouterLink>
+      <div v-else class="flex flex-col rounded-2xl border border-line bg-surface px-2 py-3">
+        <span class="font-display text-2xl font-bold tabular-nums">{{ social.profile.followers_count }}</span>
+        <span class="text-xs text-ink-muted">{{ $t('social.profile.followers', social.profile.followers_count) }}</span>
+      </div>
       <RouterLink
+        v-if="auth.isAuthenticated"
         :to="{ name: 'following', params: { username: social.profile.username } }"
         class="flex min-h-11 flex-col rounded-2xl border border-line bg-surface px-2 py-3"
       >
         <span class="font-display text-2xl font-bold tabular-nums">{{ social.profile.following_count }}</span>
         <span class="text-xs text-ink-muted">{{ $t('social.profile.following', social.profile.following_count) }}</span>
       </RouterLink>
+      <div v-else class="flex flex-col rounded-2xl border border-line bg-surface px-2 py-3">
+        <span class="font-display text-2xl font-bold tabular-nums">{{ social.profile.following_count }}</span>
+        <span class="text-xs text-ink-muted">{{ $t('social.profile.following', social.profile.following_count) }}</span>
+      </div>
     </div>
 
     <ErrorNotice v-if="followError" :message="followError" retryable class="mb-3" @retry="toggleFollow" />
 
+    <RouterLink
+      v-if="!auth.isAuthenticated"
+      :to="loginTarget"
+      class="mb-6 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 font-semibold text-on-accent"
+    >
+      {{ $t('social.profile.loginToFollow') }}
+    </RouterLink>
+
     <button
-      v-if="!social.profile.is_me"
+      v-else-if="!social.profile.is_me"
       type="button"
       :disabled="busy"
       :aria-pressed="social.profile.is_following"

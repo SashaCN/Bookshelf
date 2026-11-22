@@ -26,6 +26,7 @@ const initials = computed(() => auth.user?.name.trim().charAt(0).toUpperCase() ?
     <slot name="action" />
 
     <RouterLink
+      v-if="auth.isAuthenticated"
       :to="{ name: 'profile' }"
       class="grid size-11 shrink-0 place-items-center rounded-full bg-sunken text-sm font-semibold"
       :aria-label="$t('profile.title')"

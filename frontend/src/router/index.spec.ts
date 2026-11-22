@@ -77,8 +77,25 @@ describe('router guards', () => {
 
     setActivePinia(createPinia())
     vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
-    await router.push('/u/olena')
+    await router.push('/u/olena/followers')
     expect(router.currentRoute.value.name).toBe('login')
+  })
+
+  it('lets a guest open a shared public profile without signing in', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
+
+    await router.push('/u/olena')
+
+    expect(router.currentRoute.value.name).toBe('public-profile')
+    expect(router.currentRoute.value.params.username).toBe('olena')
+  })
+
+  it('keeps a signed-in reader on a public profile', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/u/olena')
+
+    expect(router.currentRoute.value.name).toBe('public-profile')
   })
 
   it('treats the visitor as a guest when the API is unreachable', async () => {

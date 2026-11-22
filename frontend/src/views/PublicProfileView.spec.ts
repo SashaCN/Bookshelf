@@ -4,6 +4,7 @@ import { ApiError } from '@/api/http'
 import { socialApi } from '@/api/social'
 import { makeProfile, makeQuote } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
+import { useAuthStore } from '@/stores/auth'
 import type { PublicProfile } from '@/types/api'
 import PublicProfileView from './PublicProfileView.vue'
 
@@ -11,8 +12,11 @@ vi.mock('@/api/social', () => ({
   socialApi: { profile: vi.fn(), quotes: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
 }))
 
-async function mountView(profile: PublicProfile | Error, next: string | null = null) {
+const reader = { id: 1, name: 'Іван', email: 'ivan@example.com', timezone: 'Europe/Kyiv', username: 'ivan', is_public: true }
+
+async function mountView(profile: PublicProfile | Error, next: string | null = null, guest = false) {
   const { plugins, router } = createTestEnvironment()
+  useAuthStore().user = guest ? null : reader
   if (profile instanceof Error) {
     vi.mocked(socialApi.profile).mockRejectedValue(profile)
   } else {
@@ -51,6 +55,35 @@ describe('PublicProfileView', () => {
     expect(wrapper.text()).toContain('Public words')
     expect(wrapper.find('[aria-label="В улюблених"]').exists()).toBe(false)
     expect(buttonWithText(wrapper, 'Редагувати')).toBeUndefined()
+  })
+
+  it('shows a guest the profile and quotes without links to the people lists or a follow button', async () => {
+    const { wrapper } = await mountView(makeProfile(), null, true)
+
+    expect(wrapper.get('h1').text()).toBe('Олена')
+    expect(wrapper.text()).toContain('Public words')
+    expect(wrapper.text()).toContain('3підписники')
+    expect(wrapper.find('a[href="/u/olena/followers"]').exists()).toBe(false)
+    expect(wrapper.find('a[href="/u/olena/following"]').exists()).toBe(false)
+    expect(buttonWithText(wrapper, 'Підписатися')).toBeUndefined()
+    expect(wrapper.find('a[href="/"]').exists()).toBe(false)
+    expect(wrapper.find('a[href="/profile"]').exists()).toBe(false)
+  })
+
+  it('offers a guest to sign in and come back to the profile', async () => {
+    const { wrapper } = await mountView(makeProfile(), null, true)
+
+    const cta = wrapper.findAll('a').find((link) => link.text() === 'Увійдіть, щоб підписатися')
+
+    expect(cta?.attributes('href')).toBe('/login?redirect=/u/olena')
+  })
+
+  it('keeps the people links and the follow button for a signed-in reader', async () => {
+    const { wrapper } = await mountView(makeProfile())
+
+    expect(wrapper.find('a[href="/u/olena/followers"]').exists()).toBe(true)
+    expect(buttonWithText(wrapper, 'Підписатися')).toBeDefined()
+    expect(wrapper.text()).not.toContain('Увійдіть, щоб підписатися')
   })
 
   it('follows and then unfollows', async () => {

@@ -62,6 +62,8 @@ export const router = createRouter({
           name: 'public-profile',
           component: PublicProfileView,
           props: (route) => ({ username: String(route.params.username) }),
+          // Shared profile links work for guests too; signed-in readers get the usual layout.
+          meta: { requiresAuth: false },
         },
         {
           path: 'u/:username/followers',
