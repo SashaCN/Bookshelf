@@ -132,7 +132,55 @@ describe('AddBookView', () => {
     })
   })
 
+  describe('failed searches', () => {
+    it('shows a failed search with a retry that searches again for the same text', async () => {
+      vi.mocked(catalogApi.search).mockRejectedValueOnce(new ApiError(500, null)).mockResolvedValueOnce([makeEntry({ title: 'Found it' })])
+      const { wrapper } = await mountView()
+
+      await type(wrapper, 'atomic')
+      await settleSearch()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+
+      await wrapper.get('[role="alert"] button').trigger('click')
+      await flushPromises()
+
+      expect(catalogApi.search).toHaveBeenCalledTimes(2)
+      expect(catalogApi.search).toHaveBeenLastCalledWith('atomic')
+      expect(wrapper.text()).toContain('Found it')
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    })
+
+    it('lets the reader retry when the catalog is down', async () => {
+      vi.mocked(catalogApi.search)
+        .mockRejectedValueOnce(new ApiError(503, { message: 'catalog.unavailable' }))
+        .mockResolvedValueOnce([])
+      const { wrapper } = await mountView()
+
+      await type(wrapper, 'atomic')
+      await settleSearch()
+      await wrapper.get('[role="alert"] button').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Нічого не знайшли.')
+    })
+  })
+
   describe('adding', () => {
+    it('does not send a second request while a book is being added', async () => {
+      vi.mocked(catalogApi.search).mockResolvedValue([makeEntry()])
+      vi.mocked(libraryApi.create).mockReturnValue(new Promise(() => undefined))
+      const { wrapper } = await mountView()
+      await type(wrapper, 'atomic')
+      await settleSearch()
+
+      await wrapper.get('li button').trigger('click')
+      await wrapper.get('li button').trigger('click')
+
+      expect(libraryApi.create).toHaveBeenCalledTimes(1)
+      expect(wrapper.get('li button').attributes('disabled')).toBeDefined()
+    })
+
     it('adds a catalog book and opens it', async () => {
       vi.mocked(catalogApi.search).mockResolvedValue([makeEntry({ work_key: '/works/OL1W' })])
       vi.mocked(libraryApi.create).mockResolvedValue(makeUserBook({ id: 42 }))

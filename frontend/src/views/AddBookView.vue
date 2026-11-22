@@ -27,7 +27,8 @@ const error = ref('')
 
 const query = ref('')
 const results = ref<CatalogEntry[]>([])
-const searchState = ref<'idle' | 'loading' | 'done' | 'unavailable'>('idle')
+const searchState = ref<'idle' | 'loading' | 'done' | 'unavailable' | 'failed'>('idle')
+const searchError = ref('')
 const addingKey = ref<string | null>(null)
 
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -51,7 +52,7 @@ onBeforeUnmount(() => clearTimeout(timer))
 
 async function runSearch(text: string) {
   const id = ++searchId
-  error.value = ''
+  searchState.value = 'loading'
 
   try {
     const found = await catalogApi.search(text)
@@ -65,13 +66,20 @@ async function runSearch(text: string) {
     if (apiErrorCode(e) === 'catalog.unavailable') {
       searchState.value = 'unavailable'
     } else {
-      searchState.value = 'idle'
-      error.value = errorMessage(e)
+      searchState.value = 'failed'
+      searchError.value = errorMessage(e)
     }
   }
 }
 
+function retrySearch() {
+  const text = query.value.trim()
+  if (text.length >= MIN_QUERY_LENGTH) runSearch(text)
+}
+
 async function addFromCatalog(entry: CatalogEntry) {
+  if (submitting.value) return
+
   addingKey.value = entry.work_key
   await add({ openlibrary_work_key: entry.work_key })
   addingKey.value = null
@@ -87,6 +95,8 @@ function toNumber(value: string): number | null {
 }
 
 async function addManually() {
+  if (submitting.value) return
+
   const authors = form.authors
     .split(',')
     .map((name) => name.trim())
@@ -155,15 +165,16 @@ function showManual() {
 
     <p v-if="searchState === 'loading'" class="text-ink-muted" role="status">{{ $t('add.searching') }}</p>
 
-    <div
+    <ErrorNotice
       v-else-if="searchState === 'unavailable'"
-      role="alert"
-      class="rounded-lg bg-danger-soft px-3 py-3 text-sm text-danger"
-    >
-      {{ $t('apiErrors.catalog.unavailable') }}
-    </div>
+      :message="$t('apiErrors.catalog.unavailable')"
+      retryable
+      @retry="retrySearch"
+    />
 
-    <p v-else-if="searchState === 'done' && !results.length" class="text-ink-muted">{{ $t('add.noResults') }}</p>
+    <ErrorNotice v-else-if="searchState === 'failed'" :message="searchError" retryable @retry="retrySearch" />
+
+    <p v-else-if="searchState === 'done' && !results.length" class="text-ink-muted" role="status">{{ $t('add.noResults') }}</p>
 
     <ul v-if="results.length && searchState === 'done'" class="flex flex-col gap-2">
       <li
@@ -186,7 +197,7 @@ function showManual() {
           v-else
           type="button"
           :disabled="submitting"
-          class="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent disabled:opacity-60"
+          class="min-h-11 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent disabled:opacity-60"
           @click="addFromCatalog(entry)"
         >
           {{ addingKey === entry.work_key ? $t('add.adding') : $t('add.add') }}
@@ -196,7 +207,7 @@ function showManual() {
 
     <p class="text-center text-sm text-ink-muted">
       {{ $t('add.notFound') }}
-      <button type="button" class="font-medium text-accent underline underline-offset-2" @click="showManual">
+      <button type="button" class="min-h-11 font-medium text-accent underline underline-offset-2" @click="showManual">
         {{ $t('add.manualLink') }}
       </button>
     </p>
