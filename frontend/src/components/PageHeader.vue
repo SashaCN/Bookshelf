@@ -21,13 +21,13 @@ const initials = computed(() => auth.user?.name.trim().charAt(0).toUpperCase() ?
       </svg>
     </RouterLink>
 
-    <h1 class="min-w-0 flex-1 truncate font-display text-3xl font-bold tracking-tight">{{ title }}</h1>
+    <h1 tabindex="-1" class="min-w-0 flex-1 truncate font-display text-3xl font-bold tracking-tight outline-none">{{ title }}</h1>
 
     <slot name="action" />
 
     <RouterLink
       :to="{ name: 'profile' }"
-      class="grid size-10 shrink-0 place-items-center rounded-full bg-sunken text-sm font-semibold"
+      class="grid size-11 shrink-0 place-items-center rounded-full bg-sunken text-sm font-semibold"
       :aria-label="$t('profile.title')"
     >
       {{ initials }}
