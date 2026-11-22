@@ -62,5 +62,11 @@ export const useAuthStore = defineStore('auth', () => {
     resetReaderData()
   }
 
-  return { user, initialized, isAuthenticated, init, login, register, updateProfile, logout }
+  /** The server no longer knows this session: forget the reader without asking it again. */
+  function expireSession(): void {
+    user.value = null
+    resetReaderData()
+  }
+
+  return { user, initialized, isAuthenticated, init, login, register, updateProfile, logout, expireSession }
 })

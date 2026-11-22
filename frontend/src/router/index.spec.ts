@@ -26,6 +26,31 @@ describe('router guards', () => {
     expect(router.currentRoute.value.name).toBe('login')
   })
 
+  it('remembers the page a guest wanted and returns there after signing in', async () => {
+    await router.push('/library/7')
+
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/library/7')
+
+    // The login form pushes the remembered page; for a signed-in reader the guest-only route honours it too.
+    setActivePinia(createPinia())
+    vi.mocked(authApi.me).mockResolvedValue(user)
+    await router.push({ name: 'login', query: { redirect: '/stats' } })
+
+    expect(router.currentRoute.value.fullPath).toBe('/stats')
+  })
+
+  it('does not add a redirect for the home page and ignores a foreign one', async () => {
+    await router.push('/')
+    expect(router.currentRoute.value.query.redirect).toBeUndefined()
+
+    setActivePinia(createPinia())
+    vi.mocked(authApi.me).mockResolvedValue(user)
+    await router.push({ name: 'login', query: { redirect: 'https://evil.example' } })
+
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
   it('lets a signed-in reader open a private page', async () => {
     vi.mocked(authApi.me).mockResolvedValue(user)
 

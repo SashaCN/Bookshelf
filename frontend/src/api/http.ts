@@ -14,6 +14,13 @@ export class ApiError extends Error {
   }
 }
 
+let unauthorizedHandler: (() => void) | null = null
+
+/** Called whenever the API answers 401, i.e. the session is gone (expired, or ended in another tab). */
+export function onUnauthorized(handler: (() => void) | null): void {
+  unauthorizedHandler = handler
+}
+
 function readCookie(name: string): string | null {
   const entry = document.cookie.split('; ').find((cookie) => cookie.startsWith(`${name}=`))
   return entry ? decodeURIComponent(entry.slice(name.length + 1)) : null
@@ -71,6 +78,10 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
   // Only parse real JSON: a redirected HTML page (e.g. "already signed in") must not crash the client.
   const isJson = response.headers.get('content-type')?.includes('json') ?? false
   const data = isJson ? ((await response.json()) as unknown) : null
+
+  if (response.status === 401) {
+    unauthorizedHandler?.()
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, data)

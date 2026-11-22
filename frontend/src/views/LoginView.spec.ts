@@ -47,6 +47,32 @@ describe('LoginView', () => {
     expect(router.currentRoute.value.name).toBe('home')
   })
 
+  it('returns to the page the reader was sent away from', async () => {
+    const { wrapper, router, auth } = mountView()
+    vi.spyOn(auth, 'login').mockResolvedValue()
+    await router.replace('/login?redirect=%2Fstats')
+    router.addRoute({ path: '/stats', name: 'stats', component: { template: '<div />' } })
+
+    await fillAndSubmit(wrapper)
+
+    expect(router.currentRoute.value.fullPath).toBe('/stats')
+  })
+
+  it('sends one request when submitted twice while waiting', async () => {
+    const { wrapper, auth } = mountView()
+    let finish: () => void = () => undefined
+    const login = vi.spyOn(auth, 'login').mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)))
+
+    await wrapper.get('#email').setValue('olena@example.com')
+    await wrapper.get('#password').setValue('secret-password')
+    await wrapper.get('form').trigger('submit')
+    await wrapper.get('form').trigger('submit')
+    finish()
+    await flushPromises()
+
+    expect(login).toHaveBeenCalledTimes(1)
+  })
+
   it('shows a localized message for wrong credentials', async () => {
     const { wrapper, auth } = mountView()
     vi.spyOn(auth, 'login').mockRejectedValue(new ApiError(422, { errors: { email: ['These credentials do not match.'] } }))
@@ -54,6 +80,16 @@ describe('LoginView', () => {
     await fillAndSubmit(wrapper)
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Невірний email або пароль.')
+  })
+
+  it('shows a generic message when the server cannot be reached', async () => {
+    const { wrapper, auth } = mountView()
+    vi.spyOn(auth, 'login').mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await fillAndSubmit(wrapper)
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('Не вдалося виконати запит. Спробуйте ще раз.')
+    expect((wrapper.get('#email').element as HTMLInputElement).value).toBe('olena@example.com')
   })
 
   it('shows a throttling message after too many attempts', async () => {

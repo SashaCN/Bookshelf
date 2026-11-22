@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import AppLayout from '@/components/AppLayout.vue'
 import { useAuthStore } from '@/stores/auth'
+import { safeRedirect } from './redirect'
 import AddBookView from '@/views/AddBookView.vue'
 import BookView from '@/views/BookView.vue'
 import FeedView from '@/views/FeedView.vue'
@@ -99,10 +100,11 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login' }
+    // Remember where the visitor was going, so signing in takes them there instead of to the home page.
+    return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } }
   }
 
   if (to.meta.guestOnly && auth.isAuthenticated) {
-    return { name: 'home' }
+    return safeRedirect(to.query.redirect) ?? { name: 'home' }
   }
 })
