@@ -64,6 +64,7 @@ export default {
   library: {
     title: 'Бібліотека',
     add: 'Додати книгу',
+    statusFilter: 'Статус книги',
     empty: {
       want: { title: 'Список порожній', text: 'Додайте книги, які хочете прочитати.' },
       reading: { title: 'Нічого не читаєте', text: 'Тут будуть книги, які ви зараз читаєте.' },
@@ -135,7 +136,6 @@ export default {
     title: 'Цитати',
     add: 'Додати',
     addQuote: 'Додати цитату',
-    more: 'Показати ще',
     page: 'с. {page}',
     favorite: 'В улюблених',
     insight: 'Інсайт',

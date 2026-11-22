@@ -3,9 +3,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
+import LoadMore from '@/components/LoadMore.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import QuoteCard from '@/components/QuoteCard.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useLoadMore } from '@/composables/useLoadMore'
 import { useLibraryStore } from '@/stores/library'
 import { useQuotesStore } from '@/stores/quotes'
 import type { QuoteFilters } from '@/types/api'
@@ -16,8 +18,9 @@ const quotes = useQuotesStore()
 const library = useLibraryStore()
 const errorMessage = useApiErrorMessage()
 
+const { moreError, loadMore } = useLoadMore(() => quotes.loadMore())
+
 const error = ref('')
-const moreError = ref('')
 
 // The filters live in the URL, so going back from a quote returns to the same list.
 const favoritesOnly = computed(() => route.query.favorite === '1')
@@ -56,16 +59,6 @@ async function load() {
   }
 }
 
-async function loadMore() {
-  moreError.value = ''
-
-  try {
-    await quotes.loadMore()
-  } catch (e) {
-    moreError.value = errorMessage(e)
-  }
-}
-
 watch(
   () => `${favoritesOnly.value}:${bookFilter.value}`,
   () => {
@@ -86,7 +79,7 @@ onMounted(() => {
     <template #action>
       <RouterLink
         :to="{ name: 'quote-new', query: bookFilter === undefined ? {} : { book: bookFilter } }"
-        class="inline-flex min-h-10 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent"
+        class="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent"
       >
         {{ $t('quotes.add') }}
       </RouterLink>
@@ -98,7 +91,7 @@ onMounted(() => {
       <button
         type="button"
         :aria-pressed="!favoritesOnly"
-        class="inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-medium"
+        class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium"
         :class="!favoritesOnly ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
         @click="select({ book: bookFilter })"
       >
@@ -107,7 +100,7 @@ onMounted(() => {
       <button
         type="button"
         :aria-pressed="favoritesOnly"
-        class="inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-medium"
+        class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium"
         :class="favoritesOnly ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
         @click="select({ favorite: true, book: bookFilter })"
       >
@@ -165,16 +158,6 @@ onMounted(() => {
       </RouterLink>
     </EmptyState>
 
-    <ErrorNotice v-if="moreError" :message="moreError" retryable class="mt-4" @retry="loadMore" />
-
-    <button
-      v-if="quotes.hasMore && !moreError"
-      type="button"
-      :disabled="quotes.loadingMore"
-      class="mt-4 min-h-11 w-full rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
-      @click="loadMore"
-    >
-      {{ $t('quotes.more') }}
-    </button>
+    <LoadMore :has-more="quotes.hasMore" :loading="quotes.loadingMore" :error="moreError" @more="loadMore" />
   </template>
 </template>
