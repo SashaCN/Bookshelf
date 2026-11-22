@@ -36,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::post('/library/{userBook}/quotes', [QuoteController::class, 'store'])->name('library.quotes.store');
     // Before the {quote} routes, or "daily" would be taken for a quote id.
+    Route::get('/quotes/export', [QuoteController::class, 'export'])->name('quotes.export');
     Route::get('/quotes/daily', [QuoteController::class, 'daily'])->name('quotes.daily');
     Route::apiResource('quotes', QuoteController::class)->except('store');
 
