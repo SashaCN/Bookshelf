@@ -211,6 +211,17 @@ describe('StatsView', () => {
     expect(wrapper.text()).toContain('Поставте ціль')
   })
 
+  it('keeps the goal and explains when removing it fails', async () => {
+    vi.mocked(statsApi.removeGoal).mockRejectedValue(new ApiError(500, null))
+    const wrapper = await mountView()
+
+    await buttonWithText(wrapper, 'Прибрати').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+    expect(buttonWithText(wrapper, 'Прибрати').attributes('disabled')).toBeUndefined()
+  })
+
   it('offers a retry when the statistics cannot be loaded', async () => {
     vi.mocked(statsApi.summary).mockRejectedValueOnce(new ApiError(500, null))
     const wrapper = await mountView()
