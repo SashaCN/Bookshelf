@@ -8,15 +8,21 @@ import type {
   BookForecast,
   BookStatus,
   CatalogEntry,
+  FeedQuote,
   GoalProgress,
+  PersonSummary,
+  PublicProfile,
   Quote,
   QuoteType,
+  QuoteVisibility,
+  ReaderChapter,
+  ReaderDocument,
   ReadingLog,
   User,
   UserBook,
 } from '@/types/api'
 
-const STORAGE_KEY = 'bookshelf-demo-state-v1'
+const STORAGE_KEY = 'bookshelf-demo-state-v2'
 const PAGE_SIZE = 15
 const DAY_MS = 86_400_000
 
@@ -34,6 +40,9 @@ interface State {
   logs: Record<number, ReadingLog[]>
   quotes: StoredQuote[]
   goals: Record<number, number>
+  /** Usernames of the fake readers the demo user follows. */
+  following: string[]
+  documents: ReaderDocument[]
 }
 
 class HttpError extends Error {
@@ -160,6 +169,7 @@ function seed(): State {
     note: null,
     page,
     is_favorite: false,
+    visibility: 'private',
     created_at: daysAgo(ago).toISOString(),
     user_book_id: userBookId,
     ...extra,
@@ -169,27 +179,121 @@ function seed(): State {
     quote(1, 3, 'quote', 'Зорко одне лише серце. Найголовнішого очима не побачиш.', 72, 36, {
       note: 'Те, до чого повертаюся щоразу, коли забуваю зупинитися.',
       is_favorite: true,
+      visibility: 'public',
     }),
     quote(2, 3, 'quote', 'Ти назавжди береш на себе відповідальність за тих, кого приручив.', 80, 36, { is_favorite: true }),
     quote(3, 1, 'quote', 'Життя не те, що з тобою сталося, а те, що ти пам\'ятаєш і як ти про це розповідаєш.', 130, 9),
     quote(4, 1, 'insight', 'Родина Буендіа повторює імена й помилки — ніби історія ходить колами. Цікаво, чи є вихід із циклу.', 160, 6, {
       note: 'Порівняти з Орвеллом — там цикл насильницький, тут — самотність.',
     }),
-    quote(5, 4, 'quote', 'Хто керує минулим, той керує майбутнім; хто керує сьогоденням, той керує минулим.', 44, 63, { is_favorite: true }),
-    quote(6, 5, 'quote', 'Contra spem spero! Без надії сподіваюсь.', 97, 125),
+    quote(5, 4, 'quote', 'Хто керує минулим, той керує майбутнім; хто керує сьогоденням, той керує минулим.', 44, 63, { is_favorite: true, visibility: 'public' }),
+    quote(6, 5, 'quote', 'Contra spem spero! Без надії сподіваюсь.', 97, 125, { visibility: 'public' }),
     quote(7, 2, 'quote', 'Гуцульщина — це не місце на мапі, це спосіб слухати гори.', 40, 3),
     quote(8, 2, 'insight', 'У Коцюбинського природа не тло, а персонаж: вона вирішує долю Івана не менше за людей.', 52, 2),
   ]
 
   return {
-    user: { id: 1, name: 'Демо-читач', email: 'demo@bookshelf.test', timezone: 'Europe/Kyiv' },
+    user: { id: 1, name: 'Демо-читач', email: 'demo@bookshelf.test', timezone: 'Europe/Kyiv', username: 'demo_reader', is_public: true },
     signedIn: true,
     nextId: 100,
     library,
     logs,
     quotes,
     goals: { [new Date().getFullYear()]: 12 },
+    following: ['olena_reads'],
+    documents: [
+      {
+        id: 1,
+        title: demoBook.title,
+        author: demoBook.author,
+        chapters_count: demoBook.chapters.length,
+        position: { chapter: 0, fraction: 0 },
+        progress: 0,
+        created_at: daysAgo(2).toISOString(),
+      },
+    ],
   }
+}
+
+// --- fake readers (for profiles, follows and the feed) and the sample EPUB -----------------------------------------
+
+/** The key of the demo user in the follow graph. */
+const ME = '@me'
+
+interface FakeReader {
+  username: string
+  name: string
+  books_finished_this_year: number
+  quotes: { content: string; note: string | null; page: number | null; type: QuoteType; ago: number; book: Quote['book'] }[]
+}
+
+const fakeReaders: FakeReader[] = [
+  {
+    username: 'olena_reads',
+    name: 'Олена Коваль',
+    books_finished_this_year: 9,
+    quotes: [
+      { content: 'Книга — це вікно, яке ти відчиняєш сам.', note: null, page: 12, type: 'quote', ago: 1, book: { title: 'Лісова пісня', authors: ['Леся Українка'], cover_url: null } },
+      { content: 'Читати повільно — теж спосіб жити повільно.', note: 'Записала після довгої дороги потягом.', page: null, type: 'insight', ago: 4, book: { title: 'Тіні забутих предків', authors: ['Михайло Коцюбинський'], cover_url: null } },
+      { content: 'Найтемніша ніч закінчується світанком.', note: null, page: 201, type: 'quote', ago: 11, book: { title: 'Зів\'яле листя', authors: ['Іван Франко'], cover_url: null } },
+    ],
+  },
+  {
+    username: 'taras_books',
+    name: 'Тарас Мельник',
+    books_finished_this_year: 14,
+    quotes: [
+      { content: 'Свобода починається там, де закінчується страх.', note: 'До цього місця завжди повертаюся.', page: 88, type: 'quote', ago: 2, book: { title: '1984', authors: ['Джордж Орвелл'], cover_url: null } },
+      { content: 'Хороший код читається як проза.', note: null, page: 31, type: 'quote', ago: 7, book: { title: 'Чистий код', authors: ['Роберт Мартін'], cover_url: null } },
+    ],
+  },
+  {
+    username: 'iryna_p',
+    name: 'Ірина Павленко',
+    books_finished_this_year: 5,
+    quotes: [
+      { content: 'Дім там, де на тебе чекає розгорнута книга.', note: null, page: 5, type: 'quote', ago: 3, book: { title: 'Маленький принц', authors: ['Антуан де Сент-Екзюпері'], cover_url: null } },
+    ],
+  },
+]
+
+/** Who follows whom among the fake readers; the demo user's own follows live in the state. */
+const fakeFollows: [string, string][] = [
+  ['olena_reads', 'taras_books'],
+  ['taras_books', 'olena_reads'],
+  ['iryna_p', 'olena_reads'],
+  ['taras_books', ME],
+]
+
+const demoBook = {
+  title: 'Прогулянка до річки',
+  author: 'Демо-автор',
+  chapters: [
+    {
+      title: 'Ранок',
+      paragraphs: [
+        'Ранок прийшов тихо, як гість, що боїться розбудити господарів. Роса ще лежала на траві сріблястим покривалом.',
+        'Хтось далеко ударив у відро, і цей дзвінкий звук розбіг по подвір\'ю, наче маленька хвиля по воді.',
+        'Я взяв кошик, хліб і вирушив стежкою вниз, до річки, де туман щойно починав розходитися.',
+      ],
+    },
+    {
+      title: 'Берег',
+      paragraphs: [
+        'Річка текла повільно, ніби думала, куди їй поспішати. Над водою кружляли дрібні мушки, а в очереті щось шелестіло.',
+        'Я сів на старе повалене дерево й довго дивився, як вода малює на піску вузькі світлі смужки.',
+        'Здавалося, що час тут працює за іншими правилами: година тягнулася, мов хвилина, а хвилина — мов година.',
+      ],
+    },
+    {
+      title: 'Дорога додому',
+      paragraphs: [
+        'Назад я йшов іншою дорогою, повз вишневий сад, де вже достигали перші ягоди.',
+        'Сонце піднялося високо, і тінь від мене стала короткою й смішною, наче в казковому гнома.',
+        'Біля воріт мене зустрів пес. Він ледь помітно махнув хвостом, мовби питав: «Ну що, варто було ходити?» Варто.',
+      ],
+    },
+  ],
 }
 
 // --- catalog (stand-in for Open Library) ---------------------------------------------------------------------------
@@ -276,6 +380,61 @@ function findQuote(id: number): StoredQuote {
 }
 
 const nextId = () => state.nextId++
+
+function paginate<T>(all: T[], page: number, path: string, size = PAGE_SIZE): { data: T[]; links: { next: string | null } } {
+  return { data: all.slice((page - 1) * size, page * size), links: { next: page * size < all.length ? `${path}?page=${page + 1}` : null } }
+}
+
+const newestFirst = <T extends { created_at: string; id: number }>(a: T, b: T) => b.created_at.localeCompare(a.created_at) || b.id - a.id
+
+// --- social ---------------------------------------------------------------------------------------------------------
+
+/** A reader by username: the demo user or one of the fake readers; unknown names are a 404. */
+function findPerson(username: string): { key: string; name: string } {
+  if (state.user.username === username) return { key: ME, name: state.user.name }
+  const reader = fakeReaders.find((r) => r.username === username)
+  if (!reader) throw new HttpError(404, { message: 'Not found' })
+  return { key: reader.username, name: reader.name }
+}
+
+function edges(): [string, string][] {
+  return [...fakeFollows, ...state.following.map((username): [string, string] => [ME, username])]
+}
+
+function summarize(key: string): PersonSummary {
+  if (key === ME) return { username: state.user.username ?? '', name: state.user.name }
+  const reader = fakeReaders.find((r) => r.username === key) as FakeReader
+  return { username: reader.username, name: reader.name }
+}
+
+function fakeQuotes(reader: FakeReader): Quote[] {
+  return reader.quotes.map((q, i) => ({
+    id: 1000 + fakeReaders.indexOf(reader) * 10 + i,
+    type: q.type,
+    content: q.content,
+    note: q.note,
+    page: q.page,
+    is_favorite: false,
+    visibility: 'public',
+    created_at: daysAgo(q.ago).toISOString(),
+    user_book_id: 0,
+    book: q.book,
+  }))
+}
+
+function profile(username: string): PublicProfile {
+  const person = findPerson(username)
+  const all = edges()
+  return {
+    username,
+    name: person.name,
+    books_finished_this_year: person.key === ME ? finishedIn(today().slice(0, 4)) : (fakeReaders.find((r) => r.username === username) as FakeReader).books_finished_this_year,
+    followers_count: all.filter(([, to]) => to === person.key).length,
+    following_count: all.filter(([from]) => from === person.key).length,
+    is_following: state.following.includes(username),
+    is_me: person.key === ME,
+  }
+}
 
 function invalid(field: string, code: string): never {
   throw new HttpError(422, { message: code, errors: { [field]: [code] } })
@@ -421,6 +580,12 @@ route('GET', '/api/me', () => {
 route('PATCH', '/api/me', (_p, _q, body) => {
   if (typeof body.name === 'string' && body.name.trim()) state.user.name = body.name.trim()
   if (typeof body.timezone === 'string') state.user.timezone = body.timezone
+
+  const username = 'username' in body ? String(body.username ?? '').trim() || null : state.user.username
+  const isPublic = typeof body.is_public === 'boolean' ? body.is_public : state.user.is_public
+  if (isPublic && !username) invalid('username', 'profile.username_required')
+  state.user.username = username
+  state.user.is_public = isPublic
   return ok(state.user)
 })
 // Any credentials work in the demo, so nobody needs to remember a password.
@@ -430,7 +595,7 @@ route('POST', '/api/auth/login', () => {
 })
 route('POST', '/api/auth/register', (_p, _q, body) => {
   state = seed()
-  state.user = { ...state.user, name: String(body.name ?? 'Читач'), email: String(body.email ?? ''), timezone: String(body.timezone ?? 'Europe/Kyiv') }
+  state.user = { ...state.user, name: String(body.name ?? 'Читач'), email: String(body.email ?? ''), timezone: String(body.timezone ?? 'Europe/Kyiv'), username: null, is_public: false }
   return null
 })
 route('POST', '/api/auth/logout', () => {
@@ -553,8 +718,8 @@ route('GET', '/api/quotes', (_p, query) => {
     .filter((q) => !query.get('book') || q.user_book_id === Number(query.get('book')))
     .filter((q) => !query.get('type') || q.type === query.get('type'))
     .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
-  const slice = all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  return { data: slice.map(presentQuote), links: { next: page * PAGE_SIZE < all.length ? `/api/quotes?page=${page + 1}` : null } }
+  const { data, links } = paginate(all, page, '/api/quotes')
+  return { data: data.map(presentQuote), links }
 })
 route('GET', '/api/quotes/(\\d+)', ([id]) => ok(presentQuote(findQuote(Number(id)))))
 route('POST', '/api/library/(\\d+)/quotes', ([id], _q, body) => {
@@ -570,6 +735,7 @@ route('POST', '/api/library/(\\d+)/quotes', ([id], _q, body) => {
     note: (body.note as string | null | undefined) ?? null,
     page: (body.page as number | null | undefined) ?? null,
     is_favorite: Boolean(body.is_favorite),
+    visibility: (body.visibility as QuoteVisibility | undefined) ?? 'private',
     created_at: new Date().toISOString(),
     user_book_id: e.id,
   }
@@ -587,6 +753,80 @@ route('DELETE', '/api/quotes/(\\d+)', ([id]) => {
   findQuote(Number(id))
   state.quotes = state.quotes.filter((q) => q.id !== Number(id))
   return null
+})
+
+// Social: the demo user's public quotes plus a few fake readers.
+route('GET', '/api/users/([^/]+)', ([username]) => ok(profile(decodeURIComponent(username))))
+route('GET', '/api/users/([^/]+)/quotes', ([username], query) => {
+  const name = decodeURIComponent(username)
+  const person = findPerson(name)
+  const all =
+    person.key === ME
+      ? state.quotes.filter((q) => q.visibility === 'public').sort(newestFirst).map(presentQuote)
+      : fakeQuotes(fakeReaders.find((r) => r.username === name) as FakeReader)
+  return paginate(all, Number(query.get('page') ?? 1), `/api/users/${username}/quotes`)
+})
+route('POST', '/api/users/([^/]+)/follow', ([username]) => {
+  const name = decodeURIComponent(username)
+  if (findPerson(name).key === ME) invalid('username', 'follow.self')
+  if (!state.following.includes(name)) state.following.push(name)
+  return null
+})
+route('DELETE', '/api/users/([^/]+)/follow', ([username]) => {
+  const name = decodeURIComponent(username)
+  findPerson(name)
+  state.following = state.following.filter((u) => u !== name)
+  return null
+})
+route('GET', '/api/users/([^/]+)/followers', ([username], query) => {
+  const key = findPerson(decodeURIComponent(username)).key
+  const people = edges().filter(([, to]) => to === key).map(([from]) => summarize(from))
+  return paginate(people, Number(query.get('page') ?? 1), `/api/users/${username}/followers`)
+})
+route('GET', '/api/users/([^/]+)/following', ([username], query) => {
+  const key = findPerson(decodeURIComponent(username)).key
+  const people = edges().filter(([from]) => from === key).map(([, to]) => summarize(to))
+  return paginate(people, Number(query.get('page') ?? 1), `/api/users/${username}/following`)
+})
+route('GET', '/api/feed', (_p, query) => {
+  const quotes = fakeReaders
+    .filter((r) => state.following.includes(r.username))
+    .flatMap((r) => fakeQuotes(r).map((q): FeedQuote => ({ ...q, author: { username: r.username, name: r.name } })))
+    .sort(newestFirst)
+  return paginate(quotes, Number(query.get('page') ?? 1), '/api/feed')
+})
+
+// Reader: the demo cannot parse uploaded files, so it ships one sample document.
+function findDocument(id: string): ReaderDocument {
+  const found = state.documents.find((d) => d.id === Number(id))
+  if (!found) throw new HttpError(404, { message: 'Not found' })
+  return found
+}
+
+route('GET', '/api/reader', () => ok([...state.documents].sort(newestFirst)))
+route('POST', '/api/reader', () => invalid('file', 'reader.invalid_epub'))
+route('GET', '/api/reader/(\\d+)', ([id]) => ok(findDocument(id)))
+route('DELETE', '/api/reader/(\\d+)', ([id]) => {
+  const doc = findDocument(id)
+  state.documents = state.documents.filter((d) => d.id !== doc.id)
+  return null
+})
+route('PUT', '/api/reader/(\\d+)/position', ([id], _q, body) => {
+  const doc = findDocument(id)
+  const chapter = Number(body.chapter)
+  const fraction = Number(body.fraction)
+  if (!Number.isInteger(chapter) || chapter < 0 || chapter >= doc.chapters_count) invalid('chapter', 'validation.invalid')
+  if (!(fraction >= 0 && fraction <= 1)) invalid('fraction', 'validation.invalid')
+  doc.position = { chapter, fraction }
+  doc.progress = Math.round(((chapter + fraction) / doc.chapters_count) * 100)
+  return ok(doc)
+})
+route('GET', '/api/reader/(\\d+)/chapters/(\\d+)', ([id, n]) => {
+  const doc = findDocument(id)
+  const chapter = demoBook.chapters[Number(n)]
+  if (!chapter) throw new HttpError(404, { message: 'Not found' })
+  const html = `<h1>${chapter.title}</h1>${chapter.paragraphs.map((p) => `<p>${p}</p>`).join('')}`
+  return ok({ index: Number(n), count: doc.chapters_count, title: chapter.title, html } satisfies ReaderChapter)
 })
 
 route('GET', '/api/stats/summary', () => ok(summary()))

@@ -3,9 +3,8 @@ export interface User {
   name: string
   email: string
   timezone: string
-  /** Optional until the demo's mock API learns the social fields. */
-  username?: string | null
-  is_public?: boolean
+  username: string | null
+  is_public: boolean
 }
 
 export interface LoginPayload {
@@ -128,8 +127,7 @@ export interface Quote {
   note: string | null
   page: number | null
   is_favorite: boolean
-  /** Optional until the demo's mock API learns it; a missing value means private. */
-  visibility?: QuoteVisibility
+  visibility: QuoteVisibility
   created_at: string
   user_book_id: number
   book: { title: string; authors: string[]; cover_url: string | null }

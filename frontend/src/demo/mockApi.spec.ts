@@ -3,6 +3,8 @@ import { ApiError } from '@/api/http'
 import { authApi } from '@/api/auth'
 import { catalogApi, libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
+import { readerApi } from '@/api/reader'
+import { socialApi } from '@/api/social'
 import { statsApi } from '@/api/stats'
 import { installMockApi, resetDemo } from './mockApi'
 
@@ -81,5 +83,62 @@ describe('demo mock API', () => {
     await statsApi.removeGoal(year)
     expect((await statsApi.goal(year)).target_books).toBeNull()
     await expect(statsApi.setGoal(year + 5, 3)).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('edits the public profile and demands a username for it', async () => {
+    expect(await authApi.me()).toMatchObject({ username: 'demo_reader', is_public: true })
+
+    await expect(authApi.updateMe({ username: null, is_public: true })).rejects.toMatchObject({ status: 422 })
+    const updated = await authApi.updateMe({ username: 'new_name', is_public: false })
+    expect(updated).toMatchObject({ username: 'new_name', is_public: false })
+  })
+
+  it('stores quote visibility', async () => {
+    const created = await quotesApi.create(1, { content: 'Для всіх', visibility: 'public' })
+    expect(created.visibility).toBe('public')
+    expect((await quotesApi.create(1, { content: 'Для себе' })).visibility).toBe('private')
+    expect((await quotesApi.update(created.id, { content: 'Для всіх', visibility: 'private' })).visibility).toBe('private')
+  })
+
+  it('shows profiles, follows and the feed of fake readers', async () => {
+    expect(await socialApi.profile('olena_reads')).toMatchObject({ is_following: true, is_me: false, followers_count: 3 })
+    expect((await socialApi.profile('demo_reader')).is_me).toBe(true)
+    await expect(socialApi.profile('nobody')).rejects.toMatchObject({ status: 404 })
+
+    const quotes = await socialApi.quotes('taras_books')
+    expect(quotes.data).toHaveLength(2)
+    expect(quotes.links.next).toBeNull()
+    expect((await socialApi.quotes('demo_reader')).data.every((q) => q.visibility === 'public')).toBe(true)
+
+    const feed = await socialApi.feed()
+    expect(feed.data.every((q) => q.author.username === 'olena_reads')).toBe(true)
+
+    await socialApi.follow('taras_books')
+    expect((await socialApi.following('demo_reader')).data.map((p) => p.username)).toEqual(['olena_reads', 'taras_books'])
+    expect((await socialApi.feed()).data.some((q) => q.author.username === 'taras_books')).toBe(true)
+
+    await socialApi.unfollow('olena_reads')
+    expect((await socialApi.profile('olena_reads')).is_following).toBe(false)
+    expect((await socialApi.followers('demo_reader')).data.map((p) => p.username)).toEqual(['taras_books'])
+    await expect(socialApi.follow('demo_reader')).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('serves the sample document, saves the position and refuses uploads', async () => {
+    const [doc] = await readerApi.list()
+    expect(doc.chapters_count).toBe(3)
+
+    const chapter = await readerApi.chapter(doc.id, 1)
+    expect(chapter).toMatchObject({ index: 1, count: 3 })
+    expect(chapter.html).toContain('<p>')
+    await expect(readerApi.chapter(doc.id, 3)).rejects.toMatchObject({ status: 404 })
+
+    expect((await readerApi.savePosition(doc.id, { chapter: 1, fraction: 0.5 })).progress).toBe(50)
+    expect((await readerApi.get(doc.id)).position).toEqual({ chapter: 1, fraction: 0.5 })
+
+    await expect(readerApi.upload(new File(['x'], 'a.epub'))).rejects.toMatchObject({ status: 422 })
+
+    await readerApi.remove(doc.id)
+    expect(await readerApi.list()).toHaveLength(0)
+    await expect(readerApi.get(doc.id)).rejects.toMatchObject({ status: 404 })
   })
 })

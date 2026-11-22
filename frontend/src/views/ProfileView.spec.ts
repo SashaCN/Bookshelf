@@ -12,7 +12,7 @@ function mountView(timezone = 'Europe/Kyiv', extra: Partial<User> = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const auth = useAuthStore()
-  auth.user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone, ...extra }
+  auth.user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone, username: null, is_public: false, ...extra }
 
   const router = createRouter({
     history: createMemoryHistory(),
