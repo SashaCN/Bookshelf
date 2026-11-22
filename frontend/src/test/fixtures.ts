@@ -1,4 +1,4 @@
-import type { Book, CatalogEntry, Quote, UserBook } from '@/types/api'
+import type { Book, CatalogEntry, FeedQuote, PublicProfile, Quote, UserBook } from '@/types/api'
 
 export function makeBook(overrides: Partial<Book> = {}): Book {
   return {
@@ -57,9 +57,27 @@ export function makeQuote(overrides: Partial<Quote> = {}): Quote {
     note: null,
     page: null,
     is_favorite: false,
+    visibility: 'private',
     created_at: '2026-10-05T10:00:00+00:00',
     user_book_id: 1,
     book: { title: 'Atomic Habits', authors: ['James Clear'], cover_url: null },
+    ...overrides,
+  }
+}
+
+export function makeFeedQuote(overrides: Partial<FeedQuote> = {}): FeedQuote {
+  return { ...makeQuote(), visibility: 'public', author: { username: 'olena', name: 'Олена' }, ...overrides }
+}
+
+export function makeProfile(overrides: Partial<PublicProfile> = {}): PublicProfile {
+  return {
+    username: 'olena',
+    name: 'Олена',
+    books_finished_this_year: 5,
+    followers_count: 3,
+    following_count: 2,
+    is_following: false,
+    is_me: false,
     ...overrides,
   }
 }

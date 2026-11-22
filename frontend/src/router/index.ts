@@ -3,13 +3,18 @@ import AppLayout from '@/components/AppLayout.vue'
 import { useAuthStore } from '@/stores/auth'
 import AddBookView from '@/views/AddBookView.vue'
 import BookView from '@/views/BookView.vue'
+import FeedView from '@/views/FeedView.vue'
 import HomeView from '@/views/HomeView.vue'
 import LibraryView from '@/views/LibraryView.vue'
 import LoginView from '@/views/LoginView.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import PeopleListView from '@/views/PeopleListView.vue'
+import PublicProfileView from '@/views/PublicProfileView.vue'
 import QuoteFormView from '@/views/QuoteFormView.vue'
 import QuoteShareView from '@/views/QuoteShareView.vue'
 import QuotesView from '@/views/QuotesView.vue'
+import ReaderListView from '@/views/ReaderListView.vue'
+import ReaderView from '@/views/ReaderView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import StatsView from '@/views/StatsView.vue'
 
@@ -47,6 +52,32 @@ export const router = createRouter({
           component: QuoteShareView,
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'quotes' },
+        },
+        { path: 'feed', name: 'feed', component: FeedView },
+        {
+          path: 'u/:username',
+          name: 'public-profile',
+          component: PublicProfileView,
+          props: (route) => ({ username: String(route.params.username) }),
+        },
+        {
+          path: 'u/:username/followers',
+          name: 'followers',
+          component: PeopleListView,
+          props: (route) => ({ username: String(route.params.username), kind: 'followers' }),
+        },
+        {
+          path: 'u/:username/following',
+          name: 'following',
+          component: PeopleListView,
+          props: (route) => ({ username: String(route.params.username), kind: 'following' }),
+        },
+        { path: 'reader', name: 'reader', component: ReaderListView },
+        {
+          path: 'reader/:id(\\d+)',
+          name: 'reader-view',
+          component: ReaderView,
+          props: (route) => ({ id: Number(route.params.id) }),
         },
         { path: 'stats', name: 'stats', component: StatsView, meta: { tab: 'stats' } },
         { path: 'profile', name: 'profile', component: ProfileView },

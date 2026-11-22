@@ -3,6 +3,9 @@ export interface User {
   name: string
   email: string
   timezone: string
+  /** Optional until the demo's mock API learns the social fields. */
+  username?: string | null
+  is_public?: boolean
 }
 
 export interface LoginPayload {
@@ -18,6 +21,8 @@ export interface RegisterPayload extends LoginPayload {
 export interface UpdateProfilePayload {
   name?: string
   timezone?: string
+  username?: string | null
+  is_public?: boolean
 }
 
 export type BookStatus = 'want' | 'reading' | 'finished' | 'abandoned'
@@ -112,6 +117,7 @@ export interface UpdateBookPayload {
 }
 
 export type QuoteType = 'quote' | 'insight'
+export type QuoteVisibility = 'private' | 'public'
 
 /** A passage (or the reader's own insight) saved from a book. */
 export interface Quote {
@@ -122,6 +128,8 @@ export interface Quote {
   note: string | null
   page: number | null
   is_favorite: boolean
+  /** Optional until the demo's mock API learns it; a missing value means private. */
+  visibility?: QuoteVisibility
   created_at: string
   user_book_id: number
   book: { title: string; authors: string[]; cover_url: string | null }
@@ -134,6 +142,7 @@ export interface QuotePayload {
   note?: string | null
   page?: number | null
   is_favorite?: boolean
+  visibility?: QuoteVisibility
 }
 
 export interface QuoteFilters {
@@ -197,4 +206,59 @@ export interface GoalProgress {
   due_books: number | null
   remaining_books: number | null
   on_track: boolean | null
+}
+
+export interface PublicProfile {
+  username: string
+  name: string
+  books_finished_this_year: number
+  followers_count: number
+  following_count: number
+  is_following: boolean
+  is_me: boolean
+}
+
+/** A reader as listed among followers or followed. */
+export interface PersonSummary {
+  username: string
+  name: string
+}
+
+export interface PeoplePage {
+  data: PersonSummary[]
+  links: { next: string | null }
+}
+
+/** A public quote in the feed, with whoever saved it. */
+export interface FeedQuote extends Quote {
+  author: PersonSummary
+}
+
+export interface FeedPage {
+  data: FeedQuote[]
+  links: { next: string | null }
+}
+
+export interface ReaderPosition {
+  chapter: number
+  fraction: number
+}
+
+/** An uploaded EPUB. `progress` is a percentage (0..100) derived from the saved position. */
+export interface ReaderDocument {
+  id: number
+  title: string
+  author: string | null
+  chapters_count: number
+  position: ReaderPosition
+  progress: number
+  created_at: string
+}
+
+/** One chapter; `html` is untrusted markup and must only ever be shown in a sandboxed iframe. */
+export interface ReaderChapter {
+  index: number
+  count: number
+  title: string | null
+  html: string
 }

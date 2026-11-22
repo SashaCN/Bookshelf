@@ -2,11 +2,12 @@
 import { ref } from 'vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useQuotesStore } from '@/stores/quotes'
-import type { Quote } from '@/types/api'
+import type { FeedQuote, Quote } from '@/types/api'
 import ErrorNotice from './ErrorNotice.vue'
 import QuoteSource from './QuoteSource.vue'
 
-const props = defineProps<{ quote: Quote }>()
+/** `readonly` is for somebody else's quote: no favorite star, no actions, and the book is not a link into the own library. */
+const props = defineProps<{ quote: Quote | FeedQuote; readonly?: boolean }>()
 
 const quotes = useQuotesStore()
 const errorMessage = useApiErrorMessage()
@@ -60,6 +61,7 @@ async function remove() {
       </div>
 
       <button
+        v-if="!readonly"
         type="button"
         :aria-pressed="quote.is_favorite"
         :aria-label="$t('quotes.favorite')"
@@ -83,11 +85,21 @@ async function remove() {
 
     <p v-if="quote.note" class="whitespace-pre-line break-words text-sm text-ink-muted">{{ quote.note }}</p>
 
-    <QuoteSource :quote="quote" />
+    <QuoteSource :quote="quote" :plain="readonly" />
+
+    <p v-if="'author' in quote" class="text-sm text-ink-muted">
+      <RouterLink
+        :to="{ name: 'public-profile', params: { username: quote.author.username } }"
+        class="font-medium text-ink underline-offset-2 hover:underline"
+      >
+        {{ quote.author.name }}
+      </RouterLink>
+      <span> @{{ quote.author.username }}</span>
+    </p>
 
     <ErrorNotice v-if="error" :message="error" />
 
-    <div v-if="!confirmingDelete" class="flex flex-wrap gap-2 border-t border-line pt-3">
+    <div v-if="!readonly && !confirmingDelete" class="flex flex-wrap gap-2 border-t border-line pt-3">
       <RouterLink
         :to="{ name: 'quote-share', params: { id: quote.id } }"
         class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium"
@@ -105,7 +117,7 @@ async function remove() {
       </button>
     </div>
 
-    <div v-else class="flex flex-col gap-2 border-t border-line pt-3">
+    <div v-else-if="!readonly" class="flex flex-col gap-2 border-t border-line pt-3">
       <p class="text-sm">{{ $t('quotes.removeConfirm') }}</p>
       <div class="flex gap-2">
         <button

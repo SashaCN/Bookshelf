@@ -43,7 +43,10 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
     'X-Requested-With': 'XMLHttpRequest',
   }
 
-  if (body !== undefined) {
+  // FormData gets its multipart Content-Type (with the boundary) from the browser.
+  const isForm = body instanceof FormData
+
+  if (body !== undefined && !isForm) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -56,7 +59,7 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
     method,
     headers,
     credentials: 'same-origin',
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   })
 
   // The CSRF token expired (e.g. the session was regenerated): fetch a fresh one and retry once.

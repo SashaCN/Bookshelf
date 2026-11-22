@@ -140,6 +140,19 @@ describe('QuoteFormView', () => {
       expect(buttonWithText(wrapper, 'Інсайт').attributes('aria-pressed')).toBe('true')
     })
 
+    it('makes a quote public when asked to', async () => {
+      const { wrapper } = await mountCreate({ book: '1' })
+      vi.mocked(quotesApi.create).mockResolvedValue(makeQuote())
+
+      expect(buttonWithText(wrapper, 'Тільки я').attributes('aria-pressed')).toBe('true')
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      await wrapper.get('#quote-content').setValue('Text')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(quotesApi.create).toHaveBeenCalledWith(1, expect.objectContaining({ visibility: 'public' }))
+    })
+
     it('saves the quote under the chosen book and leaves for the list', async () => {
       const { wrapper, router } = await mountCreate({ book: '1' })
       vi.mocked(quotesApi.create).mockResolvedValue(makeQuote({ id: 8 }))
@@ -153,6 +166,7 @@ describe('QuoteFormView', () => {
 
       expect(quotesApi.create).toHaveBeenCalledWith(1, {
         type: 'insight',
+        visibility: 'private',
         content: 'A thought worth keeping.',
         note: 'Mine.',
         page: 42,
@@ -168,7 +182,7 @@ describe('QuoteFormView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(quotesApi.create).toHaveBeenCalledWith(1, { type: 'quote', content: 'Just the text', note: null, page: null })
+      expect(quotesApi.create).toHaveBeenCalledWith(1, { type: 'quote', visibility: 'private', content: 'Just the text', note: null, page: null })
     })
 
     it('goes back to where the reader came from when there is somewhere to go back to', async () => {
@@ -346,6 +360,13 @@ describe('QuoteFormView', () => {
       expect(field(wrapper, '#quote-page').attributes('max')).toBe('320')
     })
 
+    it('shows the visibility the quote already has', async () => {
+      vi.mocked(quotesApi.get).mockResolvedValue({ ...existing, visibility: 'public' })
+      const { wrapper } = await mountEdit()
+
+      expect(buttonWithText(wrapper, 'Усі').attributes('aria-pressed')).toBe('true')
+    })
+
     it('saves the changes and updates the list', async () => {
       vi.mocked(quotesApi.get).mockResolvedValue(existing)
       const { wrapper, router } = await mountEdit()
@@ -358,7 +379,7 @@ describe('QuoteFormView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(quotesApi.update).toHaveBeenCalledWith(5, { type: 'quote', content: 'New text', note: null, page: null })
+      expect(quotesApi.update).toHaveBeenCalledWith(5, { type: 'quote', visibility: 'private', content: 'New text', note: null, page: null })
       expect(quotesApi.create).not.toHaveBeenCalled()
       expect(router.currentRoute.value.name).toBe('quotes')
     })

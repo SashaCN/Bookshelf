@@ -47,6 +47,12 @@ describe('HomeView', () => {
     vi.resetAllMocks()
   })
 
+  it('links to the feed', async () => {
+    const { wrapper } = await mountView([reading(1, 'Дюна')], null)
+
+    expect(wrapper.get('a[href="/feed"]').text()).toBe('Стрічка друзів')
+  })
+
   it('shows a card for each book being read', async () => {
     const { wrapper } = await mountView([reading(1, 'First Book'), reading(2, 'Second Book'), makeUserBook({ id: 3 })], null)
 

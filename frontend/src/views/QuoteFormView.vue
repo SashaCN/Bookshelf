@@ -10,7 +10,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLibraryStore } from '@/stores/library'
 import { useQuotesStore } from '@/stores/quotes'
-import type { Quote, QuoteType } from '@/types/api'
+import type { Quote, QuoteType, QuoteVisibility } from '@/types/api'
 
 const MAX_LENGTH = 2000
 /** The most pages the server accepts; the book's own page count is the tighter limit when it is known. */
@@ -32,7 +32,7 @@ const errorMessage = useApiErrorMessage()
 const editing = computed(() => props.id !== undefined)
 
 // The page is kept as text on purpose: v-model on a number input would turn it into a number (see PageJumpForm).
-const form = reactive({ type: 'quote' as QuoteType, content: '', note: '', page: '' })
+const form = reactive({ type: 'quote' as QuoteType, visibility: 'private' as QuoteVisibility, content: '', note: '', page: '' })
 const bookId = ref<number | ''>('')
 const quote = ref<Quote | null>(null)
 
@@ -48,6 +48,11 @@ const typeOptions = computed(() => [
   { value: 'insight' as const, label: t('quotes.type.insight') },
 ])
 
+const visibilityOptions = computed(() => [
+  { value: 'private' as const, label: t('quotes.visibility.private') },
+  { value: 'public' as const, label: t('quotes.visibility.public') },
+])
+
 const selectedBook = computed(() => {
   const id = quote.value ? quote.value.user_book_id : bookId.value
   return id === '' ? undefined : library.find(id)
@@ -56,6 +61,7 @@ const maxPage = computed(() => selectedBook.value?.total_pages ?? MAX_PAGE)
 
 function fill(source: Quote) {
   form.type = source.type
+  form.visibility = source.visibility ?? 'private'
   form.content = source.content
   form.note = source.note ?? ''
   form.page = source.page === null ? '' : String(source.page)
@@ -128,6 +134,7 @@ async function submit() {
 
   const body = {
     type: form.type,
+    visibility: form.visibility,
     content: form.content.trim(),
     note: form.note.trim() || null,
     page: toPage(form.page),
@@ -202,6 +209,11 @@ async function submit() {
     </div>
 
     <SegmentedControl v-model="form.type" :label="$t('quotes.type.label')" :options="typeOptions" />
+
+    <div class="flex flex-col gap-1.5">
+      <SegmentedControl v-model="form.visibility" :label="$t('quotes.visibility.label')" :options="visibilityOptions" />
+      <p class="text-sm text-ink-muted">{{ $t('quotes.visibility.hint') }}</p>
+    </div>
 
     <div class="flex flex-col gap-1.5">
       <label for="quote-content" class="text-sm font-medium">{{ $t('quotes.form.content') }}</label>

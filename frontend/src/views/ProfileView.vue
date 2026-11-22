@@ -11,6 +11,8 @@ const router = useRouter()
 const errorMessage = useApiErrorMessage()
 
 const name = ref(auth.user?.name ?? '')
+const username = ref(auth.user?.username ?? '')
+const isPublic = ref(auth.user?.is_public ?? false)
 const timezone = ref(auth.user?.timezone ?? 'Europe/Kyiv')
 const saving = ref(false)
 const saved = ref(false)
@@ -28,7 +30,12 @@ async function save() {
   error.value = ''
 
   try {
-    await auth.updateProfile({ name: name.value.trim(), timezone: timezone.value })
+    await auth.updateProfile({
+      name: name.value.trim(),
+      timezone: timezone.value,
+      username: username.value.trim().toLowerCase() || null,
+      is_public: isPublic.value,
+    })
     saved.value = true
   } catch (e) {
     error.value = errorMessage(e)
@@ -79,6 +86,45 @@ async function logout() {
       </select>
       <p id="profile-timezone-hint" class="text-sm text-ink-muted">{{ $t('profile.timezoneHint') }}</p>
     </div>
+
+    <div class="flex flex-col gap-1.5">
+      <label for="profile-username" class="text-sm font-medium">{{ $t('profile.username') }}</label>
+      <input
+        id="profile-username"
+        v-model="username"
+        type="text"
+        minlength="3"
+        maxlength="30"
+        pattern="[a-z0-9_]{3,30}"
+        autocapitalize="none"
+        autocomplete="username"
+        aria-describedby="profile-username-hint"
+        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+      >
+      <p id="profile-username-hint" class="text-sm text-ink-muted">{{ $t('profile.usernameHint') }}</p>
+    </div>
+
+    <div class="flex items-start gap-3">
+      <input
+        id="profile-public"
+        v-model="isPublic"
+        type="checkbox"
+        aria-describedby="profile-public-hint"
+        class="mt-1 size-5 accent-accent"
+      >
+      <div class="flex flex-col">
+        <label for="profile-public" class="text-sm font-medium">{{ $t('profile.isPublic') }}</label>
+        <p id="profile-public-hint" class="text-sm text-ink-muted">{{ $t('profile.isPublicHint') }}</p>
+      </div>
+    </div>
+
+    <RouterLink
+      v-if="auth.user?.username && auth.user.is_public"
+      :to="{ name: 'public-profile', params: { username: auth.user.username } }"
+      class="text-sm font-medium text-accent underline-offset-2 hover:underline"
+    >
+      {{ $t('profile.publicLink') }}
+    </RouterLink>
 
     <button
       type="submit"

@@ -5,19 +5,21 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@/api/http'
 import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
+import type { User } from '@/types/api'
 import ProfileView from './ProfileView.vue'
 
-function mountView(timezone = 'Europe/Kyiv') {
+function mountView(timezone = 'Europe/Kyiv', extra: Partial<User> = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const auth = useAuthStore()
-  auth.user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone }
+  auth.user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone, ...extra }
 
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/login', name: 'login', component: { template: '<div />' } },
+      { path: '/u/:username', name: 'public-profile', component: { template: '<div />' } },
       { path: '/profile', name: 'profile', component: ProfileView },
     ],
   })
@@ -57,7 +59,7 @@ describe('ProfileView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(update).toHaveBeenCalledWith({ name: 'Olena K.', timezone: 'Europe/Warsaw' })
+    expect(update).toHaveBeenCalledWith({ name: 'Olena K.', timezone: 'Europe/Warsaw', username: null, is_public: false })
     expect(wrapper.get('[role="status"]').text()).toBe('Збережено.')
   })
 
@@ -81,5 +83,49 @@ describe('ProfileView', () => {
 
     expect(logout).toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('login')
+  })
+
+  describe('public profile', () => {
+    it('shows the saved username and the toggle', () => {
+      const { wrapper } = mountView('Europe/Kyiv', { username: 'olena', is_public: true })
+
+      expect((wrapper.get('#profile-username').element as HTMLInputElement).value).toBe('olena')
+      expect((wrapper.get('#profile-public').element as HTMLInputElement).checked).toBe(true)
+    })
+
+    it('saves the username and the toggle with the rest of the profile', async () => {
+      const { wrapper, auth } = mountView()
+      const update = vi.spyOn(auth, 'updateProfile').mockResolvedValue()
+
+      await wrapper.get('#profile-username').setValue(' Olena_K ')
+      await wrapper.get('#profile-public').setValue(true)
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(update).toHaveBeenCalledWith({ name: 'Olena', timezone: 'Europe/Kyiv', username: 'olena_k', is_public: true })
+    })
+
+    it('links to the own public page only when it is set and public', () => {
+      const hidden = mountView('Europe/Kyiv', { username: 'olena', is_public: false })
+      expect(hidden.wrapper.find('a[href="/u/olena"]').exists()).toBe(false)
+
+      const noName = mountView('Europe/Kyiv', { username: null, is_public: true })
+      expect(noName.wrapper.find('a[href^="/u/"]').exists()).toBe(false)
+
+      const shown = mountView('Europe/Kyiv', { username: 'olena', is_public: true })
+      expect(shown.wrapper.get('a[href="/u/olena"]').text()).toBe('Моя публічна сторінка')
+    })
+
+    it('explains that a username is needed to go public', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'updateProfile').mockRejectedValue(
+        new ApiError(422, { message: 'Invalid', errors: { username: ['profile.username_required'] } }),
+      )
+
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('вкажіть імʼя користувача')
+    })
   })
 })

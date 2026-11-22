@@ -42,6 +42,20 @@ describe('router guards', () => {
     expect(router.currentRoute.value.name).toBe('home')
   })
 
+  it('opens the social pages for a signed-in reader and guards them from guests', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+    await router.push('/u/olena/followers')
+    expect(router.currentRoute.value.name).toBe('followers')
+
+    await router.push('/feed')
+    expect(router.currentRoute.value.name).toBe('feed')
+
+    setActivePinia(createPinia())
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
+    await router.push('/u/olena')
+    expect(router.currentRoute.value.name).toBe('login')
+  })
+
   it('treats the visitor as a guest when the API is unreachable', async () => {
     vi.mocked(authApi.me).mockRejectedValue(new Error('Network down'))
 

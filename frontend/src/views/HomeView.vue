@@ -45,4 +45,15 @@ onMounted(() => load())
   </EmptyState>
 
   <DailyQuoteCard />
+
+  <RouterLink
+    :to="{ name: 'feed' }"
+    class="mt-4 flex min-h-11 items-center rounded-2xl border border-line bg-surface px-4 text-sm font-medium"
+  >
+    {{ $t('home.feedLink') }}
+  </RouterLink>
+
+  <RouterLink :to="{ name: 'reader' }" class="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-accent underline underline-offset-2">
+    {{ $t('home.readerLink') }}
+  </RouterLink>
 </template>
