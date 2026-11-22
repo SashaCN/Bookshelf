@@ -12,7 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class QuoteResource extends JsonResource
 {
     /**
-     * @return array<string, mixed>
+     * @return array<int|string, mixed>
      */
     public function toArray(Request $request): array
     {
@@ -20,9 +20,12 @@ class QuoteResource extends JsonResource
             'id' => $this->id,
             'type' => $this->type,
             'content' => $this->content,
-            'note' => $this->note,
             'page' => $this->page,
-            'is_favorite' => $this->is_favorite,
+            // Private to the owner: a public quote shows its words, not the reader's notes or favorites.
+            $this->mergeWhen($request->user('sanctum')?->id === $this->user_id, fn () => [
+                'note' => $this->note,
+                'is_favorite' => $this->is_favorite,
+            ]),
             'visibility' => $this->visibility,
             'created_at' => $this->created_at?->toIso8601String(),
             // The library entry the quote belongs to, and enough of its book to show where the quote comes from.
