@@ -335,6 +335,7 @@ export default {
     smaller: 'Зменшити шрифт',
     larger: 'Збільшити шрифт',
     frameTitle: 'Текст розділу',
+    toc: 'Зміст',
   },
   apiErrors: {
     generic: 'Не вдалося виконати запит. Спробуйте ще раз.',

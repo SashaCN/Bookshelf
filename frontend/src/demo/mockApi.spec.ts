@@ -133,6 +133,7 @@ describe('demo mock API', () => {
   it('serves the sample document, saves the position and refuses uploads', async () => {
     const [doc] = await readerApi.list()
     expect(doc.chapters_count).toBe(3)
+    expect((await readerApi.get(doc.id)).toc).toHaveLength(3)
 
     const chapter = await readerApi.chapter(doc.id, 1)
     expect(chapter).toMatchObject({ index: 1, count: 3 })

@@ -12,8 +12,8 @@ vi.mock('@/api/reader', () => ({
 
 const mounted: ReturnType<typeof mount>[] = []
 
-async function mountView(chapter = 2) {
-  vi.mocked(readerApi.get).mockResolvedValue(makeReaderDoc({ id: 4, position: { chapter, fraction: 0 } }))
+async function mountView(chapter = 2, toc?: { index: number; title: string }[]) {
+  vi.mocked(readerApi.get).mockResolvedValue(makeReaderDoc({ id: 4, position: { chapter, fraction: 0 }, toc }))
   vi.mocked(readerApi.chapter).mockImplementation(async (_id, index) =>
     makeReaderChapter({ index, html: `<p>Розділ-${index}</p>` }),
   )
@@ -250,5 +250,61 @@ describe('ReaderView', () => {
     window.localStorage.setItem('reader.fontSize', '14')
     const small = await mountView(0)
     expect(small.get('[aria-label="Зменшити шрифт"]').attributes('disabled')).toBeDefined()
+  })
+
+  describe('table of contents', () => {
+    const toc = [
+      { index: 0, title: 'Вступ' },
+      { index: 2, title: 'Ранок' },
+      { index: 5, title: 'Вечір' },
+    ]
+
+    it('hides the button when there is no toc', async () => {
+      expect((await mountView(2)).find('button[aria-haspopup="dialog"]').exists()).toBe(false)
+      expect((await mountView(2, [])).find('button[aria-haspopup="dialog"]').exists()).toBe(false)
+    })
+
+    it('opens the list, moves focus to the current entry and marks it', async () => {
+      const wrapper = await mountView(3, toc)
+
+      await wrapper.get('button[aria-haspopup="dialog"]').trigger('click')
+      await flushPromises()
+
+      const items = wrapper.findAll('[role="dialog"] button')
+      expect(items.map((b) => b.text())).toEqual(['Вступ', 'Ранок', 'Вечір'])
+      // Chapter 3 has no title of its own, so it belongs to "Ранок".
+      expect(items.map((b) => b.attributes('aria-current'))).toEqual([undefined, 'true', undefined])
+      expect(document.activeElement).toBe(items[1].element)
+    })
+
+    it('jumps to the chapter and saves the position, debounced', async () => {
+      const wrapper = await mountView(2, toc)
+
+      await wrapper.get('button[aria-haspopup="dialog"]').trigger('click')
+      await flushPromises()
+      await wrapper.findAll('[role="dialog"] button')[2].trigger('click')
+      await flushPromises()
+
+      expect(readerApi.chapter).toHaveBeenLastCalledWith(4, 5)
+      expect(wrapper.get('iframe').attributes('srcdoc')).toContain('Розділ-5')
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(readerApi.savePosition).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(800)
+      expect(readerApi.savePosition).toHaveBeenCalledWith(4, { chapter: 5, fraction: 0 })
+    })
+
+    it('closes on Escape and returns focus to the button', async () => {
+      const wrapper = await mountView(2, toc)
+      const button = wrapper.get('button[aria-haspopup="dialog"]')
+
+      await button.trigger('click')
+      await flushPromises()
+      await wrapper.get('[role="dialog"]').trigger('keydown', { key: 'Escape' })
+      await flushPromises()
+
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(document.activeElement).toBe(button.element)
+    })
   })
 })

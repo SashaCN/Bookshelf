@@ -210,6 +210,7 @@ function seed(): State {
         position: { chapter: 0, fraction: 0 },
         progress: 0,
         created_at: daysAgo(2).toISOString(),
+        toc: demoBook.chapters.map((c, index) => ({ index, title: c.title })),
       },
     ],
   }

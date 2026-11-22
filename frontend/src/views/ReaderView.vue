@@ -27,6 +27,13 @@ const loadingChapter = ref(false)
 const target = ref(0)
 const prevButton = ref<HTMLButtonElement | null>(null)
 const nextButton = ref<HTMLButtonElement | null>(null)
+const tocButton = ref<HTMLButtonElement | null>(null)
+const tocPanel = ref<HTMLElement | null>(null)
+const tocOpen = ref(false)
+
+const toc = computed(() => doc.value?.toc ?? [])
+/** The last table-of-contents entry at or before the current chapter: chapters without a title belong to the one before. */
+const currentTocIndex = computed(() => toc.value.reduce((found, entry) => (entry.index <= index.value ? entry.index : found), -1))
 
 function readFontSize(): number {
   try {
@@ -118,6 +125,26 @@ async function go(step: number) {
   }
 }
 
+async function openToc() {
+  tocOpen.value = true
+  await nextTick()
+  const current = tocPanel.value?.querySelector<HTMLElement>('[aria-current="true"]')
+  ;(current ?? tocPanel.value?.querySelector<HTMLElement>('button'))?.focus()
+}
+
+function closeToc() {
+  tocOpen.value = false
+  nextTick(() => tocButton.value?.focus())
+}
+
+async function jumpTo(chapterIndex: number) {
+  if (loadingChapter.value) return
+  closeToc()
+  if (chapterIndex === index.value || chapterIndex < 0 || chapterIndex >= count.value) return
+  await openChapter(chapterIndex)
+  if (index.value === chapterIndex) scheduleSave()
+}
+
 async function load() {
   error.value = ''
   notFound.value = false
@@ -177,8 +204,42 @@ onBeforeUnmount(() => {
         <h1 class="truncate font-display text-lg font-semibold leading-tight">{{ doc?.title }}</h1>
         <p v-if="chapter?.title" class="truncate text-xs text-ink-muted">{{ chapter.title }}</p>
       </div>
+      <button
+        v-if="toc.length"
+        ref="tocButton"
+        type="button"
+        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-sm"
+        aria-haspopup="dialog"
+        :aria-expanded="tocOpen"
+        @click="tocOpen ? closeToc() : openToc()"
+      >
+        {{ $t('reader.toc') }}
+      </button>
       <button type="button" class="min-h-11 min-w-11 rounded-lg border border-line bg-surface text-sm disabled:opacity-50" :aria-label="$t('reader.smaller')" :disabled="fontSize <= FONT_MIN" @click="changeFont(-2)">A−</button>
       <button type="button" class="min-h-11 min-w-11 rounded-lg border border-line bg-surface text-base disabled:opacity-50" :aria-label="$t('reader.larger')" :disabled="fontSize >= FONT_MAX" @click="changeFont(2)">A+</button>
+    </div>
+
+    <div
+      v-if="tocOpen"
+      ref="tocPanel"
+      role="dialog"
+      :aria-label="$t('reader.toc')"
+      class="max-h-[50dvh] overflow-y-auto rounded-2xl border border-line bg-surface p-2 shadow-lg"
+      @keydown.esc.stop="closeToc"
+    >
+      <ul class="flex flex-col">
+        <li v-for="entry in toc" :key="entry.index">
+          <button
+            type="button"
+            class="min-h-11 w-full rounded-lg px-3 text-left text-sm"
+            :class="entry.index === currentTocIndex ? 'bg-accent/10 font-semibold' : ''"
+            :aria-current="entry.index === currentTocIndex ? 'true' : undefined"
+            @click="jumpTo(entry.index)"
+          >
+            {{ entry.title }}
+          </button>
+        </li>
+      </ul>
     </div>
 
     <div v-if="notFound" class="flex flex-col items-start gap-2 rounded-2xl border border-dashed border-line p-4">

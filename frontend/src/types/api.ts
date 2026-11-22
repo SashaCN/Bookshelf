@@ -247,6 +247,12 @@ export interface ReaderPosition {
   fraction: number
 }
 
+/** A chapter named in the book's table of contents; `index` is the position in the spine. */
+export interface ReaderTocEntry {
+  index: number
+  title: string
+}
+
 /** An uploaded EPUB. `progress` is a percentage (0..100) derived from the saved position. */
 export interface ReaderDocument {
   id: number
@@ -256,6 +262,8 @@ export interface ReaderDocument {
   position: ReaderPosition
   progress: number
   created_at: string
+  /** Only in the response for a single book, not in the list. */
+  toc?: ReaderTocEntry[]
 }
 
 /** One chapter; `html` is untrusted markup and must only ever be shown in a sandboxed iframe. */
