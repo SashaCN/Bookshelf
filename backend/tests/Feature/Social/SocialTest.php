@@ -25,8 +25,6 @@ it('requires authentication for every endpoint', function (string $method, strin
 })->with([
     ['GET', '/api/feed'],
     ['GET', '/api/users?q=al'],
-    ['GET', '/api/users/alice'],
-    ['GET', '/api/users/alice/quotes'],
     ['GET', '/api/users/alice/followers'],
     ['GET', '/api/users/alice/following'],
     ['POST', '/api/users/alice/follow'],
@@ -198,6 +196,69 @@ describe('profile quotes', function () {
             ->assertJsonCount(20, 'data')
             ->assertJsonStructure(['data', 'links', 'meta']);
         $this->actingAs($this->me)->getJson('/api/users/alice/quotes?page=2')->assertJsonCount(1, 'data');
+    });
+});
+
+describe('guest access', function () {
+    it('shows a public profile and its public quotes to a guest', function () {
+        quoteOf($this->alice, true, ['content' => 'Open words', 'note' => 'my secret note', 'is_favorite' => true]);
+        quoteOf($this->alice, false, ['content' => 'Secret words']);
+
+        $this->getJson('/api/users/alice')->assertOk()
+            ->assertJsonPath('data.username', 'alice')
+            ->assertJsonPath('data.is_following', false)
+            ->assertJsonPath('data.is_me', false);
+
+        $response = $this->getJson('/api/users/alice/quotes')->assertOk()->assertJsonCount(1, 'data');
+        expect($response->json('data.0.content'))->toBe('Open words');
+    });
+
+    it('answers 404 for a private or missing profile', function (string $suffix) {
+        $this->getJson("/api/users/hidden{$suffix}")->assertNotFound();
+        $this->getJson("/api/users/nobody{$suffix}")->assertNotFound();
+    })->with(['', '/quotes']);
+
+    it('keeps followers, following and following actions for signed-in readers', function (string $method, string $suffix) {
+        $this->json($method, "/api/users/alice{$suffix}")->assertUnauthorized();
+    })->with([['GET', '/followers'], ['GET', '/following'], ['POST', '/follow'], ['DELETE', '/follow']]);
+
+    it('still knows a signed-in reader on the public routes', function () {
+        app(FollowUser::class)->follow($this->me, $this->alice);
+
+        $this->actingAs($this->me)->getJson('/api/users/alice')
+            ->assertJsonPath('data.is_following', true)->assertJsonPath('data.is_me', false);
+    });
+
+    it('still lets a signed-in reader open their own private profile', function () {
+        $this->actingAs($this->hidden)->getJson('/api/users/hidden')->assertOk()->assertJsonPath('data.is_me', true);
+    });
+
+    it('hides the notes and favorite flag of a quote from a guest', function () {
+        quoteOf($this->alice, true, ['note' => 'my secret note', 'is_favorite' => true]);
+
+        $this->getJson('/api/users/alice/quotes')->assertJsonMissingPath('data.0.note')->assertJsonMissingPath('data.0.is_favorite');
+    });
+
+    it('hides the notes and favorite flag of a quote from another reader', function () {
+        quoteOf($this->alice, true, ['note' => 'my secret note', 'is_favorite' => true]);
+
+        $this->actingAs($this->me)->getJson('/api/users/alice/quotes')
+            ->assertJsonMissingPath('data.0.note')->assertJsonMissingPath('data.0.is_favorite');
+    });
+
+    it('keeps the notes and favorite flag for the owner', function () {
+        quoteOf($this->alice, true, ['note' => 'my secret note', 'is_favorite' => true]);
+
+        $this->actingAs($this->alice)->getJson('/api/users/alice/quotes')
+            ->assertJsonPath('data.0.note', 'my secret note')->assertJsonPath('data.0.is_favorite', true);
+    });
+
+    it('throttles guests by address', function () {
+        foreach (range(1, 60) as $ignored) {
+            $this->getJson('/api/users/alice')->assertOk();
+        }
+
+        $this->getJson('/api/users/alice')->assertStatus(429);
     });
 });
 

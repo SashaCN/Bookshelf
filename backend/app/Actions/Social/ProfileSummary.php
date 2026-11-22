@@ -11,7 +11,7 @@ class ProfileSummary
     /**
      * @return array{username: string|null, name: string, books_finished_this_year: int, followers_count: int, following_count: int, is_following: bool, is_me: bool}
      */
-    public function handle(User $viewer, User $profile): array
+    public function handle(?User $viewer, User $profile): array
     {
         $statistics = new ReadingStatistics($profile);
         $today = $statistics->today();
@@ -22,8 +22,8 @@ class ProfileSummary
             'books_finished_this_year' => $statistics->booksFinished($today->startOfYear(), $today->endOfYear()),
             'followers_count' => $this->visible($profile->followers()),
             'following_count' => $this->visible($profile->following()),
-            'is_following' => $viewer->following()->whereKey($profile->id)->exists(),
-            'is_me' => $viewer->is($profile),
+            'is_following' => $viewer?->following()->whereKey($profile->id)->exists() ?? false,
+            'is_me' => $viewer?->is($profile) ?? false,
         ];
     }
 

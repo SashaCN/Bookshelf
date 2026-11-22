@@ -15,23 +15,23 @@ class ProfileController extends Controller
 {
     public function show(Request $request, string $username, FindPublicProfile $find, ProfileSummary $summary): JsonResponse
     {
-        $profile = $find->handle($request->user(), $username);
+        $profile = $find->handle($request->user('sanctum'), $username);
 
-        return response()->json(['data' => $summary->handle($request->user(), $profile)]);
+        return response()->json(['data' => $summary->handle($request->user('sanctum'), $profile)]);
     }
 
     public function quotes(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
     {
-        return QuoteResource::collection($query->quotes($find->handle($request->user(), $username)));
+        return QuoteResource::collection($query->quotes($find->handle($request->user('sanctum'), $username)));
     }
 
     public function followers(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
     {
-        return ProfileMemberResource::collection($query->followers($find->handle($request->user(), $username)));
+        return ProfileMemberResource::collection($query->followers($find->handle($request->user('sanctum'), $username)));
     }
 
     public function following(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
     {
-        return ProfileMemberResource::collection($query->following($find->handle($request->user(), $username)));
+        return ProfileMemberResource::collection($query->following($find->handle($request->user('sanctum'), $username)));
     }
 }

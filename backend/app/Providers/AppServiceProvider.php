@@ -30,5 +30,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Each upload is unzipped and parsed, which costs far more than a normal request.
         RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(10)->by((string) ($request->user()->id ?? $request->ip())));
+
+        // Shared profile links are open to guests, who are told apart by address only.
+        RateLimiter::for('public-profile', fn (Request $request) => Limit::perMinute(60)->by((string) ($request->user('sanctum')->id ?? $request->ip())));
     }
 }

@@ -14,6 +14,13 @@ use App\Http\Controllers\UserBookController;
 use App\Http\Controllers\UserSearchController;
 use Illuminate\Support\Facades\Route;
 
+// Public profiles can be opened from a shared link without signing in. The session is still honoured,
+// so a signed-in reader sees their own private profile and their follow state.
+Route::middleware('throttle:public-profile')->group(function (): void {
+    Route::get('/users/{username}', [ProfileController::class, 'show'])->name('users.show');
+    Route::get('/users/{username}/quotes', [ProfileController::class, 'quotes'])->name('users.quotes');
+});
+
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/me', [MeController::class, 'show'])->name('me.show');
     Route::patch('/me', [MeController::class, 'update'])->name('me.update');
@@ -45,8 +52,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('/feed', FeedController::class)->name('feed');
     Route::get('/users', UserSearchController::class)->name('users.search');
-    Route::get('/users/{username}', [ProfileController::class, 'show'])->name('users.show');
-    Route::get('/users/{username}/quotes', [ProfileController::class, 'quotes'])->name('users.quotes');
     Route::get('/users/{username}/followers', [ProfileController::class, 'followers'])->name('users.followers');
     Route::get('/users/{username}/following', [ProfileController::class, 'following'])->name('users.following');
     Route::post('/users/{username}/follow', [FollowController::class, 'store'])->name('users.follow');

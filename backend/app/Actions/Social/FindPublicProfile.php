@@ -9,15 +9,15 @@ class FindPublicProfile
 {
     /**
      * The reader behind a handle. A private or missing profile is "not found" for everybody
-     * but its owner, so the API never confirms that a private reader exists.
+     * but its owner (a guest has no private access), so the API never confirms that a private reader exists.
      *
      * @throws ModelNotFoundException<User>
      */
-    public function handle(User $viewer, string $username): User
+    public function handle(?User $viewer, string $username): User
     {
         return User::query()
             ->where('username', mb_strtolower($username))
-            ->where(fn ($query) => $query->where('is_public', true)->orWhere('id', $viewer->id))
+            ->where(fn ($query) => $query->where('is_public', true)->orWhere('id', $viewer?->id))
             ->firstOrFail();
     }
 }
