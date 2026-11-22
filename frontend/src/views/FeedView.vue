@@ -2,16 +2,18 @@
 import { onMounted, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
+import LoadMore from '@/components/LoadMore.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import QuoteCard from '@/components/QuoteCard.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useLoadMore } from '@/composables/useLoadMore'
 import { useSocialStore } from '@/stores/social'
 
 const social = useSocialStore()
 const errorMessage = useApiErrorMessage()
+const { moreError, loadMore } = useLoadMore(() => social.feed.loadMore())
 
 const error = ref('')
-const moreError = ref('')
 
 async function load() {
   error.value = ''
@@ -21,16 +23,6 @@ async function load() {
     await social.loadFeed()
   } catch (e) {
     error.value = errorMessage(e)
-  }
-}
-
-async function loadMore() {
-  moreError.value = ''
-
-  try {
-    await social.feed.loadMore()
-  } catch (e) {
-    moreError.value = errorMessage(e)
   }
 }
 
@@ -51,18 +43,15 @@ onMounted(load)
       </li>
     </ul>
 
-    <EmptyState v-else :title="$t('social.feed.empty.title')" :text="$t('social.feed.empty.text')" />
+    <EmptyState v-else :title="$t('social.feed.empty.title')" :text="$t('social.feed.empty.text')">
+      <RouterLink
+        :to="{ name: 'profile' }"
+        class="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 font-semibold text-on-accent"
+      >
+        {{ $t('social.feed.empty.action') }}
+      </RouterLink>
+    </EmptyState>
 
-    <ErrorNotice v-if="moreError" :message="moreError" retryable class="mt-4" @retry="loadMore" />
-
-    <button
-      v-if="social.feed.hasMore && !moreError"
-      type="button"
-      :disabled="social.feed.loadingMore"
-      class="mt-4 min-h-11 w-full rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
-      @click="loadMore"
-    >
-      {{ $t('quotes.more') }}
-    </button>
+    <LoadMore :has-more="social.feed.hasMore" :loading="social.feed.loadingMore" :error="moreError" @more="loadMore" />
   </template>
 </template>

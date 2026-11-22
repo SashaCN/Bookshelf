@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useLoadMore } from '@/composables/useLoadMore'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
+import LoadMore from '@/components/LoadMore.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { ApiError } from '@/api/http'
 import { useSocialStore } from '@/stores/social'
@@ -12,8 +14,9 @@ const props = defineProps<{ username: string; kind: 'followers' | 'following' }>
 const social = useSocialStore()
 const errorMessage = useApiErrorMessage()
 
+const { moreError, loadMore } = useLoadMore(() => social.people.loadMore())
+
 const error = ref('')
-const moreError = ref('')
 const notFound = ref(false)
 
 const title = computed(() => (props.kind === 'followers' ? 'social.people.followersTitle' : 'social.people.followingTitle'))
@@ -35,21 +38,11 @@ async function load() {
   }
 }
 
-async function loadMore() {
-  moreError.value = ''
-
-  try {
-    await social.people.loadMore()
-  } catch (e) {
-    moreError.value = errorMessage(e)
-  }
-}
-
 watch(() => [props.username, props.kind], load, { immediate: true })
 </script>
 
 <template>
-  <PageHeader :title="$t(title)" :back-to="{ name: 'home' }" />
+  <PageHeader :title="$t(title)" :back-to="{ name: 'public-profile', params: { username } }" />
 
   <p v-if="notFound" class="py-10 text-center text-ink-muted">{{ $t('social.profile.notFound') }}</p>
 
@@ -70,18 +63,8 @@ watch(() => [props.username, props.kind], load, { immediate: true })
       </li>
     </ul>
 
-    <EmptyState v-else :title="$t(title)" :text="$t(empty)" />
+    <EmptyState v-else :title="$t('social.people.emptyTitle')" :text="$t(empty)" />
 
-    <ErrorNotice v-if="moreError" :message="moreError" retryable class="mt-4" @retry="loadMore" />
-
-    <button
-      v-if="social.people.hasMore && !moreError"
-      type="button"
-      :disabled="social.people.loadingMore"
-      class="mt-4 min-h-11 w-full rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
-      @click="loadMore"
-    >
-      {{ $t('social.people.more') }}
-    </button>
+    <LoadMore :has-more="social.people.hasMore" :loading="social.people.loadingMore" :error="moreError" @more="loadMore" />
   </template>
 </template>

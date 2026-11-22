@@ -30,6 +30,11 @@ function buttonWithText(wrapper: ReturnType<typeof mount>, text: string) {
   return wrapper.findAll('button').find((candidate) => candidate.text() === text)
 }
 
+/** The number and its word are two lines of one link. */
+function stat(wrapper: ReturnType<typeof mount>, selector: string) {
+  return wrapper.findAll(`${selector} span`).map((span) => span.text()).join(' ')
+}
+
 describe('PublicProfileView', () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -40,7 +45,7 @@ describe('PublicProfileView', () => {
 
     expect(wrapper.get('h1').text()).toBe('Олена')
     expect(wrapper.text()).toContain('@olena')
-    expect(wrapper.get('dl').text()).toContain('5')
+    expect(wrapper.text()).toContain('Прочитано цього року')
     expect(wrapper.find('a[href="/u/olena/followers"]').text()).toContain('3')
     expect(wrapper.find('a[href="/u/olena/following"]').text()).toContain('2')
     expect(wrapper.text()).toContain('Public words')
@@ -100,6 +105,89 @@ describe('PublicProfileView', () => {
     const { wrapper } = await mountView(new ApiError(404, null))
 
     expect(wrapper.text()).toContain('Такого профілю немає')
-    expect(wrapper.find('dl').exists()).toBe(false)
+    expect(wrapper.find('a[href="/u/olena/followers"]').exists()).toBe(false)
+  })
+
+  it('declines the counter words in Ukrainian', async () => {
+    const one = await mountView(makeProfile({ followers_count: 1, following_count: 1 }))
+    expect(stat(one.wrapper, 'a[href="/u/olena/followers"]')).toBe('1 підписник')
+    expect(stat(one.wrapper, 'a[href="/u/olena/following"]')).toBe('1 підписка')
+
+    const few = await mountView(makeProfile({ followers_count: 2, following_count: 3 }))
+    expect(stat(few.wrapper, 'a[href="/u/olena/followers"]')).toBe('2 підписники')
+    expect(stat(few.wrapper, 'a[href="/u/olena/following"]')).toBe('3 підписки')
+
+    const many = await mountView(makeProfile({ followers_count: 5, following_count: 11 }))
+    expect(stat(many.wrapper, 'a[href="/u/olena/followers"]')).toBe('5 підписників')
+    expect(stat(many.wrapper, 'a[href="/u/olena/following"]')).toBe('11 підписок')
+  })
+
+  it('disables the follow button while the request is on its way', async () => {
+    let finish: () => void = () => undefined
+    vi.mocked(socialApi.follow).mockReturnValue(new Promise((resolve) => { finish = () => resolve(null) }))
+    const { wrapper } = await mountView(makeProfile())
+
+    await buttonWithText(wrapper, 'Підписатися')!.trigger('click')
+
+    const button = buttonWithText(wrapper, 'Відписатися')!
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(button.attributes('aria-pressed')).toBe('true')
+    await button.trigger('click')
+    expect(socialApi.unfollow).not.toHaveBeenCalled()
+
+    finish()
+    await flushPromises()
+    expect(buttonWithText(wrapper, 'Відписатися')!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('retries a failed follow', async () => {
+    vi.mocked(socialApi.follow).mockRejectedValueOnce(new ApiError(500, null)).mockResolvedValue(null)
+    const { wrapper } = await mountView(makeProfile())
+
+    await buttonWithText(wrapper, 'Підписатися')!.trigger('click')
+    await flushPromises()
+    await buttonWithText(wrapper, 'Повторити')!.trigger('click')
+    await flushPromises()
+
+    expect(socialApi.follow).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('Не вдалося')
+    expect(buttonWithText(wrapper, 'Відписатися')).toBeDefined()
+  })
+
+  it('shows an error with a retry when the profile cannot be loaded', async () => {
+    const { wrapper } = await mountView(new ApiError(500, null))
+    vi.mocked(socialApi.profile).mockResolvedValue(makeProfile())
+
+    await buttonWithText(wrapper, 'Повторити')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe('Олена')
+  })
+
+  it('keeps the quotes and offers a retry when loading more fails', async () => {
+    const { wrapper } = await mountView(makeProfile(), '/n')
+    vi.mocked(socialApi.quotes).mockRejectedValueOnce(new ApiError(500, null))
+
+    await buttonWithText(wrapper, 'Показати ще')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Public words')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося')
+    expect(buttonWithText(wrapper, 'Показати ще')).toBeUndefined()
+
+    vi.mocked(socialApi.quotes).mockResolvedValue({ data: [makeQuote({ id: 2, content: 'More words' })], links: { next: null } })
+    await buttonWithText(wrapper, 'Повторити')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('More words')
+  })
+
+  it('says when there are no public quotes yet', async () => {
+    const { wrapper } = await mountView(makeProfile())
+    vi.mocked(socialApi.quotes).mockResolvedValue({ data: [], links: { next: null } })
+    await wrapper.setProps({ username: 'ivan' })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Публічних цитат поки немає.')
   })
 })

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
-defineProps<{ title: string; backTo?: { name: string } }>()
+defineProps<{ title: string; backTo?: { name: string; params?: Record<string, string> } }>()
 
 const auth = useAuthStore()
 const initials = computed(() => auth.user?.name.trim().charAt(0).toUpperCase() ?? '')

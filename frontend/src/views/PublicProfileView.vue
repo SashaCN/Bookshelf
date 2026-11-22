@@ -2,9 +2,11 @@
 import { ref, watch } from 'vue'
 import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
+import LoadMore from '@/components/LoadMore.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import QuoteCard from '@/components/QuoteCard.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useLoadMore } from '@/composables/useLoadMore'
 import { useSocialStore } from '@/stores/social'
 
 const props = defineProps<{ username: string }>()
@@ -13,8 +15,9 @@ const social = useSocialStore()
 const errorMessage = useApiErrorMessage()
 
 const notFound = ref(false)
+const { moreError, loadMore } = useLoadMore(() => social.profileQuotes.loadMore())
+
 const error = ref('')
-const moreError = ref('')
 const followError = ref('')
 const busy = ref(false)
 
@@ -32,16 +35,6 @@ async function load() {
     } else {
       error.value = errorMessage(e)
     }
-  }
-}
-
-async function loadMore() {
-  moreError.value = ''
-
-  try {
-    await social.profileQuotes.loadMore()
-  } catch (e) {
-    moreError.value = errorMessage(e)
   }
 }
 
@@ -75,28 +68,28 @@ watch(() => props.username, load, { immediate: true })
   <template v-else>
     <p class="-mt-2 mb-4 text-ink-muted">@{{ social.profile.username }}</p>
 
-    <dl class="mb-4 grid grid-cols-3 gap-2 text-center">
+    <div class="mb-4 grid grid-cols-3 gap-2 text-center">
       <div class="rounded-2xl border border-line bg-surface px-2 py-3">
-        <dd class="font-display text-2xl font-bold tabular-nums">{{ social.profile.books_finished_this_year }}</dd>
-        <dt class="text-xs text-ink-muted">{{ $t('social.profile.finishedThisYear') }}</dt>
+        <p class="font-display text-2xl font-bold tabular-nums">{{ social.profile.books_finished_this_year }}</p>
+        <p class="text-xs text-ink-muted">{{ $t('social.profile.finishedThisYear') }}</p>
       </div>
       <RouterLink
         :to="{ name: 'followers', params: { username: social.profile.username } }"
-        class="rounded-2xl border border-line bg-surface px-2 py-3"
+        class="flex min-h-11 flex-col rounded-2xl border border-line bg-surface px-2 py-3"
       >
-        <span class="block font-display text-2xl font-bold tabular-nums">{{ social.profile.followers_count }}</span>
-        <span class="text-xs text-ink-muted">{{ $t('social.profile.followers') }}</span>
+        <span class="font-display text-2xl font-bold tabular-nums">{{ social.profile.followers_count }}</span>
+        <span class="text-xs text-ink-muted">{{ $t('social.profile.followers', social.profile.followers_count) }}</span>
       </RouterLink>
       <RouterLink
         :to="{ name: 'following', params: { username: social.profile.username } }"
-        class="rounded-2xl border border-line bg-surface px-2 py-3"
+        class="flex min-h-11 flex-col rounded-2xl border border-line bg-surface px-2 py-3"
       >
-        <span class="block font-display text-2xl font-bold tabular-nums">{{ social.profile.following_count }}</span>
-        <span class="text-xs text-ink-muted">{{ $t('social.profile.following') }}</span>
+        <span class="font-display text-2xl font-bold tabular-nums">{{ social.profile.following_count }}</span>
+        <span class="text-xs text-ink-muted">{{ $t('social.profile.following', social.profile.following_count) }}</span>
       </RouterLink>
-    </dl>
+    </div>
 
-    <ErrorNotice v-if="followError" :message="followError" class="mb-3" />
+    <ErrorNotice v-if="followError" :message="followError" retryable class="mb-3" @retry="toggleFollow" />
 
     <button
       v-if="!social.profile.is_me"
@@ -120,16 +113,6 @@ watch(() => props.username, load, { immediate: true })
 
     <p v-else-if="social.profileQuotes.loaded" class="text-ink-muted">{{ $t('social.profile.noQuotes') }}</p>
 
-    <ErrorNotice v-if="moreError" :message="moreError" retryable class="mt-4" @retry="loadMore" />
-
-    <button
-      v-if="social.profileQuotes.hasMore && !moreError"
-      type="button"
-      :disabled="social.profileQuotes.loadingMore"
-      class="mt-4 min-h-11 w-full rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
-      @click="loadMore"
-    >
-      {{ $t('social.profile.more') }}
-    </button>
+    <LoadMore :has-more="social.profileQuotes.hasMore" :loading="social.profileQuotes.loadingMore" :error="moreError" @more="loadMore" />
   </template>
 </template>
