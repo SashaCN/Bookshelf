@@ -44,7 +44,7 @@ class EpubParser
     private const UNSAFE_SCHEMES = ['javascript:', 'vbscript:', 'data:'];
 
     /**
-     * @return array{title: string, author: string|null, chapters: list<string>}
+     * @return array{title: string, author: string|null, chapters: list<string>, titles: list<string|null>}
      *
      * @throws ValidationException
      */
@@ -82,6 +82,7 @@ class EpubParser
                 'title' => mb_substr($title ?? $fallbackTitle, 0, 255),
                 'author' => $author !== null ? mb_substr($author, 0, 255) : null,
                 'chapters' => $chapters,
+                'titles' => $this->titles($zip, $xpath, dirname($opfPath), $chapters),
             ];
         } finally {
             $zip->close();
@@ -347,9 +348,14 @@ class EpubParser
 
     private function loadXml(?string $xml): DOMDocument
     {
+        return $this->parseXml($xml) ?? $this->fail('reader.invalid_epub');
+    }
+
+    private function parseXml(?string $xml): ?DOMDocument
+    {
         // Metadata has no use for entities, and declaring them is how XML bombs are built.
         if ($xml === null || trim($xml) === '' || stripos($xml, '<!ENTITY') !== false) {
-            $this->fail('reader.invalid_epub');
+            return null;
         }
 
         $dom = new DOMDocument;
@@ -359,11 +365,7 @@ class EpubParser
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
 
-        if (! $loaded) {
-            $this->fail('reader.invalid_epub');
-        }
-
-        return $dom;
+        return $loaded ? $dom : null;
     }
 
     private function text(DOMXPath $xpath, string $query): ?string
@@ -396,13 +398,10 @@ class EpubParser
                 continue;
             }
 
-            // A reference to a part of a file (#fragment) or a query is still that file; "/x" is relative to the archive root.
-            $target = rawurldecode(explode('#', explode('?', $href)[0])[0]);
-            if ($target === '' || preg_match('#^[a-z][a-z0-9+.-]*:#i', $target) === 1) {
+            $entry = $this->resolve($href, $baseDir);
+            if ($entry === null) {
                 continue;
             }
-
-            $entry = $this->normalize(str_starts_with($target, '/') || $baseDir === '.' ? $target : $baseDir.'/'.$target);
 
             // A book may list a file twice, and a manifest may name a file the archive does not have.
             if (! in_array($entry, $chapters, true) && $zip->locateName($entry) !== false) {
@@ -411,6 +410,91 @@ class EpubParser
         }
 
         return $chapters;
+    }
+
+    /**
+     * A reference to a part of a file (#fragment) or a query is still that file; "/x" is relative to the archive root.
+     * Null for an empty or external reference.
+     */
+    private function resolve(string $href, string $baseDir): ?string
+    {
+        $target = rawurldecode(explode('#', explode('?', $href)[0])[0]);
+        if ($target === '' || preg_match('#^[a-z][a-z0-9+.-]*:#i', $target) === 1) {
+            return null;
+        }
+
+        return $this->normalize(str_starts_with($target, '/') || $baseDir === '.' ? $target : $baseDir.'/'.$target);
+    }
+
+    /**
+     * Chapter titles from the table of contents, aligned to the spine; null where the book names none.
+     * A broken or missing table of contents only means no titles, never a failed import.
+     *
+     * @param  list<string>  $chapters
+     * @return list<string|null>
+     */
+    private function titles(ZipArchive $zip, DOMXPath $opf, string $baseDir, array $chapters): array
+    {
+        $titles = array_fill(0, count($chapters), null);
+
+        try {
+            foreach ($this->tocEntries($zip, $opf, $baseDir) as [$entry, $title]) {
+                $index = array_search($entry, $chapters, true);
+                if ($index !== false && $titles[$index] === null) {
+                    $titles[$index] = $title;
+                }
+            }
+        } catch (\Throwable) {
+            // Titles are a nicety.
+        }
+
+        return $titles;
+    }
+
+    /**
+     * @return list<array{string, string}> archive entry and title, in document order, nesting flattened
+     */
+    private function tocEntries(ZipArchive $zip, DOMXPath $opf, string $baseDir): array
+    {
+        $manifest = '//*[local-name()="manifest"]/*[local-name()="item"]';
+        $nav = $opf->query($manifest.'[contains(concat(" ", normalize-space(@properties), " "), " nav ")]')->item(0);
+        $ncx = $opf->query('//*[local-name()="spine"]/@toc')->item(0)?->nodeValue;
+        $ncx = $ncx !== null ? $opf->query($manifest.'[@id="'.str_replace('"', '', $ncx).'"]')->item(0) : null;
+
+        $found = [];
+        foreach ([[$nav, '//*[local-name()="nav"][@*[local-name()="type" and contains(concat(" ", normalize-space(.), " "), " toc ")]]//*[local-name()="a"][@href]', './/text()'],
+            [$ncx, '//*[local-name()="navMap"]//*[local-name()="navPoint"]', null]] as [$item, $query, $text]) {
+            $href = $item instanceof DOMElement ? $item->getAttribute('href') : '';
+            $file = $href !== '' ? $this->resolve($href, $baseDir) : null;
+            $dom = $file !== null ? $this->parseXml($this->read($zip, $file, self::MAX_XML_SIZE)) : null;
+            if ($dom === null) {
+                continue;
+            }
+
+            $xpath = new DOMXPath($dom);
+            $fileDir = dirname($file);
+            foreach ($xpath->query($query) ?: [] as $node) {
+                if ($text !== null) {
+                    $ref = $node instanceof DOMElement ? $node->getAttribute('href') : '';
+                    $label = $node->textContent;
+                } else {
+                    $ref = $xpath->query('./*[local-name()="content"]/@src', $node)->item(0)->nodeValue ?? '';
+                    $label = $xpath->query('./*[local-name()="navLabel"]/*[local-name()="text"]', $node)->item(0)->textContent ?? '';
+                }
+
+                $label = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $label)), 0, 255);
+                $entry = $ref !== '' ? $this->resolve($ref, $fileDir) : null;
+                if ($entry !== null && $label !== '') {
+                    $found[] = [$entry, $label];
+                }
+            }
+
+            if ($found !== []) {
+                break;
+            }
+        }
+
+        return $found;
     }
 
     /**

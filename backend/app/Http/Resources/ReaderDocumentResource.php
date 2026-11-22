@@ -11,12 +11,25 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class ReaderDocumentResource extends JsonResource
 {
+    private bool $withToc = false;
+
+    /**
+     * The table of contents is only sent with a single book, not in the list.
+     */
+    public function withToc(): static
+    {
+        $this->withToc = true;
+
+        return $this;
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
-        return [
+        /** @var array<string, mixed> $data */
+        $data = [
             'id' => $this->id,
             'title' => $this->title,
             'author' => $this->author,
@@ -28,5 +41,11 @@ class ReaderDocumentResource extends JsonResource
             'progress' => $this->progress(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
+
+        if ($this->withToc) {
+            $data['toc'] = $this->toc();
+        }
+
+        return $data;
     }
 }

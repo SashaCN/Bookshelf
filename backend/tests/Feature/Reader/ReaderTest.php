@@ -523,3 +523,108 @@ describe('failures while storing', function () {
         $this->actingAs($this->stranger)->postJson('/api/reader', [])->assertUnprocessable();
     });
 });
+
+describe('table of contents', function () {
+    /**
+     * A three-chapter EPUB with a hand-written navigation file.
+     *
+     * @param  array<string, string>  $nav  zip path => content of the nav or ncx file
+     */
+    function makeTocEpub(array $nav, string $navItem, string $spineAttrs = ''): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'epub');
+        $zip = new ZipArchive;
+        $zip->open($path, ZipArchive::OVERWRITE);
+        $zip->addFromString('mimetype', 'application/epub+zip');
+        $zip->addFromString('META-INF/container.xml', '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>'
+            .'<rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+        $manifest = $navItem;
+        $spine = '';
+        foreach ([1, 2, 3] as $i) {
+            $manifest .= '<item id="c'.$i.'" href="Text/ch'.$i.'.xhtml" media-type="application/xhtml+xml"/>';
+            $spine .= '<itemref idref="c'.$i.'"/>';
+            $zip->addFromString("OEBPS/Text/ch{$i}.xhtml", '<html><body><p>'.$i.'</p></body></html>');
+        }
+        $zip->addFromString('OEBPS/content.opf', '<package xmlns="http://www.idpf.org/2007/opf"><metadata><title>Toc</title></metadata>'
+            ."<manifest>{$manifest}</manifest><spine {$spineAttrs}>{$spine}</spine></package>");
+        foreach ($nav as $name => $content) {
+            $zip->addFromString($name, $content);
+        }
+        $zip->close();
+
+        return new UploadedFile($path, 'toc.epub', 'application/epub+zip', null, true);
+    }
+
+    function navDocument(string $list): string
+    {
+        return '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body>'
+            .'<nav epub:type="landmarks"><ol><li><a href="Text/ch3.xhtml">Landmark</a></li></ol></nav>'
+            .'<nav epub:type="toc"><ol>'.$list.'</ol></nav></body></html>';
+    }
+
+    function importToc(mixed $test, UploadedFile $file): ReaderDocument
+    {
+        $test->actingAs($test->user)->postJson('/api/reader', ['file' => $file])->assertCreated();
+
+        return ReaderDocument::query()->sole();
+    }
+
+    it('reads titles from the EPUB 3 nav document, relative to it', function () {
+        $nav = navDocument('<li><a href="Text/ch1.xhtml">Start</a></li><li><a href="Text/ch3.xhtml">  The   End </a></li>');
+        $file = makeTocEpub(['OEBPS/nav.xhtml' => $nav], '<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/>');
+
+        expect(importToc($this, $file)->chapter_titles)->toBe(['Start', null, 'The End']);
+    });
+
+    it('reads titles from the EPUB 2 NCX', function () {
+        $ncx = '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap>'
+            .'<navPoint><navLabel><text>One</text></navLabel><content src="Text/ch1.xhtml"/></navPoint>'
+            .'<navPoint><navLabel><text>Two</text></navLabel><content src="Text/ch2.xhtml"/></navPoint></navMap></ncx>';
+        $file = makeTocEpub(['OEBPS/toc.ncx' => $ncx], '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>', 'toc="ncx"');
+
+        expect(importToc($this, $file)->chapter_titles)->toBe(['One', 'Two', null]);
+    });
+
+    it('flattens nested entries and maps fragment hrefs, first title wins', function () {
+        $nav = navDocument('<li><a href="Text/ch1.xhtml#top">Part</a><ol>'
+            .'<li><a href="Text/ch1.xhtml#s1">Section</a></li><li><a href="Text/ch2.xhtml#s2">Nested</a></li></ol></li>'
+            .'<li><a href="Text/missing.xhtml">Gone</a></li><li><a href="https://example.com/">Web</a></li>');
+        $file = makeTocEpub(['OEBPS/nav.xhtml' => $nav], '<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/>');
+
+        expect(importToc($this, $file)->chapter_titles)->toBe(['Part', 'Nested', null]);
+    });
+
+    it('does not fail the import when the navigation is broken', function (string $content) {
+        $file = makeTocEpub(['OEBPS/nav.xhtml' => $content], '<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/>');
+
+        expect(importToc($this, $file)->chapter_titles)->toBe([null, null, null]);
+    })->with([
+        'not xml' => ['<nav><ol><li>'],
+        'entities' => ['<!DOCTYPE x [<!ENTITY a "b">]><html><body><nav epub:type="toc"><ol><li><a href="Text/ch1.xhtml">&a;</a></li></ol></nav></body></html>'],
+        'empty' => [''],
+    ]);
+
+    it('does not fail the import when the navigation file is missing', function () {
+        $file = makeTocEpub([], '<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/>');
+
+        expect(importToc($this, $file)->chapter_titles)->toBe([null, null, null]);
+    });
+
+    it('shows the toc of one book but not in the list', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create(['chapter_titles' => ['A', null, 'C']]);
+
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}")
+            ->assertOk()
+            ->assertJsonPath('data.toc', [['index' => 0, 'title' => 'A'], ['index' => 2, 'title' => 'C']]);
+
+        $this->actingAs($this->user)->getJson('/api/reader')
+            ->assertOk()
+            ->assertJsonMissingPath('data.0.toc');
+    });
+
+    it('shows an empty toc for a book imported before titles existed', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create(['chapter_titles' => null]);
+
+        $this->actingAs($this->user)->getJson("/api/reader/{$document->id}")->assertOk()->assertJsonPath('data.toc', []);
+    });
+});

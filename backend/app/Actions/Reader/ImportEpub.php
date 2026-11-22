@@ -35,6 +35,7 @@ class ImportEpub
                 'author' => $parsed['author'],
                 'path' => $path,
                 'chapters' => $parsed['chapters'],
+                'chapter_titles' => $parsed['titles'],
                 'chapters_count' => count($parsed['chapters']),
             ]);
         } catch (Throwable $exception) {

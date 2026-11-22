@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'author',
     'path',
     'chapters',
+    'chapter_titles',
     'chapters_count',
     'position_chapter',
     'position_fraction',
@@ -35,6 +36,7 @@ class ReaderDocument extends Model
     {
         return [
             'chapters' => 'array',
+            'chapter_titles' => 'array',
             'chapters_count' => 'integer',
             'position_chapter' => 'integer',
             'position_fraction' => 'float',
@@ -59,5 +61,22 @@ class ReaderDocument extends Model
         }
 
         return round(($this->position_chapter + $this->position_fraction) / $this->chapters_count * 100, 1);
+    }
+
+    /**
+     * Chapters that have a title in the table of contents, in spine order.
+     *
+     * @return list<array{index: int, title: string}>
+     */
+    public function toc(): array
+    {
+        $toc = [];
+        foreach ($this->chapter_titles ?? [] as $index => $title) {
+            if (is_string($title) && $title !== '') {
+                $toc[] = ['index' => $index, 'title' => $title];
+            }
+        }
+
+        return $toc;
     }
 }

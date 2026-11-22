@@ -36,7 +36,7 @@ class ReaderDocumentController extends Controller
     {
         Gate::authorize('view', $readerDocument);
 
-        return new ReaderDocumentResource($readerDocument);
+        return (new ReaderDocumentResource($readerDocument))->withToc();
     }
 
     public function destroy(ReaderDocument $readerDocument): Response
