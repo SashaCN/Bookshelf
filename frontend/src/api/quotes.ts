@@ -1,11 +1,16 @@
 import type { Quote, QuoteFilters, QuotePayload, QuotesPage } from '@/types/api'
 import { http } from './http'
 
-function listQuery(filters: QuoteFilters, page: number): string {
+function filterParams(filters: QuoteFilters): URLSearchParams {
   const params = new URLSearchParams()
   if (filters.favorite) params.set('favorite', '1')
   if (filters.book !== undefined) params.set('book', String(filters.book))
   if (filters.type) params.set('type', filters.type)
+  return params
+}
+
+function listQuery(filters: QuoteFilters, page: number): string {
+  const params = filterParams(filters)
   params.set('page', String(page))
   return params.toString()
 }
@@ -15,6 +20,11 @@ export const quotesApi = {
   /** The quote of the day, or null while the reader has no quotes. */
   daily: () => http.get<{ data: Quote | null }>('/api/quotes/daily').then((response) => response.data),
   get: (id: number) => http.get<{ data: Quote }>(`/api/quotes/${id}`).then((response) => response.data),
+  /** The quotes matching the filters as a Markdown file. */
+  exportMarkdown: (filters: QuoteFilters = {}) => {
+    const query = filterParams(filters).toString()
+    return http.download(`/api/quotes/export${query ? `?${query}` : ''}`)
+  },
   create: (userBookId: number, payload: QuotePayload) =>
     http.post<{ data: Quote }>(`/api/library/${userBookId}/quotes`, payload).then((response) => response.data),
   update: (id: number, payload: Partial<QuotePayload>) =>

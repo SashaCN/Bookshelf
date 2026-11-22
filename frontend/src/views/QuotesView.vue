@@ -6,6 +6,7 @@ import ErrorNotice from '@/components/ErrorNotice.vue'
 import LoadMore from '@/components/LoadMore.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import QuoteCard from '@/components/QuoteCard.vue'
+import { quotesApi } from '@/api/quotes'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLoadMore } from '@/composables/useLoadMore'
 import { useLibraryStore } from '@/stores/library'
@@ -21,6 +22,10 @@ const errorMessage = useApiErrorMessage()
 const { moreError, loadMore } = useLoadMore(() => quotes.loadMore())
 
 const error = ref('')
+const exporting = ref(false)
+const exportError = ref('')
+
+const REVOKE_DELAY_MS = 10_000
 
 // The filters live in the URL, so going back from a quote returns to the same list.
 const favoritesOnly = computed(() => route.query.favorite === '1')
@@ -67,6 +72,27 @@ watch(
   },
   { immediate: true },
 )
+
+async function exportMarkdown() {
+  exporting.value = true
+  exportError.value = ''
+
+  try {
+    const file = await quotesApi.exportMarkdown(filters.value)
+    const url = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `bookshelf-quotes-${new Date().toLocaleDateString('sv-SE')}.md`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS)
+  } catch (e) {
+    exportError.value = errorMessage(e)
+  } finally {
+    exporting.value = false
+  }
+}
 
 onMounted(() => {
   // Only feeds the book filter: without the library it simply offers "all books".
@@ -122,6 +148,19 @@ onMounted(() => {
       </select>
     </div>
   </div>
+
+  <div class="mb-4">
+    <button
+      type="button"
+      :disabled="exporting"
+      class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-4 text-sm font-medium disabled:opacity-60"
+      @click="exportMarkdown"
+    >
+      {{ exporting ? $t('quotes.exporting') : $t('quotes.export') }}
+    </button>
+  </div>
+
+  <ErrorNotice v-if="exportError" class="mb-4" :message="exportError" />
 
   <ErrorNotice v-if="error" :message="error" retryable @retry="load" />
 

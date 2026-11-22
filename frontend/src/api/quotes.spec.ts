@@ -4,7 +4,7 @@ import { http } from './http'
 import { quotesApi } from './quotes'
 
 vi.mock('./http', () => ({
-  http: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+  http: { download: vi.fn(), get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }))
 
 describe('quotesApi', () => {
@@ -36,6 +36,17 @@ describe('quotesApi', () => {
     expect((await quotesApi.daily())?.id).toBe(4)
     expect(await quotesApi.daily()).toBeNull()
     expect(http.get).toHaveBeenCalledWith('/api/quotes/daily')
+  })
+
+  it('downloads the export with the filters that are set and without paging', async () => {
+    const file = new Blob(['# Мої цитати'])
+    vi.mocked(http.download).mockResolvedValue(file)
+
+    expect(await quotesApi.exportMarkdown({ favorite: true, book: 7 })).toBe(file)
+    await quotesApi.exportMarkdown()
+
+    expect(http.download).toHaveBeenNthCalledWith(1, '/api/quotes/export?favorite=1&book=7')
+    expect(http.download).toHaveBeenNthCalledWith(2, '/api/quotes/export')
   })
 
   it('creates a quote under its library entry and unwraps the answer', async () => {

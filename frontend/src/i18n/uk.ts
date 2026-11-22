@@ -138,6 +138,8 @@ export default {
     title: 'Цитати',
     add: 'Додати',
     addQuote: 'Додати цитату',
+    export: 'Експорт у Markdown',
+    exporting: 'Готуємо файл…',
     page: 'с. {page}',
     favorite: 'В улюблених',
     insight: 'Інсайт',

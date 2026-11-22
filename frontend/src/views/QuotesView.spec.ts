@@ -13,7 +13,7 @@ vi.mock('@/api/library', () => ({
   catalogApi: { search: vi.fn() },
 }))
 vi.mock('@/api/quotes', () => ({
-  quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), exportMarkdown: vi.fn() },
 }))
 
 const books = [
@@ -268,5 +268,71 @@ describe('QuotesView', () => {
 
     expect(wrapper.findAll('blockquote')).toHaveLength(1)
     expect(wrapper.findAll('#quotes-book option')).toHaveLength(1)
+  })
+
+  describe('export', () => {
+    function stubDownload() {
+      const createObjectURL = vi.fn().mockReturnValue('blob:export')
+      const revokeObjectURL = vi.fn()
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+      Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+      const downloads: { href: string; download: string }[] = []
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        downloads.push({ href: this.href, download: this.download })
+      })
+      return { createObjectURL, revokeObjectURL, downloads }
+    }
+
+    it('downloads the file with the current filters', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] })
+      const { createObjectURL, revokeObjectURL, downloads } = stubDownload()
+      const file = new Blob(['# Мої цитати'])
+      vi.mocked(quotesApi.exportMarkdown).mockResolvedValue(file)
+      const { wrapper } = await mountView({ favorite: '1', book: '2' })
+
+      await buttonWithText(wrapper, 'Експорт у Markdown').trigger('click')
+      await flushPromises()
+
+      expect(quotesApi.exportMarkdown).toHaveBeenCalledWith({ favorite: true, book: 2 })
+      expect(createObjectURL).toHaveBeenCalledWith(file)
+      expect(downloads).toHaveLength(1)
+      expect(downloads[0]?.download).toMatch(/^bookshelf-quotes-\d{4}-\d{2}-\d{2}\.md$/)
+      expect(document.querySelector('a[download]')).toBeNull()
+
+      vi.runAllTimers()
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:export')
+      vi.useRealTimers()
+    })
+
+    it('disables the button while the file is being prepared', async () => {
+      stubDownload()
+      let finish: (file: Blob) => void = () => undefined
+      vi.mocked(quotesApi.exportMarkdown).mockReturnValue(new Promise((resolve) => (finish = resolve)))
+      const { wrapper } = await mountView()
+
+      await buttonWithText(wrapper, 'Експорт у Markdown').trigger('click')
+
+      const pending = buttonWithText(wrapper, 'Готуємо файл…')
+      expect(pending.attributes('disabled')).toBeDefined()
+
+      finish(new Blob(['x']))
+      await flushPromises()
+
+      expect(buttonWithText(wrapper, 'Експорт у Markdown').attributes('disabled')).toBeUndefined()
+    })
+
+    it('shows the error and keeps the list when the export fails', async () => {
+      const { downloads } = stubDownload()
+      vi.mocked(quotesApi.exportMarkdown).mockRejectedValue(new ApiError(500, null))
+      const { wrapper } = await mountView()
+
+      await buttonWithText(wrapper, 'Експорт у Markdown').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+      expect(downloads).toHaveLength(0)
+      expect(wrapper.findAll('blockquote')).toHaveLength(1)
+      expect(buttonWithText(wrapper, 'Експорт у Markdown').attributes('disabled')).toBeUndefined()
+    })
   })
 })

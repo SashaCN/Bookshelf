@@ -568,6 +568,14 @@ type Handler = (params: string[], query: URLSearchParams, body: Body) => unknown
 
 const ok = (data: unknown) => ({ data })
 
+/** A non-JSON answer (a file for download). */
+class TextFile {
+  constructor(
+    readonly text: string,
+    readonly type: string,
+  ) {}
+}
+
 const routes: { method: string; pattern: RegExp; handle: Handler }[] = []
 const route = (method: string, pattern: string, handle: Handler) =>
   routes.push({ method, pattern: new RegExp(`^${pattern}$`), handle })
@@ -711,6 +719,28 @@ route('GET', '/api/quotes/daily', () => {
   if (state.quotes.length === 0) return ok(null)
   const index = dayNumber(today()) % state.quotes.length
   return ok(presentQuote(state.quotes[index]))
+})
+// Simple on purpose: the real export escapes Markdown, the demo only has to hand over a believable file.
+route('GET', '/api/quotes/export', (_p, query) => {
+  const chosen = state.quotes
+    .filter((q) => query.get('favorite') !== '1' || q.is_favorite)
+    .filter((q) => !query.get('book') || q.user_book_id === Number(query.get('book')))
+    .filter((q) => !query.get('type') || q.type === query.get('type'))
+    .sort((a, b) => a.id - b.id)
+
+  const byBook = new Map<string, string[]>()
+  for (const q of chosen) {
+    const { book } = presentQuote(q)
+    const lines = byBook.get(book.title) ?? [`## ${book.title}`, ...(book.authors.length ? ['', `_${book.authors.join(', ')}_`] : [])]
+    const text = q.type === 'insight' ? `💡 ${q.content}` : `> ${q.content}`
+    const details = [q.page ? `— с. ${q.page}` : '', q.note ? `Нотатка: ${q.note}` : '', q.is_favorite ? '★' : ''].filter(Boolean)
+    lines.push('', text, ...(details.length ? ['', details.join('  \n')] : []))
+    byBook.set(book.title, lines)
+  }
+
+  const sections = [...byBook.keys()].sort((a, b) => a.localeCompare(b)).map((title) => (byBook.get(title) ?? []).join('\n'))
+  const body = sections.length ? sections.join('\n\n') : 'Цитат поки немає.'
+  return new TextFile(`# Мої цитати\n\n${body}\n`, 'text/markdown; charset=UTF-8')
 })
 route('GET', '/api/quotes', (_p, query) => {
   const page = Number(query.get('page') ?? 1)
@@ -867,6 +897,7 @@ route('DELETE', '/api/goals/(\\d+)', ([year]) => {
 // --- fetch --------------------------------------------------------------------------------------------------------
 
 function respond(status: number, body: unknown): Response {
+  if (body instanceof TextFile) return new Response(body.text, { status, headers: { 'Content-Type': body.type } })
   if (body === null) return new Response(null, { status: status === 200 ? 204 : status })
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }

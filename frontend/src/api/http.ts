@@ -90,7 +90,28 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
   return data as T
 }
 
+/** GET a file (not JSON): the raw body as a Blob, with the same session and error handling as the JSON calls. */
+async function download(path: string): Promise<Blob> {
+  const response = await fetch(path, {
+    method: 'GET',
+    headers: { Accept: '*/*', 'X-Requested-With': 'XMLHttpRequest' },
+    credentials: 'same-origin',
+  })
+
+  if (response.status === 401) {
+    unauthorizedHandler?.()
+  }
+
+  if (!response.ok) {
+    const isJson = response.headers.get('content-type')?.includes('json') ?? false
+    throw new ApiError(response.status, isJson ? ((await response.json()) as unknown) : null)
+  }
+
+  return response.blob()
+}
+
 export const http = {
+  download,
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),

@@ -65,6 +65,20 @@ describe('demo mock API', () => {
     expect(await quotesApi.daily()).not.toBeNull()
   })
 
+  it('exports the quotes as Markdown, honouring the filters', async () => {
+    const all = await (await quotesApi.exportMarkdown()).text()
+    expect(all.startsWith('# Мої цитати\n')).toBe(true)
+    expect(all).toContain('## Маленький принц')
+    expect(all).toContain('> Зорко одне лише серце.')
+    expect(all).toContain('💡 ')
+
+    const favorites = await (await quotesApi.exportMarkdown({ favorite: true })).text()
+    expect(favorites).toContain('★')
+    expect(favorites).not.toContain('💡')
+
+    expect(await (await quotesApi.exportMarkdown({ book: 9999 })).text()).toContain('Цитат поки немає.')
+  })
+
   it('computes statistics from the reading history', async () => {
     const summary = await statsApi.summary()
     expect(summary.streak.current).toBeGreaterThan(0)

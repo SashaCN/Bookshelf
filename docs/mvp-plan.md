@@ -30,7 +30,7 @@
 - Сканер ISBN камерою
 - Офлайн-оновлення прогресу з подальшою синхронізацією
 - Повнотекстовий пошук (FULLTEXT-індекс MySQL) і теги для цитат
-- Експорт цитат у Markdown
+- Експорт цитат у Markdown — зроблено
 - Вхід через Google
 - Перечитування (кілька проходів однієї книги)
 
@@ -236,6 +236,7 @@ erDiagram
 | POST | `/api/library/{userBook}/progress` | `{page}`: оновити прогрес |
 | GET | `/api/library/{userBook}/logs` | журнал читання книги |
 | GET | `/api/quotes?favorite=&book=&type=` | мої цитати, нові першими, по 20 |
+| GET | `/api/quotes/export?favorite=&book=&type=` | мої цитати файлом Markdown (`bookshelf-quotes-РРРР-ММ-ДД.md`, дата за календарем читача): за книгами, у книзі від старих до нових; ті самі фільтри, що й у списку |
 | GET | `/api/quotes/daily?favorite=1` | цитата дня: та сама весь день за календарем читача, завтра інша; `data: null`, якщо цитат немає |
 | POST | `/api/library/{userBook}/quotes` | нова цитата |
 | GET / PATCH / DELETE | `/api/quotes/{quote}` | одна цитата; редагувати, позначити улюбленою; видалити |
