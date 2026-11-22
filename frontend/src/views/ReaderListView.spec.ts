@@ -87,4 +87,115 @@ describe('ReaderListView', () => {
     expect(readerApi.remove).toHaveBeenCalledWith(1)
     expect(wrapper.text()).toContain('Тут поки порожньо')
   })
+
+  it('offers the upload right in the empty state', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([])
+    vi.mocked(readerApi.upload).mockResolvedValue(makeReaderDoc({ id: 7, title: 'Нова' }))
+    const wrapper = await mountView()
+    const click = vi.spyOn(wrapper.get('[data-testid="epub-input"]').element as HTMLInputElement, 'click')
+
+    const buttons = wrapper.findAll('button').filter((button) => button.text() === 'Завантажити EPUB')
+    expect(buttons).toHaveLength(2)
+    await buttons[1].trigger('click')
+
+    expect(click).toHaveBeenCalled()
+  })
+
+  it('shows progress and disables both upload buttons while uploading', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([])
+    let finish: (doc: ReturnType<typeof makeReaderDoc>) => void = () => undefined
+    vi.mocked(readerApi.upload).mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    const wrapper = await mountView()
+
+    await pickFile(wrapper)
+
+    expect(wrapper.get('[role="status"]').text()).toBe('Завантажуємо…')
+    const buttons = wrapper.findAll('button').filter((button) => button.text() === 'Завантажуємо…')
+    expect(buttons).toHaveLength(2)
+    buttons.forEach((button) => expect(button.attributes('disabled')).toBeDefined())
+
+    finish(makeReaderDoc({ id: 7, title: 'Нова' }))
+    await flushPromises()
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Нова')
+  })
+
+  it('refuses a file over 20 MB without sending it', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([])
+    const wrapper = await mountView()
+    const input = wrapper.get('[data-testid="epub-input"]')
+    const big = new File(['x'], 'big.epub')
+    Object.defineProperty(big, 'size', { value: 21 * 1024 * 1024 })
+    Object.defineProperty(input.element, 'files', { value: [big], configurable: true })
+
+    await input.trigger('change')
+    await flushPromises()
+
+    expect(readerApi.upload).not.toHaveBeenCalled()
+    expect(wrapper.get('[role="alert"]').text()).toContain('максимум 20 МБ')
+  })
+
+  it('ignores a cancelled file dialog', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([])
+    const wrapper = await mountView()
+
+    await wrapper.get('[data-testid="epub-input"]').trigger('change')
+
+    expect(readerApi.upload).not.toHaveBeenCalled()
+  })
+
+  it('names the book for screen readers and can cancel the deletion', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([makeReaderDoc({ id: 1, title: 'Кобзар' })])
+    const wrapper = await mountView()
+
+    await wrapper.get('[aria-label="Видалити «Кобзар»"]').trigger('click')
+    expect(wrapper.text()).toContain('Видалити цю книгу з читалки?')
+    await buttonWithText(wrapper, 'Скасувати').trigger('click')
+
+    expect(readerApi.remove).not.toHaveBeenCalled()
+    expect(wrapper.find('[aria-label="Видалити «Кобзар»"]').exists()).toBe(true)
+  })
+
+  it('shows the pending state of a deletion and an error when it fails', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([makeReaderDoc({ id: 1 })])
+    let fail: (error: Error) => void = () => undefined
+    vi.mocked(readerApi.remove).mockReturnValue(new Promise((_, reject) => { fail = reject }))
+    const wrapper = await mountView()
+
+    await buttonWithText(wrapper, 'Видалити').trigger('click')
+    await buttonWithText(wrapper, 'Так, видалити').trigger('click')
+
+    expect(buttonWithText(wrapper, 'Видаляємо…').attributes('disabled')).toBeDefined()
+    expect(buttonWithText(wrapper, 'Скасувати').attributes('disabled')).toBeDefined()
+
+    fail(new ApiError(500, null))
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося')
+    expect(wrapper.text()).toContain('Кобзар')
+  })
+
+  it('shows an error with a retry when the list cannot be loaded', async () => {
+    vi.mocked(readerApi.list).mockRejectedValueOnce(new ApiError(500, null))
+    const wrapper = await mountView()
+    vi.mocked(readerApi.list).mockResolvedValue([makeReaderDoc({ title: 'Кобзар' })])
+
+    await buttonWithText(wrapper, 'Повторити').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Кобзар')
+  })
+
+  it('shows a loading note and links each book to the reader', async () => {
+    vi.mocked(readerApi.list).mockReturnValue(new Promise(() => undefined))
+    const { plugins } = createTestEnvironment()
+    const wrapper = mount(ReaderListView, { global: { plugins } })
+
+    expect(wrapper.text()).toContain('Завантаження…')
+
+    vi.mocked(readerApi.list).mockResolvedValue([makeReaderDoc({ id: 3 })])
+    const loaded = await mountView()
+    expect(loaded.get('a[href="/reader/3"]').text()).toContain('Кобзар')
+  })
 })

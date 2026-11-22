@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -7,6 +8,9 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useReaderStore } from '@/stores/reader'
 
+const MAX_FILE_BYTES = 20 * 1024 * 1024
+
+const { t } = useI18n()
 const reader = useReaderStore()
 const errorMessage = useApiErrorMessage()
 
@@ -14,6 +18,7 @@ const error = ref('')
 const uploadError = ref('')
 const uploading = ref(false)
 const confirmingId = ref<number | null>(null)
+const removingId = ref<number | null>(null)
 const input = ref<HTMLInputElement | null>(null)
 
 async function load() {
@@ -31,6 +36,14 @@ async function onFile(event: Event) {
   if (!file) return
 
   uploadError.value = ''
+
+  // The server turns such a file down too; this only spares the reader a long upload.
+  if (file.size > MAX_FILE_BYTES) {
+    uploadError.value = t('apiErrors.reader.too_large')
+    target.value = ''
+    return
+  }
+
   uploading.value = true
   try {
     await reader.upload(file)
@@ -44,13 +57,19 @@ async function onFile(event: Event) {
 
 async function remove(id: number) {
   uploadError.value = ''
+  removingId.value = id
   try {
     await reader.remove(id)
   } catch (e) {
     uploadError.value = errorMessage(e)
   } finally {
+    removingId.value = null
     confirmingId.value = null
   }
+}
+
+function pick() {
+  input.value?.click()
 }
 
 onMounted(load)
@@ -63,7 +82,7 @@ onMounted(load)
         type="button"
         :disabled="uploading"
         class="inline-flex min-h-10 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent disabled:opacity-60"
-        @click="input?.click()"
+        @click="pick"
       >
         {{ uploading ? $t('reader.uploading') : $t('reader.upload') }}
       </button>
@@ -79,6 +98,7 @@ onMounted(load)
     @change="onFile"
   >
 
+  <p v-if="uploading" role="status" class="mb-4 text-sm text-ink-muted">{{ $t('reader.uploading') }}</p>
   <ErrorNotice v-if="uploadError" :message="uploadError" class="mb-4" />
   <ErrorNotice v-if="error" :message="error" retryable @retry="load" />
 
@@ -102,20 +122,29 @@ onMounted(load)
         <div class="mt-3 flex items-center justify-end gap-2">
           <template v-if="confirmingId === doc.id">
             <span class="mr-auto text-sm">{{ $t('reader.confirmRemove') }}</span>
-            <button type="button" class="min-h-10 rounded-lg border border-line px-3 text-sm" @click="confirmingId = null">
+            <button type="button" :disabled="removingId === doc.id" class="min-h-11 rounded-lg border border-line px-3 text-sm disabled:opacity-60" @click="confirmingId = null">
               {{ $t('common.cancel') }}
             </button>
-            <button type="button" class="min-h-10 rounded-lg bg-danger px-3 text-sm font-semibold text-on-accent" @click="remove(doc.id)">
-              {{ $t('reader.confirmYes') }}
+            <button type="button" :disabled="removingId === doc.id" class="min-h-11 rounded-lg bg-danger px-3 text-sm font-semibold text-on-accent disabled:opacity-60" @click="remove(doc.id)">
+              {{ removingId === doc.id ? $t('reader.removing') : $t('reader.confirmYes') }}
             </button>
           </template>
-          <button v-else type="button" class="min-h-10 rounded-lg px-3 text-sm text-danger" @click="confirmingId = doc.id">
+          <button v-else type="button" :aria-label="$t('reader.removeNamed', { title: doc.title })" class="min-h-11 rounded-lg px-3 text-sm text-danger" @click="confirmingId = doc.id">
             {{ $t('reader.remove') }}
           </button>
         </div>
       </li>
     </ul>
 
-    <EmptyState v-else :title="$t('reader.empty.title')" :text="$t('reader.empty.text')" />
+    <EmptyState v-else :title="$t('reader.empty.title')" :text="$t('reader.empty.text')">
+      <button
+        type="button"
+        :disabled="uploading"
+        class="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+        @click="pick"
+      >
+        {{ uploading ? $t('reader.uploading') : $t('reader.upload') }}
+      </button>
+    </EmptyState>
   </template>
 </template>
