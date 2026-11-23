@@ -2,7 +2,6 @@
 
 namespace App\Actions\Social;
 
-use App\Enums\QuoteVisibility;
 use App\Models\Quote;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -52,8 +51,7 @@ class LikeQuote
     {
         return Quote::query()
             ->whereKey($quoteId)
-            ->where('visibility', QuoteVisibility::Public)
-            ->whereHas('user', fn ($query) => $query->where('is_public', true)->visibleTo($user))
+            ->sharedWith($user)
             ->firstOrFail();
     }
 }

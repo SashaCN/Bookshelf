@@ -14,7 +14,7 @@ class BlockUser
 
     /**
      * Blocks the reader: both are hidden from each other from now on, so the follows between them
-     * and the likes on each other's quotes go away, all in one transaction. Blocking twice changes nothing.
+     * and the likes and comments on each other's quotes go away, all in one transaction. Blocking twice changes nothing.
      *
      * @throws ValidationException
      */
@@ -38,6 +38,9 @@ class BlockUser
 
             $this->deleteLikes($blocker->id, $target->id);
             $this->deleteLikes($target->id, $blocker->id);
+
+            $this->deleteComments($blocker->id, $target->id);
+            $this->deleteComments($target->id, $blocker->id);
         });
     }
 
@@ -83,6 +86,17 @@ class BlockUser
     private function deleteLikes(int $userId, int $ownerId): void
     {
         DB::table('quote_likes')
+            ->where('user_id', $userId)
+            ->whereIn('quote_id', DB::table('quotes')->where('user_id', $ownerId)->select('id'))
+            ->delete();
+    }
+
+    /**
+     * Removes the comments the user wrote on the quotes of the owner.
+     */
+    private function deleteComments(int $userId, int $ownerId): void
+    {
+        DB::table('quote_comments')
             ->where('user_id', $userId)
             ->whereIn('quote_id', DB::table('quotes')->where('user_id', $ownerId)->select('id'))
             ->delete();

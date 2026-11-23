@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'user_book_id',
@@ -71,6 +72,40 @@ class Quote extends Model
     public function likes(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'quote_likes')->withPivot('created_at');
+    }
+
+    /**
+     * @return HasMany<QuoteComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(QuoteComment::class);
+    }
+
+    /**
+     * Quotes the viewer may like and comment on: public, from a public profile, with no block either way.
+     * The same rule as the feed and profiles.
+     *
+     * @param  Builder<Quote>  $query
+     */
+    #[Scope]
+    protected function sharedWith(Builder $query, ?User $viewer): void
+    {
+        $query
+            ->where('visibility', QuoteVisibility::Public)
+            ->whereHas('user', fn ($user) => $user->where('is_public', true)->visibleTo($viewer));
+    }
+
+    /**
+     * Adds comments_count: the comments the viewer can see (not those of readers blocked either way), in the same query.
+     * A correlated subquery with two small NOT IN lookups per quote on the (quote_id, id) index, so it stays cheap.
+     *
+     * @param  Builder<Quote>  $query
+     */
+    #[Scope]
+    protected function withComments(Builder $query, ?User $viewer = null): void
+    {
+        $query->withCount(['comments' => fn ($comments) => $comments->visibleTo($viewer)]);
     }
 
     /**

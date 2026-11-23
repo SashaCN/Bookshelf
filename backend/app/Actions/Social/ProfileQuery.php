@@ -23,6 +23,7 @@ class ProfileQuery
         return $profile->quotes()
             ->where('visibility', QuoteVisibility::Public)
             ->withLikes($viewer)
+            ->withComments($viewer)
             ->with('userBook.book.authors')
             ->latest('id')
             ->simplePaginate(self::PER_PAGE);
@@ -55,6 +56,7 @@ class ProfileQuery
             ->where('visibility', QuoteVisibility::Public)
             ->whereIn('user_id', $viewer->following()->where('users.is_public', true)->visibleTo($viewer)->select('users.id'))
             ->withLikes($viewer)
+            ->withComments($viewer)
             ->with(['user', 'userBook.book.authors'])
             ->latest('id')
             ->simplePaginate(self::PER_PAGE);

@@ -7,6 +7,7 @@ use App\Http\Controllers\FollowController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuoteCommentController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\QuoteLikeController;
 use App\Http\Controllers\ReaderBookmarkController;
@@ -23,6 +24,7 @@ Route::middleware('throttle:public-profile')->group(function (): void {
     Route::get('/users/{username}', [ProfileController::class, 'show'])->name('users.show');
     Route::get('/users/{username}/quotes', [ProfileController::class, 'quotes'])->name('users.quotes');
     Route::get('/users/{username}/reviews', [ProfileController::class, 'reviews'])->name('users.reviews');
+    Route::get('/quotes/{quote}/comments', [QuoteCommentController::class, 'index'])->where('quote', '[0-9]+')->name('quotes.comments.index');
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
@@ -48,6 +50,14 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::apiResource('quotes', QuoteController::class)->except('store');
     Route::post('/quotes/{quote}/like', [QuoteLikeController::class, 'store'])->where('quote', '[0-9]+')->name('quotes.like');
     Route::delete('/quotes/{quote}/like', [QuoteLikeController::class, 'destroy'])->where('quote', '[0-9]+')->name('quotes.unlike');
+
+    Route::post('/quotes/{quote}/comments', [QuoteCommentController::class, 'store'])
+        ->middleware('throttle:comments')
+        ->where('quote', '[0-9]+')
+        ->name('quotes.comments.store');
+    Route::delete('/quotes/{quote}/comments/{comment}', [QuoteCommentController::class, 'destroy'])
+        ->where(['quote' => '[0-9]+', 'comment' => '[0-9]+'])
+        ->name('quotes.comments.destroy');
 
     Route::post('/reader', [ReaderDocumentController::class, 'store'])
         ->middleware('throttle:uploads')
