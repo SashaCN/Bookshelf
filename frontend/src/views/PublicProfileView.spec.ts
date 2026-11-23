@@ -305,13 +305,13 @@ describe('PublicProfileView', () => {
       const { wrapper } = await mountView(makeProfile({ reviews_count: 1 }))
 
       expect(socialApi.reviews).not.toHaveBeenCalled()
-      expect(wrapper.text()).toContain('1 відгук')
+      expect(buttonWithText(wrapper, 'Відгуки · 1')).toBeDefined()
 
-      await buttonWithText(wrapper, 'Відгуки')!.trigger('click')
+      await buttonWithText(wrapper, 'Відгуки · 1')!.trigger('click')
       await flushPromises()
 
       expect(socialApi.reviews).toHaveBeenCalledWith('olena', 1)
-      expect(buttonWithText(wrapper, 'Відгуки')!.attributes('aria-pressed')).toBe('true')
+      expect(buttonWithText(wrapper, 'Відгуки · 1')!.attributes('aria-pressed')).toBe('true')
       expect(wrapper.text()).toContain('Маленький принц')
       expect(wrapper.text()).toContain('5 жовтня')
       expect(wrapper.find('[aria-label="Оцінка: 4 з 5"]').exists()).toBe(true)
@@ -323,9 +323,14 @@ describe('PublicProfileView', () => {
       expect(wrapper.text()).toContain('Public words')
     })
 
-    it('declines the number of reviews', async () => {
-      expect((await mountView(makeProfile({ reviews_count: 3 }))).wrapper.text()).toContain('3 відгуки')
-      expect((await mountView(makeProfile({ reviews_count: 5 }))).wrapper.text()).toContain('5 відгуків')
+    it('shows the number of reviews in the tab label only when there are some', async () => {
+      const some = (await mountView(makeProfile({ reviews_count: 3 }))).wrapper
+      expect(buttonWithText(some, 'Відгуки · 3')).toBeDefined()
+      expect(some.text()).not.toContain('3 відгуки')
+
+      const none = (await mountView(makeProfile({ reviews_count: 0 }))).wrapper
+      expect(buttonWithText(none, 'Відгуки')).toBeDefined()
+      expect(none.text()).not.toContain('0 відгуків')
     })
 
     it('says so when there are no public reviews', async () => {
@@ -344,7 +349,7 @@ describe('PublicProfileView', () => {
         .mockResolvedValueOnce({ data: [makePublicReview({ id: 2, book: { title: 'Друга книга', authors: [], cover_url: null } })], links: { next: null } })
       const { wrapper } = await mountView(makeProfile({ reviews_count: 2 }))
 
-      await buttonWithText(wrapper, 'Відгуки')!.trigger('click')
+      await buttonWithText(wrapper, 'Відгуки · 2')!.trigger('click')
       await flushPromises()
       await buttonWithText(wrapper, 'Показати ще')!.trigger('click')
       await flushPromises()
@@ -369,7 +374,7 @@ describe('PublicProfileView', () => {
       vi.mocked(socialApi.reviews).mockResolvedValue({ data: [review], links: { next: null } })
       const { wrapper } = await mountView(makeProfile({ reviews_count: 1 }), null, true)
 
-      await buttonWithText(wrapper, 'Відгуки')!.trigger('click')
+      await buttonWithText(wrapper, 'Відгуки · 1')!.trigger('click')
       await flushPromises()
 
       expect(wrapper.text()).toContain('Маленький принц')

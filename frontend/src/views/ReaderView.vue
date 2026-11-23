@@ -35,6 +35,9 @@ const tocOpen = ref(false)
 const marksButton = ref<HTMLButtonElement | null>(null)
 const marksPanel = ref<HTMLElement | null>(null)
 const marksOpen = ref(false)
+const fontButton = ref<HTMLButtonElement | null>(null)
+const fontPanel = ref<HTMLElement | null>(null)
+const fontOpen = ref(false)
 /** Bookmarks are loaded once per book; null until then (or when loading failed). */
 const bookmarks = ref<ReaderBookmark[] | null>(null)
 const bookmarksError = ref('')
@@ -67,6 +70,29 @@ function changeFont(step: number) {
   } catch {
     // Storage may be blocked: the size then simply lasts for this visit.
   }
+  keepFontFocus()
+}
+
+/** A button that has just reached its limit is disabled and loses the focus; hand it to the other one. */
+async function keepFontFocus() {
+  await nextTick()
+  const active = document.activeElement
+  if (!fontPanel.value || (active && fontPanel.value.contains(active) && !(active as HTMLButtonElement).disabled)) return
+  fontPanel.value.querySelector<HTMLElement>('button:not(:disabled)')?.focus()
+}
+
+async function openFont() {
+  tocOpen.value = false
+  closeMarks(false)
+  fontOpen.value = true
+  await nextTick()
+  ;(fontPanel.value?.querySelector<HTMLElement>('button:not(:disabled)') ?? fontPanel.value)?.focus()
+}
+
+function closeFont(returnFocus = true) {
+  if (!fontOpen.value) return
+  fontOpen.value = false
+  if (returnFocus) nextTick(() => fontButton.value?.focus())
 }
 
 const count = computed(() => chapter.value?.count ?? doc.value?.chapters_count ?? 0)
@@ -146,6 +172,7 @@ async function go(step: number) {
 }
 
 async function openToc() {
+  closeFont(false)
   closeMarks(false)
   tocOpen.value = true
   await nextTick()
@@ -249,6 +276,7 @@ async function saveNote(bookmark: ReaderBookmark) {
 }
 
 async function openMarks() {
+  closeFont(false)
   closeToc()
   marksOpen.value = true
   if (!bookmarks.value) loadBookmarks()
@@ -308,17 +336,17 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="flex h-[calc(100dvh-8rem)] flex-col gap-2 pt-2">
-    <div class="flex items-center gap-2">
+    <div class="relative flex items-center gap-1.5">
       <RouterLink
         :to="{ name: 'reader' }"
         class="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink-muted"
         :aria-label="$t('reader.toList')"
       >
-        <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 5l-7 7 7 7" />
         </svg>
       </RouterLink>
-      <div class="min-w-0 flex-1">
+      <div class="min-w-0 flex-1 px-1">
         <h1 class="truncate font-display text-lg font-semibold leading-tight">{{ doc?.title }}</h1>
         <p v-if="chapter?.title" class="truncate text-xs text-ink-muted">{{ chapter.title }}</p>
       </div>
@@ -326,15 +354,56 @@ onBeforeUnmount(() => {
         v-if="toc.length"
         ref="tocButton"
         type="button"
-        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-sm"
+        class="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-surface text-ink-muted"
+        :class="{ 'text-accent': tocOpen }"
+        :aria-label="$t('reader.toc')"
         aria-haspopup="dialog"
         :aria-expanded="tocOpen"
         @click="tocOpen ? closeToc() : openToc()"
       >
-        {{ $t('reader.toc') }}
+        <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
+        </svg>
       </button>
-      <button type="button" class="min-h-11 min-w-11 rounded-lg border border-line bg-surface text-sm disabled:opacity-50" :aria-label="$t('reader.smaller')" :disabled="fontSize <= FONT_MIN" @click="changeFont(-2)">A−</button>
-      <button type="button" class="min-h-11 min-w-11 rounded-lg border border-line bg-surface text-base disabled:opacity-50" :aria-label="$t('reader.larger')" :disabled="fontSize >= FONT_MAX" @click="changeFont(2)">A+</button>
+      <button
+        ref="marksButton"
+        type="button"
+        class="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-surface text-ink-muted"
+        :class="{ 'text-accent': marksOpen }"
+        :aria-label="$t('reader.bookmarks.title')"
+        aria-haspopup="dialog"
+        :aria-expanded="marksOpen"
+        @click="marksOpen ? closeMarks() : openMarks()"
+      >
+        <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4.5 4h9v16l-4.5-3-4.5 3zM17 7v13" />
+        </svg>
+      </button>
+      <button
+        ref="fontButton"
+        type="button"
+        class="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-surface font-display text-base font-semibold text-ink-muted"
+        :class="{ 'text-accent': fontOpen }"
+        :aria-label="$t('reader.fontSize')"
+        aria-haspopup="dialog"
+        :aria-expanded="fontOpen"
+        @click="fontOpen ? closeFont() : openFont()"
+      >
+        <span aria-hidden="true">Аа</span>
+      </button>
+
+      <div
+        v-if="fontOpen"
+        ref="fontPanel"
+        role="dialog"
+        tabindex="-1"
+        :aria-label="$t('reader.fontSize')"
+        class="absolute right-0 top-full z-10 mt-1 flex gap-2 rounded-2xl border border-line bg-surface p-2 shadow-lg"
+        @keydown.esc.stop="closeFont()"
+      >
+        <button type="button" class="min-h-11 min-w-11 rounded-lg border border-line bg-surface text-sm disabled:opacity-50" :aria-label="$t('reader.smaller')" :disabled="fontSize <= FONT_MIN" @click="changeFont(-2)">A−</button>
+        <button type="button" class="min-h-11 min-w-11 rounded-lg border border-line bg-surface text-base disabled:opacity-50" :aria-label="$t('reader.larger')" :disabled="fontSize >= FONT_MAX" @click="changeFont(2)">A+</button>
+      </div>
     </div>
 
     <div
@@ -437,47 +506,35 @@ onBeforeUnmount(() => {
       :class="{ 'opacity-60': loadingChapter }"
     />
 
-    <div class="flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2">
       <button
         ref="prevButton"
         type="button"
-        class="min-h-11 min-w-11 rounded-lg border border-line bg-surface px-4 text-lg font-medium disabled:opacity-50"
+        class="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-surface text-lg font-medium disabled:opacity-50"
         :aria-label="$t('reader.prev')"
         :disabled="loadingChapter || index <= 0"
         @click="go(-1)"
       >
         <span aria-hidden="true">←</span>
       </button>
-      <div class="flex min-w-0 items-center gap-2">
-        <button
-          type="button"
-          class="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-surface disabled:opacity-50"
-          :class="currentBookmark ? 'text-accent' : 'text-ink-muted'"
-          :aria-label="currentBookmark ? $t('reader.bookmarks.remove') : $t('reader.bookmarks.add')"
-          :aria-pressed="currentBookmark !== null"
-          :disabled="!bookmarks || bookmarkBusy"
-          @click="toggleBookmark"
-        >
-          <svg viewBox="0 0 24 24" class="size-6" :fill="currentBookmark ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 4h12v17l-6-4-6 4z" />
-          </svg>
-        </button>
-        <button
-          ref="marksButton"
-          type="button"
-          class="min-h-11 rounded-lg border border-line bg-surface px-3 text-sm"
-          aria-haspopup="dialog"
-          :aria-expanded="marksOpen"
-          @click="marksOpen ? closeMarks() : openMarks()"
-        >
-          {{ $t('reader.bookmarks.title') }}
-        </button>
-        <span role="status" class="truncate text-sm text-ink-muted">{{ $t('reader.chapter', { n: index + 1, total: count }) }}</span>
-      </div>
+      <span role="status" class="min-w-0 flex-1 whitespace-nowrap text-center text-sm text-ink-muted">{{ $t('reader.chapter', { n: index + 1, total: count }) }}</span>
+      <button
+        type="button"
+        class="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-surface disabled:opacity-50"
+        :class="currentBookmark ? 'text-accent' : 'text-ink-muted'"
+        :aria-label="currentBookmark ? $t('reader.bookmarks.remove') : $t('reader.bookmarks.add')"
+        :aria-pressed="currentBookmark !== null"
+        :disabled="!bookmarks || bookmarkBusy"
+        @click="toggleBookmark"
+      >
+        <svg viewBox="0 0 24 24" class="size-6" :fill="currentBookmark ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 4h12v17l-6-4-6 4z" />
+        </svg>
+      </button>
       <button
         ref="nextButton"
         type="button"
-        class="min-h-11 min-w-11 rounded-lg border border-line bg-surface px-4 text-lg font-medium disabled:opacity-50"
+        class="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-surface text-lg font-medium disabled:opacity-50"
         :aria-label="$t('reader.next')"
         :disabled="loadingChapter || index >= count - 1"
         @click="go(1)"

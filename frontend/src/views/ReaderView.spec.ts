@@ -32,11 +32,16 @@ function buttonWithLabel(wrapper: ReturnType<typeof mount>, label: string) {
 }
 
 function tocButton(wrapper: ReturnType<typeof mount>) {
-  return wrapper.findAll('button[aria-haspopup="dialog"]').find((b) => b.text() === 'Зміст')
+  return wrapper.find('button[aria-haspopup="dialog"][aria-label="Зміст"]')
+}
+
+async function openFont(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('button[aria-label="Розмір шрифту"]').trigger('click')
+  await flushPromises()
 }
 
 function marksButton(wrapper: ReturnType<typeof mount>) {
-  return wrapper.findAll('button[aria-haspopup="dialog"]').find((b) => b.text() === 'Закладки')!
+  return wrapper.get('button[aria-haspopup="dialog"][aria-label="Закладки"]')
 }
 
 describe('ReaderView', () => {
@@ -119,6 +124,7 @@ describe('ReaderView', () => {
   it('changes and remembers the font size within 14-28', async () => {
     const wrapper = await mountView(0)
     expect(wrapper.get('iframe').attributes('srcdoc')).toContain('font-size: 18px')
+    await openFont(wrapper)
 
     await wrapper.get('[aria-label="Збільшити шрифт"]').trigger('click')
     expect(wrapper.get('iframe').attributes('srcdoc')).toContain('font-size: 20px')
@@ -267,6 +273,7 @@ describe('ReaderView', () => {
     const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
     const setSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
     const wrapper = await mountView(0)
+    await openFont(wrapper)
 
     await wrapper.get('[aria-label="Збільшити шрифт"]').trigger('click')
 
@@ -278,11 +285,49 @@ describe('ReaderView', () => {
   it('disables the font buttons at the limits', async () => {
     window.localStorage.setItem('reader.fontSize', '28')
     const big = await mountView(0)
+    await openFont(big)
     expect(big.get('[aria-label="Збільшити шрифт"]').attributes('disabled')).toBeDefined()
 
     window.localStorage.setItem('reader.fontSize', '14')
     const small = await mountView(0)
+    await openFont(small)
     expect(small.get('[aria-label="Зменшити шрифт"]').attributes('disabled')).toBeDefined()
+  })
+
+  describe('font popover', () => {
+    it('is closed at first, opens with the focus inside and closes on Escape returning the focus', async () => {
+      const wrapper = await mountView(0)
+      const button = wrapper.get('button[aria-label="Розмір шрифту"]')
+      expect(wrapper.find('[aria-label="Збільшити шрифт"]').exists()).toBe(false)
+
+      await openFont(wrapper)
+      expect(button.attributes('aria-expanded')).toBe('true')
+      expect(wrapper.get('[role="dialog"]').element.contains(document.activeElement)).toBe(true)
+
+      await wrapper.get('[role="dialog"]').trigger('keydown', { key: 'Escape' })
+      await flushPromises()
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(document.activeElement).toBe(button.element)
+    })
+
+    it('keeps the focus inside when a button reaches its limit', async () => {
+      window.localStorage.setItem('reader.fontSize', '26')
+      const wrapper = await mountView(0)
+      await openFont(wrapper)
+      const larger = wrapper.get('[aria-label="Збільшити шрифт"]')
+      ;(larger.element as HTMLButtonElement).focus()
+
+      await larger.trigger('click')
+      await flushPromises()
+
+      expect(larger.attributes('disabled')).toBeDefined()
+      expect(document.activeElement).toBe(wrapper.get('[aria-label="Зменшити шрифт"]').element)
+    })
+
+    it('keeps the chapter label whole in the bottom bar', async () => {
+      const wrapper = await mountView(0)
+      expect(wrapper.get('[role="status"]').classes()).toContain('whitespace-nowrap')
+    })
   })
 
   describe('table of contents', () => {
@@ -293,14 +338,14 @@ describe('ReaderView', () => {
     ]
 
     it('hides the button when there is no toc', async () => {
-      expect(tocButton(await mountView(2))).toBeUndefined()
-      expect(tocButton(await mountView(2, []))).toBeUndefined()
+      expect(tocButton(await mountView(2)).exists()).toBe(false)
+      expect(tocButton(await mountView(2, [])).exists()).toBe(false)
     })
 
     it('opens the list, moves focus to the current entry and marks it', async () => {
       const wrapper = await mountView(3, toc)
 
-      await tocButton(wrapper)!.trigger('click')
+      await tocButton(wrapper).trigger('click')
       await flushPromises()
 
       const items = wrapper.findAll('[role="dialog"] button')
@@ -313,7 +358,7 @@ describe('ReaderView', () => {
     it('jumps to the chapter and saves the position, debounced', async () => {
       const wrapper = await mountView(2, toc)
 
-      await tocButton(wrapper)!.trigger('click')
+      await tocButton(wrapper).trigger('click')
       await flushPromises()
       await wrapper.findAll('[role="dialog"] button')[2].trigger('click')
       await flushPromises()
@@ -329,7 +374,7 @@ describe('ReaderView', () => {
 
     it('closes on Escape and returns focus to the button', async () => {
       const wrapper = await mountView(2, toc)
-      const button = tocButton(wrapper)!
+      const button = tocButton(wrapper)
 
       await button.trigger('click')
       await flushPromises()

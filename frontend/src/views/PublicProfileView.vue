@@ -10,7 +10,7 @@ import RatingStars from '@/components/RatingStars.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLoadMore } from '@/composables/useLoadMore'
-import { formatDay } from '@/utils/format'
+import { formatMoment } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import { useSocialStore } from '@/stores/social'
 
@@ -32,7 +32,12 @@ const tab = ref<'quotes' | 'reviews'>('quotes')
 const reviewsError = ref('')
 const tabOptions = computed(() => [
   { value: 'quotes' as const, label: t('social.profile.tabQuotes') },
-  { value: 'reviews' as const, label: t('social.profile.tabReviews') },
+  {
+    value: 'reviews' as const,
+    label: social.profile && social.profile.reviews_count > 0
+      ? t('social.profile.tabReviewsCount', { count: social.profile.reviews_count })
+      : t('social.profile.tabReviews'),
+  },
 ])
 
 /** Reviews are read when the tab is first opened, so a profile that is only skimmed costs one request less. */
@@ -50,8 +55,8 @@ watch(tab, (value) => {
   if (value === 'reviews' && !social.profileReviews.loaded) void loadReviews()
 })
 
-/** An ISO timestamp as a day; the date is shown in the reader's own calendar. */
-const reviewDay = (iso: string) => formatDay(iso.slice(0, 10))
+/** An ISO timestamp as a day in the viewer's own time zone. */
+const reviewDay = (iso: string) => formatMoment(iso)
 
 const error = ref('')
 const followError = ref('')
@@ -209,8 +214,6 @@ watch(() => props.username, load, { immediate: true })
         @focus="($event.target as HTMLInputElement).select()"
       >
     </div>
-
-    <p class="mb-4 text-center text-sm text-ink-muted">{{ $t('social.profile.reviewsCount', social.profile.reviews_count) }}</p>
 
     <SegmentedControl v-model="tab" :label="$t('social.profile.tabsLabel')" :options="tabOptions" hide-label class="mb-4" />
 
