@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/api/http'
 import AuthLayout from '@/components/AuthLayout.vue'
 import FormField from '@/components/FormField.vue'
+import { safeRedirect } from '@/router/redirect'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
@@ -22,6 +24,9 @@ const fieldErrors = reactive<{ name?: string; email?: string; password?: string 
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
 async function submit() {
+  // Enter in a field can submit again while the first request is still on its way.
+  if (submitting.value) return
+
   submitting.value = true
   error.value = ''
   delete fieldErrors.name
@@ -30,7 +35,7 @@ async function submit() {
 
   try {
     await auth.register({ name: name.value, email: email.value, password: password.value, timezone })
-    await router.push({ name: 'home' })
+    await router.push(safeRedirect(route.query.redirect) ?? { name: 'home' })
   } catch (e) {
     if (e instanceof ApiError && e.status === 422) {
       const errors = e.fieldErrors

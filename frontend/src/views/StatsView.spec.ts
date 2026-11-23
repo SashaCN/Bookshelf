@@ -8,7 +8,7 @@ import type { GoalProgress, StatsSummary } from '@/types/api'
 import StatsView from './StatsView.vue'
 
 vi.mock('@/api/stats', () => ({
-  statsApi: { summary: vi.fn(), daily: vi.fn(), goal: vi.fn(), setGoal: vi.fn(), removeGoal: vi.fn() },
+  statsApi: { summary: vi.fn(), year: vi.fn(), daily: vi.fn(), goal: vi.fn(), setGoal: vi.fn(), removeGoal: vi.fn() },
 }))
 
 function makeSummary(overrides: Partial<StatsSummary> = {}): StatsSummary {
@@ -19,6 +19,7 @@ function makeSummary(overrides: Partial<StatsSummary> = {}): StatsSummary {
     month: { pages: 210, books_finished: 1 },
     year: { pages: 3100, books_finished: 8 },
     forecasts: [],
+    reader: { chapters_this_month: 0, chapters_this_year: 0, documents_in_progress: 0 },
     ...overrides,
   }
 }
@@ -32,6 +33,7 @@ function makeDays(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     date: new Date(Date.UTC(2026, 9, 15 - (count - 1) + index)).toISOString().slice(0, 10),
     pages: index,
+    chapters: 0,
   }))
 }
 
@@ -68,6 +70,42 @@ describe('StatsView', () => {
     expect(wrapper.text()).toContain('1 книга')
     expect(wrapper.text()).toContain(`${formatNumber(3100)} стор.`)
     expect(wrapper.text()).toContain('8 книг')
+  })
+
+  it('links to the recap of the current year and of the previous one', async () => {
+    const wrapper = await mountView()
+
+    const links = wrapper.findAll('a').filter((link) => link.attributes('href')?.startsWith('/stats/year/'))
+    expect(links.map((link) => link.attributes('href'))).toEqual(['/stats/year/2026', '/stats/year/2025'])
+    expect(links[0]!.text()).toBe('Рік у книгах →')
+    expect(links[1]!.text()).toContain('2025')
+  })
+
+  it('hides the reader tiles when the reader is not used', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).not.toContain('Читанка')
+  })
+
+  it('shows the reader tiles with the chapters and the books in progress', async () => {
+    vi.mocked(statsApi.summary).mockResolvedValue(
+      makeSummary({ reader: { chapters_this_month: 3, chapters_this_year: 21, documents_in_progress: 2 } }),
+    )
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).toContain('Читанка')
+    expect(wrapper.text()).toContain('3 розділи')
+    expect(wrapper.text()).toContain('21 розділ')
+    expect(wrapper.text()).toContain('Книг відкрито за 30 днів')
+  })
+
+  it('shows the reader tiles when there are only chapters from this year', async () => {
+    vi.mocked(statsApi.summary).mockResolvedValue(
+      makeSummary({ reader: { chapters_this_month: 0, chapters_this_year: 5, documents_in_progress: 0 } }),
+    )
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).toContain('5 розділів')
   })
 
   it('nudges the reader to keep a streak alive that has not been read today', async () => {
@@ -209,6 +247,17 @@ describe('StatsView', () => {
 
     expect(statsApi.removeGoal).toHaveBeenCalledWith(2026)
     expect(wrapper.text()).toContain('Поставте ціль')
+  })
+
+  it('keeps the goal and explains when removing it fails', async () => {
+    vi.mocked(statsApi.removeGoal).mockRejectedValue(new ApiError(500, null))
+    const wrapper = await mountView()
+
+    await buttonWithText(wrapper, 'Прибрати').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+    expect(buttonWithText(wrapper, 'Прибрати').attributes('disabled')).toBeUndefined()
   })
 
   it('offers a retry when the statistics cannot be loaded', async () => {

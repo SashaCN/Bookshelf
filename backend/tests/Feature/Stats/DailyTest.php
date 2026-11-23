@@ -21,9 +21,9 @@ it('covers the last 30 days by default, with zeros for the days without reading'
     $response = $this->actingAs($this->user)->getJson('/api/stats/daily')->assertOk();
 
     $response->assertJsonCount(30, 'data')
-        ->assertJsonPath('data.0', ['date' => '2026-09-16', 'pages' => 5])
-        ->assertJsonPath('data.1', ['date' => '2026-09-17', 'pages' => 0])
-        ->assertJsonPath('data.29', ['date' => '2026-10-15', 'pages' => 20])
+        ->assertJsonPath('data.0', ['date' => '2026-09-16', 'pages' => 5, 'chapters' => 0])
+        ->assertJsonPath('data.1', ['date' => '2026-09-17', 'pages' => 0, 'chapters' => 0])
+        ->assertJsonPath('data.29', ['date' => '2026-10-15', 'pages' => 20, 'chapters' => 0])
         ->assertJsonPath('meta', ['from' => '2026-09-16', 'to' => '2026-10-15', 'total_pages' => 25]);
 });
 
@@ -34,7 +34,7 @@ it('covers the last N days when asked for N', function () {
         ->assertOk()
         ->assertJsonCount(7, 'data')
         ->assertJsonPath('data.0.date', '2026-10-09')
-        ->assertJsonPath('data.6', ['date' => '2026-10-15', 'pages' => 20]);
+        ->assertJsonPath('data.6', ['date' => '2026-10-15', 'pages' => 20, 'chapters' => 0]);
 
     $this->actingAs($this->user)->getJson('/api/stats/daily?days=1')->assertJsonCount(1, 'data');
 });
@@ -51,9 +51,9 @@ it('returns the requested range, both ends included', function () {
     $this->actingAs($this->user)->getJson('/api/stats/daily?from=2026-10-01&to=2026-10-03')
         ->assertOk()
         ->assertJsonPath('data', [
-            ['date' => '2026-10-01', 'pages' => 10],
-            ['date' => '2026-10-02', 'pages' => 0],
-            ['date' => '2026-10-03', 'pages' => 20],
+            ['date' => '2026-10-01', 'pages' => 10, 'chapters' => 0],
+            ['date' => '2026-10-02', 'pages' => 0, 'chapters' => 0],
+            ['date' => '2026-10-03', 'pages' => 20, 'chapters' => 0],
         ])
         ->assertJsonPath('meta.total_pages', 30);
 });
@@ -109,3 +109,9 @@ it('rejects dates it cannot read and ranges that run backwards', function (strin
     'bad to' => ['to=15.10.2026', 'to'],
     'backwards' => ['from=2026-10-10&to=2026-10-01', 'to'],
 ]);
+
+it('refuses a start in the future when no end is given', function () {
+    $this->actingAs($this->user)->getJson('/api/stats/daily?from=2099-01-01')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('from');
+});

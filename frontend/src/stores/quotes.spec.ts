@@ -180,6 +180,21 @@ describe('quotes store', () => {
       expect(quotes.items.map((item) => item.id)).toEqual([2, 1])
     })
 
+    it('treats another tag as another list, and files a new quote under its tag', async () => {
+      vi.mocked(quotesApi.list).mockResolvedValue(page([]))
+      const quotes = useQuotesStore()
+
+      await quotes.load({ tag: 'a' })
+      await quotes.load({ tag: 'b' })
+      expect(quotes.items).toEqual([])
+
+      vi.mocked(quotesApi.create).mockResolvedValueOnce(makeQuote({ id: 8, tags: ['a'] })).mockResolvedValueOnce(makeQuote({ id: 9, tags: ['b'] }))
+      await quotes.create(1, { content: 'x', tags: ['a'] })
+      expect(quotes.items.map((item) => item.id)).toEqual([])
+      await quotes.create(1, { content: 'y', tags: ['b'] })
+      expect(quotes.items.map((item) => item.id)).toEqual([9])
+    })
+
     it('leaves a new quote out of a list it does not belong to', async () => {
       vi.mocked(quotesApi.list).mockResolvedValue(page([1]))
       vi.mocked(quotesApi.create).mockResolvedValue(makeQuote({ id: 2, user_book_id: 5, is_favorite: false }))

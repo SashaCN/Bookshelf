@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { statsApi } from '@/api/stats'
 import EmptyState from '@/components/EmptyState.vue'
@@ -21,6 +21,14 @@ const summary = ref<StatsSummary | null>(null)
 const goal = ref<GoalProgress | null>(null)
 const days = ref<DailyPages[]>([])
 const range = ref<(typeof RANGES)[number]>(30)
+
+// The tile group is for readers who use the built-in reader; it stays out of the way of everybody else.
+const hasReaderActivity = computed(
+  () => !!summary.value && (summary.value.reader.documents_in_progress > 0 || summary.value.reader.chapters_this_year > 0),
+)
+
+/** The year of the recap link: the reader's own current year. */
+const recapYear = computed(() => Number(summary.value?.today.date.slice(0, 4)))
 
 const failed = ref(false)
 const chartError = ref('')
@@ -133,6 +141,32 @@ onMounted(load)
       />
     </div>
 
+    <nav class="flex flex-wrap gap-x-4 gap-y-1" :aria-label="$t('stats.recap.title', { year: recapYear })">
+      <RouterLink :to="{ name: 'year-recap', params: { year: recapYear } }" class="inline-flex min-h-11 items-center font-semibold text-accent">
+        {{ $t('stats.recap.link') }}
+      </RouterLink>
+      <RouterLink :to="{ name: 'year-recap', params: { year: recapYear - 1 } }" class="inline-flex min-h-11 items-center text-ink-muted underline">
+        {{ $t('stats.recap.linkYear', { year: recapYear - 1 }) }}
+      </RouterLink>
+    </nav>
+
+    <section v-if="hasReaderActivity" class="flex flex-col gap-2" :aria-label="$t('stats.reader.title')">
+      <h2 class="font-display text-xl font-semibold">{{ $t('stats.reader.title') }}</h2>
+      <div class="grid grid-cols-3 gap-3">
+        <StatTile
+          :label="t('stats.reader.month')"
+          :value="formatNumber(summary.reader.chapters_this_month)"
+          :hint="t('stats.chapters', { n: summary.reader.chapters_this_month }, summary.reader.chapters_this_month)"
+        />
+        <StatTile
+          :label="t('stats.reader.year')"
+          :value="formatNumber(summary.reader.chapters_this_year)"
+          :hint="t('stats.chapters', { n: summary.reader.chapters_this_year }, summary.reader.chapters_this_year)"
+        />
+        <StatTile :label="t('stats.reader.inProgress')" :value="formatNumber(summary.reader.documents_in_progress)" />
+      </div>
+    </section>
+
     <section class="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="font-display text-xl font-semibold">{{ $t('stats.chart.title') }}</h2>
@@ -142,7 +176,7 @@ onMounted(load)
             :key="count"
             type="button"
             :aria-pressed="range === count"
-            class="min-h-10 min-w-10 rounded-full border px-3 text-sm font-medium"
+            class="min-h-11 min-w-11 rounded-full border px-3 text-sm font-medium"
             :class="range === count ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
             @click="selectRange(count)"
           >

@@ -4,7 +4,7 @@ import { http } from './http'
 import { quotesApi } from './quotes'
 
 vi.mock('./http', () => ({
-  http: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+  http: { download: vi.fn(), get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }))
 
 describe('quotesApi', () => {
@@ -30,12 +30,47 @@ describe('quotesApi', () => {
     expect(http.get).toHaveBeenNthCalledWith(2, '/api/quotes?book=7&page=2')
   })
 
+  it('sends the search with the other filters, in the list and in the export', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: [], links: { next: null } })
+    vi.mocked(http.download).mockResolvedValue(new Blob([]))
+
+    await quotesApi.list({ favorite: true, q: 'щастя тут' }, 2)
+    await quotesApi.exportMarkdown({ q: 'щастя' })
+
+    expect(http.get).toHaveBeenCalledWith('/api/quotes?favorite=1&q=%D1%89%D0%B0%D1%81%D1%82%D1%8F+%D1%82%D1%83%D1%82&page=2')
+    expect(http.download).toHaveBeenCalledWith('/api/quotes/export?q=%D1%89%D0%B0%D1%81%D1%82%D1%8F')
+  })
+
+  it('sends the tag filter, in the list and in the export, and lists the tags', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: [{ name: 'мудрість', quotes_count: 2 }] })
+    vi.mocked(http.download).mockResolvedValue(new Blob([]))
+
+    await quotesApi.list({ book: 7, tag: 'мудрість' })
+    await quotesApi.exportMarkdown({ tag: 'a b' })
+
+    expect(http.get).toHaveBeenCalledWith('/api/quotes?book=7&tag=%D0%BC%D1%83%D0%B4%D1%80%D1%96%D1%81%D1%82%D1%8C&page=1')
+    expect(http.download).toHaveBeenCalledWith('/api/quotes/export?tag=a+b')
+    expect(await quotesApi.tags()).toEqual([{ name: 'мудрість', quotes_count: 2 }])
+    expect(http.get).toHaveBeenLastCalledWith('/api/tags')
+  })
+
   it('unwraps the quote of the day, which may be missing', async () => {
     vi.mocked(http.get).mockResolvedValueOnce({ data: makeQuote({ id: 4 }) }).mockResolvedValueOnce({ data: null })
 
     expect((await quotesApi.daily())?.id).toBe(4)
     expect(await quotesApi.daily()).toBeNull()
     expect(http.get).toHaveBeenCalledWith('/api/quotes/daily')
+  })
+
+  it('downloads the export with the filters that are set and without paging', async () => {
+    const file = new Blob(['# Мої цитати'])
+    vi.mocked(http.download).mockResolvedValue(file)
+
+    expect(await quotesApi.exportMarkdown({ favorite: true, book: 7 })).toBe(file)
+    await quotesApi.exportMarkdown()
+
+    expect(http.download).toHaveBeenNthCalledWith(1, '/api/quotes/export?favorite=1&book=7')
+    expect(http.download).toHaveBeenNthCalledWith(2, '/api/quotes/export')
   })
 
   it('creates a quote under its library entry and unwraps the answer', async () => {

@@ -19,6 +19,16 @@ class OpenLibraryClient
 
     private const MAX_SUBJECTS = 12;
 
+    /** Anthologies list hundreds of authors; a library entry keeps the first few (the pivot position is a tiny int). */
+    private const MAX_AUTHORS = 10;
+
+    /** The limits of our own columns and validation rules: whatever the catalog sends must fit them. */
+    private const MAX_TEXT = 255;
+
+    private const MAX_PAGES = 20000;
+
+    private const MAX_YEAR = 9999;
+
     /**
      * @return list<CatalogEntry>
      *
@@ -26,7 +36,11 @@ class OpenLibraryClient
      */
     public function search(string $query, int $limit = 20): array
     {
-        return $this->entries($this->cachedSearch(Str::lower(Str::squish($query)), $limit));
+        // A valid ISBN (10 or 13, hyphens allowed) is looked up by that field instead of as free text.
+        $isbn = Isbn::normalize($query);
+        $q = $isbn !== null ? 'isbn:'.$isbn : Str::lower(Str::squish($query));
+
+        return $this->entries($this->cachedSearch($q, $limit));
     }
 
     /**
@@ -72,7 +86,9 @@ class OpenLibraryClient
                 ->withUserAgent((string) config('services.openlibrary.user_agent'))
                 ->acceptJson()
                 ->timeout((int) config('services.openlibrary.timeout'))
-                ->retry(2, 150, throw: false)
+                // A rejected request will not get better by repeating it; an outage or a 429 might.
+                ->retry(2, 150, when: fn (\Throwable $e) => ! ($e instanceof RequestException)
+                    || $e->response->serverError() || $e->response->status() === 429, throw: false)
                 ->get('/search.json', ['q' => $query, 'limit' => $limit, 'fields' => self::FIELDS]);
 
             $response->throw();
@@ -114,28 +130,28 @@ class OpenLibraryClient
     private function toEntry(array $doc): ?CatalogEntry
     {
         $key = $doc['key'] ?? null;
-        $title = isset($doc['title']) && is_string($doc['title']) ? trim($doc['title']) : '';
+        $title = isset($doc['title']) && is_string($doc['title']) ? $this->clip($doc['title']) : '';
 
         // Without a stable key or a title the work cannot be added to a library.
-        if (! is_string($key) || ! str_starts_with($key, '/works/') || $title === '') {
+        if (! is_string($key) || preg_match('#^/works/OL\d+W$#', $key) !== 1 || $title === '') {
             return null;
         }
 
         $pageCount = $doc['number_of_pages_median'] ?? null;
         $year = $doc['first_publish_year'] ?? null;
         $coverId = $doc['cover_i'] ?? null;
-        $subtitle = isset($doc['subtitle']) && is_string($doc['subtitle']) ? trim($doc['subtitle']) : null;
+        $subtitle = isset($doc['subtitle']) && is_string($doc['subtitle']) ? $this->clip($doc['subtitle']) : null;
 
         return new CatalogEntry(
             workKey: $key,
             title: $title,
             subtitle: $subtitle !== '' ? $subtitle : null,
-            authors: $this->strings($doc['author_name'] ?? []),
+            authors: array_slice($this->strings($doc['author_name'] ?? []), 0, self::MAX_AUTHORS),
             coverUrl: is_int($coverId) && $coverId > 0
                 ? rtrim((string) config('services.openlibrary.covers_url'), '/')."/b/id/{$coverId}-M.jpg"
                 : null,
-            pageCount: is_int($pageCount) && $pageCount > 0 ? $pageCount : null,
-            publishedYear: is_int($year) && $year > 0 ? $year : null,
+            pageCount: is_int($pageCount) && $pageCount > 0 && $pageCount <= self::MAX_PAGES ? $pageCount : null,
+            publishedYear: is_int($year) && $year > 0 && $year <= self::MAX_YEAR ? $year : null,
             subjects: array_slice($this->strings($doc['subject'] ?? []), 0, self::MAX_SUBJECTS),
             isbn13: $this->isbn13($doc['isbn'] ?? []),
         );
@@ -153,12 +169,17 @@ class OpenLibraryClient
         $strings = [];
 
         foreach ($value as $item) {
-            if (is_string($item) && trim($item) !== '') {
-                $strings[] = trim($item);
+            if (is_string($item) && $this->clip($item) !== '') {
+                $strings[] = $this->clip($item);
             }
         }
 
         return array_values(array_unique($strings));
+    }
+
+    private function clip(string $text): string
+    {
+        return trim(mb_substr(trim($text), 0, self::MAX_TEXT));
     }
 
     private function isbn13(mixed $isbns): ?string

@@ -58,3 +58,12 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/*
+ * Keyboard focus must be visible on every control. Text fields already draw their own ring, so this covers the rest:
+ * links, buttons and custom widgets, whose browser default outline is easy to miss on our colours.
+ */
+:where(a, button, summary, [role='tab'], [role='button'], [tabindex]:not([tabindex='-1'])):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

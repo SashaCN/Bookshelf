@@ -21,25 +21,39 @@ const loaded = ref(false)
 const loading = ref(false)
 const error = ref('')
 
+// A slower answer for an older request (another book, or the journal before the latest change) must not overwrite a newer one.
+let request = 0
+
 async function load(pageToLoad = 1) {
+  const current = ++request
   loading.value = true
   error.value = ''
 
   try {
     const result = await libraryApi.logs(props.bookId, pageToLoad)
+    if (current !== request) return
     entries.value = pageToLoad === 1 ? result.data : [...entries.value, ...result.data]
     hasMore.value = result.links.next !== null
     page.value = pageToLoad
     loaded.value = true
   } catch (e) {
-    error.value = errorMessage(e)
+    if (current === request) error.value = errorMessage(e)
   } finally {
-    loading.value = false
+    if (current === request) loading.value = false
   }
 }
 
 onMounted(() => load())
-watch([() => props.bookId, () => props.version], () => load())
+watch(
+  () => props.bookId,
+  () => {
+    entries.value = []
+    hasMore.value = false
+    loaded.value = false
+    load()
+  },
+)
+watch(() => props.version, () => load())
 </script>
 
 <template>
@@ -71,7 +85,7 @@ watch([() => props.bookId, () => props.version], () => load())
       class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
       @click="load(page + 1)"
     >
-      {{ $t('book.journal.more') }}
+      {{ loading ? $t('common.loading') : $t('book.journal.more') }}
     </button>
   </section>
 </template>

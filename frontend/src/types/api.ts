@@ -3,11 +3,28 @@ export interface User {
   name: string
   email: string
   timezone: string
+  username: string | null
+  is_public: boolean
+  /** Public readers who followed since the list was last opened; the server caps it at 99. */
+  new_followers_count: number
 }
 
 export interface LoginPayload {
   email: string
   password: string
+}
+
+export interface ChangePasswordPayload {
+  current_password: string
+  password: string
+  password_confirmation: string
+}
+
+export interface ResetPasswordPayload {
+  token: string
+  email: string
+  password: string
+  password_confirmation: string
 }
 
 export interface RegisterPayload extends LoginPayload {
@@ -18,6 +35,8 @@ export interface RegisterPayload extends LoginPayload {
 export interface UpdateProfilePayload {
   name?: string
   timezone?: string
+  username?: string | null
+  is_public?: boolean
 }
 
 export type BookStatus = 'want' | 'reading' | 'finished' | 'abandoned'
@@ -36,6 +55,12 @@ export interface Book {
 }
 
 /** A book in the reader's own library, with their progress. */
+/** An earlier, finished pass through a book that was read again. */
+export interface ReadPass {
+  started_at: string | null
+  finished_at: string
+}
+
 export interface UserBook {
   id: number
   status: BookStatus
@@ -45,10 +70,20 @@ export interface UserBook {
   total_pages: number | null
   progress_percent: number | null
   rating: number | null
+  /** The reader's text about the book; only written for a finished or abandoned one. */
+  review: string | null
+  review_visibility: QuoteVisibility
+  reviewed_at: string | null
   started_at: string | null
   finished_at: string | null
   created_at: string | null
   book: Book
+  /** The linked EPUB read most recently; only in the response for a single entry, not in the list. */
+  reader_document_id?: number | null
+  /** Finished passes through the book, the current one included when it is finished. */
+  times_read: number
+  /** Archived earlier passes, newest first; only in the response for a single entry, not in the list. */
+  reads?: ReadPass[]
 }
 
 /** One move of the bookmark in a book's reading journal. */
@@ -108,10 +143,14 @@ export interface AddBookPayload {
 export interface UpdateBookPayload {
   status?: BookStatus
   rating?: number | null
+  /** An empty string or null clears the review. */
+  review?: string | null
+  review_visibility?: QuoteVisibility
   total_pages?: number
 }
 
 export type QuoteType = 'quote' | 'insight'
+export type QuoteVisibility = 'private' | 'public'
 
 /** A passage (or the reader's own insight) saved from a book. */
 export interface Quote {
@@ -122,6 +161,15 @@ export interface Quote {
   note: string | null
   page: number | null
   is_favorite: boolean
+  visibility: QuoteVisibility
+  /** The reader's own tags (lowercase, by name). Only on the own quotes, never on what other readers see. */
+  tags?: string[]
+  /** Present in the lists: the own quotes and quotes of other readers. */
+  likes_count?: number
+  /** Present in the lists of other readers' quotes: the comments the viewer can see. */
+  comments_count?: number
+  /** Present on quotes of other readers; always false for a guest. */
+  liked_by_me?: boolean
   created_at: string
   user_book_id: number
   book: { title: string; authors: string[]; cover_url: string | null }
@@ -134,6 +182,15 @@ export interface QuotePayload {
   note?: string | null
   page?: number | null
   is_favorite?: boolean
+  visibility?: QuoteVisibility
+  /** The whole set of tags of the quote: the server normalizes them and drops duplicates. */
+  tags?: string[]
+}
+
+/** One of the reader's tags with the number of quotes carrying it. */
+export interface TagCount {
+  name: string
+  quotes_count: number
 }
 
 export interface QuoteFilters {
@@ -141,6 +198,24 @@ export interface QuoteFilters {
   /** The id of a library entry (user book). */
   book?: number
   type?: QuoteType
+  /** Full-text search over the text and notes of the reader's quotes (2 to 100 characters). */
+  q?: string
+  /** Only quotes carrying this tag. */
+  tag?: string
+}
+
+/** A public review of a book, as other readers see it. */
+export interface PublicReview {
+  id: number
+  book: { title: string; authors: string[]; cover_url: string | null }
+  rating: number | null
+  review: string
+  reviewed_at: string
+}
+
+export interface ReviewsPage {
+  data: PublicReview[]
+  links: { next: string | null }
 }
 
 export interface QuotesPage {
@@ -175,11 +250,39 @@ export interface StatsSummary {
   month: { pages: number; books_finished: number }
   year: { pages: number; books_finished: number }
   forecasts: BookForecast[]
+  /** Activity in the built-in EPUB reader, in the reader's time zone. */
+  reader: { chapters_this_month: number; chapters_this_year: number; documents_in_progress: number }
+}
+
+/** "A year in books": everything in the reader's own calendar; a book read again counts once per finished pass. */
+export interface YearRecap {
+  year: number
+  books_finished: number
+  pages_read: number
+  days_with_reading: number
+  longest_streak_in_year: number
+  chapters_read: number
+  quotes_added: number
+  reviews_written: number
+  average_rating: number | null
+  top_rated: { title: string; authors: string[]; rating: number; finished_at: string }[]
+  longest_book: { title: string; authors: string[]; total_pages: number } | null
+  /** Month number 1-12 with the most pages. */
+  busiest_month: { month: number; pages: number } | null
+  goal: { target: number; achieved: number } | null
+  finished_books: { title: string; authors: string[]; finished_at: string; rating: number | null }[]
+}
+
+export interface YearRecapResponse {
+  data: YearRecap
+  meta: { first_year: number; current_year: number }
 }
 
 export interface DailyPages {
   date: string
   pages: number
+  /** EPUB chapters read that day (the server always sends it; the pages chart does not use it). */
+  chapters?: number
 }
 
 export interface DailyStats {
@@ -197,4 +300,113 @@ export interface GoalProgress {
   due_books: number | null
   remaining_books: number | null
   on_track: boolean | null
+}
+
+export interface PublicProfile {
+  username: string
+  name: string
+  books_finished_this_year: number
+  followers_count: number
+  following_count: number
+  /** Public reviews only. */
+  reviews_count: number
+  is_following: boolean
+  is_me: boolean
+}
+
+/** A reader as listed among followers or followed. */
+export interface PersonSummary {
+  username: string
+  name: string
+  /** Only in the reader's own followers list: followed since they last looked. */
+  is_new?: boolean
+}
+
+/** A person found by the people search, with whether the reader already follows them. */
+export interface PersonSearchResult extends PersonSummary {
+  is_following: boolean
+}
+
+export interface PeoplePage {
+  data: PersonSummary[]
+  links: { next: string | null }
+}
+
+/** A public quote in the feed, with whoever saved it. */
+export interface FeedQuote extends Quote {
+  author: PersonSummary
+}
+
+/** A comment on a public quote. An author without a public profile is anonymous: no handle, no name. */
+export interface QuoteComment {
+  id: number
+  body: string
+  created_at: string
+  author: { username: string | null; name: string | null }
+  can_delete: boolean
+}
+
+export interface QuoteCommentsPage {
+  data: QuoteComment[]
+  links: { next: string | null }
+}
+
+export interface FeedPage {
+  data: FeedQuote[]
+  links: { next: string | null }
+}
+
+export interface ReaderPosition {
+  chapter: number
+  fraction: number
+}
+
+/** A chapter named in the book's table of contents; `index` is the position in the spine. */
+export interface ReaderTocEntry {
+  index: number
+  title: string
+}
+
+/** An uploaded EPUB. `progress` is a percentage (0..100) derived from the saved position. */
+export interface ReaderDocument {
+  id: number
+  title: string
+  author: string | null
+  /** The library entry this document is linked to; only a link, nothing is synced. */
+  user_book_id: number | null
+  user_book: { id: number; title: string } | null
+  chapters_count: number
+  position: ReaderPosition
+  progress: number
+  /** When the position was last saved; null for a book that has not been opened yet. */
+  last_read_at: string | null
+  created_at: string
+  /** Only in the response for a single book, not in the list. */
+  toc?: ReaderTocEntry[]
+}
+
+/** A bookmark of a chapter (scroll inside a chapter is not tracked), with an optional short note. */
+export interface ReaderBookmark {
+  id: number
+  chapter: number
+  chapter_title: string | null
+  note: string | null
+  created_at: string
+}
+
+/** One chapter; `html` is untrusted markup and must only ever be shown in a sandboxed iframe. */
+export interface ReaderChapter {
+  index: number
+  count: number
+  title: string | null
+  html: string
+}
+
+/** What `POST /api/library/import` reports about a Goodreads CSV. Row numbers count like a spreadsheet (the header is row 1). */
+export interface GoodreadsImportResult {
+  imported: number
+  skipped_existing: number
+  skipped_invalid: number
+  /** The first 20 unusable rows. */
+  errors: { row: number; reason: string }[]
 }

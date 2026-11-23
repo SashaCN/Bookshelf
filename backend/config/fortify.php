@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ThrottleFortifyRoutes;
 use Laravel\Fortify\Features;
 
 /*
@@ -30,7 +31,7 @@ return [
 
     'domain' => null,
 
-    'middleware' => ['web'],
+    'middleware' => ['web', ThrottleFortifyRoutes::class],
 
     'limiters' => [
         'login' => 'login',
@@ -40,5 +41,7 @@ return [
 
     'features' => [
         Features::registration(),
+        Features::resetPasswords(),
+        Features::updatePasswords(),
     ],
 ];

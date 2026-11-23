@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
+import { useAuthStore } from '@/stores/auth'
 import { useQuotesStore } from '@/stores/quotes'
 import { makeBook, makeQuote, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
@@ -10,11 +11,12 @@ import type { UserBook } from '@/types/api'
 import QuoteFormView from './QuoteFormView.vue'
 
 vi.mock('@/api/library', () => ({
-  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(), logs: vi.fn() },
+  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(),
+    reread: vi.fn(), logs: vi.fn() },
   catalogApi: { search: vi.fn() },
 }))
 vi.mock('@/api/quotes', () => ({
-  quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), tags: vi.fn() },
 }))
 
 const library = [
@@ -103,6 +105,7 @@ describe('QuoteFormView', () => {
         ['Текст', 'quote-content'],
         ['Моя думка', 'quote-note'],
         ['Сторінка', 'quote-page'],
+        ['Теги', 'quote-tags'],
       ])
     })
 
@@ -140,6 +143,36 @@ describe('QuoteFormView', () => {
       expect(buttonWithText(wrapper, 'Інсайт').attributes('aria-pressed')).toBe('true')
     })
 
+    it('warns that a public quote stays hidden while the profile is private', async () => {
+      const { wrapper } = await mountCreate({ book: '1' })
+      const auth = useAuthStore()
+      auth.user = { id: 1, name: 'Olena', email: 'o@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
+
+      expect(wrapper.text()).toContain('лише якщо ваш профіль публічний')
+      expect(wrapper.text()).not.toContain('приватний, тож')
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      expect(wrapper.text()).toContain('Ваш профіль зараз приватний')
+      expect(wrapper.findAll('a[href="/profile"]').map((link) => link.text())).toContain('Налаштувати профіль')
+
+      auth.user = { ...auth.user, is_public: true, new_followers_count: 0 }
+      await wrapper.vm.$nextTick()
+      expect(wrapper.text()).not.toContain('Ваш профіль зараз приватний')
+    })
+
+    it('makes a quote public when asked to', async () => {
+      const { wrapper } = await mountCreate({ book: '1' })
+      vi.mocked(quotesApi.create).mockResolvedValue(makeQuote())
+
+      expect(buttonWithText(wrapper, 'Тільки я').attributes('aria-pressed')).toBe('true')
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      await wrapper.get('#quote-content').setValue('Text')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(quotesApi.create).toHaveBeenCalledWith(1, expect.objectContaining({ visibility: 'public' }))
+    })
+
     it('saves the quote under the chosen book and leaves for the list', async () => {
       const { wrapper, router } = await mountCreate({ book: '1' })
       vi.mocked(quotesApi.create).mockResolvedValue(makeQuote({ id: 8 }))
@@ -153,9 +186,11 @@ describe('QuoteFormView', () => {
 
       expect(quotesApi.create).toHaveBeenCalledWith(1, {
         type: 'insight',
+        visibility: 'private',
         content: 'A thought worth keeping.',
         note: 'Mine.',
         page: 42,
+        tags: [],
       })
       expect(router.currentRoute.value.name).toBe('quotes')
     })
@@ -168,7 +203,111 @@ describe('QuoteFormView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(quotesApi.create).toHaveBeenCalledWith(1, { type: 'quote', content: 'Just the text', note: null, page: null })
+      expect(quotesApi.create).toHaveBeenCalledWith(1, { type: 'quote', visibility: 'private', content: 'Just the text', note: null, page: null, tags: [] })
+    })
+
+    describe('tags', () => {
+      async function typeTag(wrapper: ReturnType<typeof mount>, text: string, key?: string) {
+        const input = wrapper.get('#quote-tags')
+        await input.setValue(text)
+        if (key) await input.trigger('keydown', { key })
+      }
+
+      const chips = (wrapper: ReturnType<typeof mount>) => wrapper.findAll('ul li span.break-all').map((chip) => chip.text())
+
+      it('turns what is typed into a normalized chip on Enter, without submitting the form', async () => {
+        const { wrapper } = await mountCreate({ book: '1' })
+
+        await typeTag(wrapper, '  Мудрі   Думки ', 'Enter')
+
+        expect(chips(wrapper)).toEqual(['#мудрі думки'])
+        expect(field(wrapper, '#quote-tags').element.value).toBe('')
+        expect(quotesApi.create).not.toHaveBeenCalled()
+      })
+
+      it('ends a tag at a comma, also in the middle of pasted text, and ignores repeats and blanks', async () => {
+        const { wrapper } = await mountCreate({ book: '1' })
+
+        await typeTag(wrapper, 'one, Two,one, ,thr')
+
+        expect(chips(wrapper)).toEqual(['#one', '#two'])
+        expect(field(wrapper, '#quote-tags').element.value).toBe('thr')
+      })
+
+      it('removes a chip with its button, which has a label', async () => {
+        const { wrapper } = await mountCreate({ book: '1' })
+        await typeTag(wrapper, 'a,b,')
+
+        await wrapper.get('[aria-label="Прибрати тег a"]').trigger('click')
+
+        expect(chips(wrapper)).toEqual(['#b'])
+      })
+
+      it('stops at ten tags', async () => {
+        const { wrapper } = await mountCreate({ book: '1' })
+
+        await typeTag(wrapper, 'a,b,c,d,e,f,g,h,i,j,k,')
+
+        expect(chips(wrapper)).toHaveLength(10)
+        expect(field(wrapper, '#quote-tags').element.disabled).toBe(true)
+      })
+
+      it('offers the known tags that are not chosen yet as suggestions', async () => {
+        vi.mocked(quotesApi.tags).mockResolvedValue([{ name: 'a', quotes_count: 2 }, { name: 'b', quotes_count: 1 }])
+        const { wrapper } = await mountCreate({ book: '1' })
+
+        expect(wrapper.get('#quote-tags').attributes('list')).toBe('quote-tag-suggestions')
+        expect(wrapper.findAll('#quote-tag-suggestions option').map((option) => option.attributes('value'))).toEqual(['a', 'b'])
+
+        await typeTag(wrapper, 'a', 'Enter')
+
+        expect(wrapper.findAll('#quote-tag-suggestions option').map((option) => option.attributes('value'))).toEqual(['b'])
+      })
+
+      it('still works when the tags cannot be loaded', async () => {
+        vi.mocked(quotesApi.tags).mockRejectedValue(new ApiError(500, null))
+        const { wrapper } = await mountCreate({ book: '1' })
+
+        expect(wrapper.find('form').exists()).toBe(true)
+      })
+
+      it('sends the chips, and the text still in the field, with the quote', async () => {
+        const { wrapper } = await mountCreate({ book: '1' })
+        vi.mocked(quotesApi.create).mockResolvedValue(makeQuote())
+
+        await wrapper.get('#quote-content').setValue('Text')
+        await typeTag(wrapper, 'one', 'Enter')
+        await typeTag(wrapper, 'two')
+        await wrapper.get('form').trigger('submit')
+        await flushPromises()
+
+        expect(quotesApi.create).toHaveBeenCalledWith(1, expect.objectContaining({ tags: ['one', 'two'] }))
+      })
+
+      it('shows the tags of an edited quote and sends the changed set', async () => {
+        vi.mocked(quotesApi.get).mockResolvedValue(makeQuote({ id: 5, tags: ['old', 'keep'] }))
+        vi.mocked(quotesApi.update).mockResolvedValue(makeQuote({ id: 5 }))
+        const { wrapper } = await mountEdit(5)
+        expect(chips(wrapper)).toEqual(['#old', '#keep'])
+
+        await wrapper.get('[aria-label="Прибрати тег old"]').trigger('click')
+        await wrapper.get('form').trigger('submit')
+        await flushPromises()
+
+        expect(quotesApi.update).toHaveBeenCalledWith(5, expect.objectContaining({ tags: ['keep'] }))
+      })
+
+      it('explains a refusal of the tags next to the field', async () => {
+        const { wrapper } = await mountCreate({ book: '1' })
+        vi.mocked(quotesApi.create).mockRejectedValue(new ApiError(422, { message: 'invalid', errors: { 'tags.0': ['bad'] } }))
+
+        await wrapper.get('#quote-content').setValue('Text')
+        await wrapper.get('form').trigger('submit')
+        await flushPromises()
+
+        expect(wrapper.text()).toContain('Не більше 10 тегів')
+        expect(wrapper.get('#quote-tags').attributes('aria-invalid')).toBe('true')
+      })
     })
 
     it('goes back to where the reader came from when there is somewhere to go back to', async () => {
@@ -346,6 +485,13 @@ describe('QuoteFormView', () => {
       expect(field(wrapper, '#quote-page').attributes('max')).toBe('320')
     })
 
+    it('shows the visibility the quote already has', async () => {
+      vi.mocked(quotesApi.get).mockResolvedValue({ ...existing, visibility: 'public' })
+      const { wrapper } = await mountEdit()
+
+      expect(buttonWithText(wrapper, 'Усі').attributes('aria-pressed')).toBe('true')
+    })
+
     it('saves the changes and updates the list', async () => {
       vi.mocked(quotesApi.get).mockResolvedValue(existing)
       const { wrapper, router } = await mountEdit()
@@ -358,7 +504,7 @@ describe('QuoteFormView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(quotesApi.update).toHaveBeenCalledWith(5, { type: 'quote', content: 'New text', note: null, page: null })
+      expect(quotesApi.update).toHaveBeenCalledWith(5, { type: 'quote', visibility: 'private', content: 'New text', note: null, page: null, tags: [] })
       expect(quotesApi.create).not.toHaveBeenCalled()
       expect(router.currentRoute.value.name).toBe('quotes')
     })

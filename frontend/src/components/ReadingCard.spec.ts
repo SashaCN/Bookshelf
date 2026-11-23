@@ -222,4 +222,16 @@ describe('ReadingCard', () => {
 
     expect(wrapper.get('a').attributes('href')).toBe('/library/1')
   })
+
+  it('shows why finishing failed and lets the reader try again', async () => {
+    const userBook = reading({ current_page: 320, progress_percent: 100 })
+    const { wrapper } = await mountCard(userBook)
+    vi.mocked(libraryApi.update).mockRejectedValue(new ApiError(500, null))
+
+    await buttonWithText(wrapper, 'Позначити прочитаною').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+    expect(buttonWithText(wrapper, 'Позначити прочитаною').attributes('disabled')).toBeUndefined()
+  })
 })

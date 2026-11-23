@@ -2,7 +2,7 @@ import { ApiError } from './http'
 
 /** Business-rule codes are "<area>.<reason>", e.g. "library.total_pages_required". */
 export function isApiErrorCode(value: unknown): value is string {
-  return typeof value === 'string' && /^(library|catalog|quotes|goals)\.[a-z_]+$/.test(value)
+  return typeof value === 'string' && /^(library|catalog|quotes|goals|profile|follow|reader)\.[a-z_]+$/.test(value)
 }
 
 /**

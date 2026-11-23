@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { libraryApi } from '@/api/library'
+import { searchKey } from '@/utils/librarySearch'
 import type { AddBookPayload, BookStatus, ProgressResult, UpdateBookPayload, UserBook } from '@/types/api'
 
 export const useLibraryStore = defineStore('library', () => {
@@ -8,6 +9,8 @@ export const useLibraryStore = defineStore('library', () => {
   const items = ref<UserBook[]>([])
   const loaded = ref(false)
   const loading = ref(false)
+  /** Bumped by reset, so a list that was requested for somebody who has since signed out is dropped on arrival. */
+  let generation = 0
 
   const byStatus = computed(() => {
     const groups: Record<BookStatus, UserBook[]> = { want: [], reading: [], finished: [], abandoned: [] }
@@ -15,6 +18,15 @@ export const useLibraryStore = defineStore('library', () => {
       groups[item.status].push(item)
     }
     return groups
+  })
+
+  /** Normalized search text per entry id; rebuilt only when the library itself changes, not per keystroke. */
+  const searchKeys = computed(() => {
+    const keys = new Map<number, string>()
+    for (const item of items.value) {
+      keys.set(item.id, searchKey(item))
+    }
+    return keys
   })
 
   /** For pickers: alphabetical, where `items` follows recent activity. */
@@ -44,12 +56,17 @@ export const useLibraryStore = defineStore('library', () => {
       return
     }
 
+    const current = generation
     loading.value = true
     try {
-      items.value = await libraryApi.list()
+      const list = await libraryApi.list()
+      if (current !== generation) return
+      items.value = list
       loaded.value = true
     } finally {
-      loading.value = false
+      if (current === generation) {
+        loading.value = false
+      }
     }
   }
 
@@ -68,6 +85,13 @@ export const useLibraryStore = defineStore('library', () => {
   async function remove(id: number): Promise<void> {
     await libraryApi.remove(id)
     items.value = items.value.filter((item) => item.id !== id)
+  }
+
+  /** Start another pass through a finished book; the server archives the finished one and resets the bookmark. */
+  async function reread(id: number): Promise<UserBook> {
+    const userBook = await libraryApi.reread(id)
+    upsert(userBook)
+    return userBook
   }
 
   /** Requests of one book go out one at a time, so a quick second tap builds on the first instead of racing it. */
@@ -138,10 +162,11 @@ export const useLibraryStore = defineStore('library', () => {
 
   /** Forget everything, e.g. when somebody else signs in on the same device. */
   function reset(): void {
+    generation++
     items.value = []
     loaded.value = false
     loading.value = false
   }
 
-  return { items, loaded, loading, byStatus, byTitle, find, upsert, load, add, update, remove, setProgress, reset }
+  return { items, loaded, loading, byStatus, byTitle, searchKeys, find, upsert, load, add, update, remove, reread, setProgress, reset }
 })

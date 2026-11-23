@@ -8,6 +8,7 @@ RUN install-php-extensions pdo_mysql bcmath intl opcache pcntl zip \
     && apk add --no-cache git unzip
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+COPY docker/php/uploads.ini "$PHP_INI_DIR/conf.d/zz-uploads.ini"
 
 WORKDIR /var/www/html
 

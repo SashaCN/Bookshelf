@@ -30,8 +30,21 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'timezone' => User::DEFAULT_TIMEZONE,
+            'username' => null,
+            'is_public' => false,
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /**
+     * A reader with a public profile.
+     */
+    public function public(): static
+    {
+        return $this->state(fn () => [
+            'username' => 'reader_'.fake()->unique()->numerify('########'),
+            'is_public' => true,
+        ]);
     }
 
     /**

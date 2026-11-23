@@ -45,6 +45,20 @@ describe('http client', () => {
     expect(init?.body).toBe(JSON.stringify({ name: 'Olena' }))
   })
 
+  it('sends FormData as is, without a JSON content type, and keeps the CSRF header', async () => {
+    document.cookie = 'XSRF-TOKEN=tok'
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { data: 1 }))
+    const form = new FormData()
+    form.append('file', new File(['x'], 'a.epub'))
+
+    await http.post('/api/reader', form)
+
+    const init = fetchMock.mock.calls[0]?.[1]
+    expect(init?.body).toBe(form)
+    expect((init?.headers as Record<string, string>)['Content-Type']).toBeUndefined()
+    expect((init?.headers as Record<string, string>)['X-XSRF-TOKEN']).toBe('tok')
+  })
+
   it('retries once with a fresh CSRF cookie after a 419', async () => {
     document.cookie = 'XSRF-TOKEN=stale'
     fetchMock.mockResolvedValueOnce(jsonResponse(419, { message: 'CSRF token mismatch.' }))

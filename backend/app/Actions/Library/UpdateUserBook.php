@@ -3,8 +3,10 @@
 namespace App\Actions\Library;
 
 use App\Enums\BookStatus;
+use App\Enums\QuoteVisibility;
+use App\Models\User;
 use App\Models\UserBook;
-use Illuminate\Support\Carbon;
+use App\Rules\ReaderDate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,13 +20,18 @@ class UpdateUserBook
     /**
      * Applies a partial update. Everything is saved together or not at all.
      *
-     * @param  array{status?: string, rating?: int|null, total_pages?: int, started_at?: string|null, finished_at?: string|null}  $data
+     * @param  array{status?: string, rating?: int|null, review?: string|null, review_visibility?: string, total_pages?: int, started_at?: string|null, finished_at?: string|null}  $data
      *
      * @throws ValidationException
      */
     public function handle(UserBook $userBook, array $data): UserBook
     {
         DB::transaction(function () use ($userBook, $data): void {
+            // Another request (a progress tap, a second tab) may have changed the entry since it was loaded;
+            // decide on what is stored now, and make the next writer wait for this one.
+            UserBook::query()->whereKey($userBook->getKey())->lockForUpdate()->firstOrFail();
+            $userBook->refresh();
+
             $wasReading = $userBook->status === BookStatus::Reading;
             $pageBefore = $userBook->current_page;
 
@@ -41,9 +48,17 @@ class UpdateUserBook
                 $this->changeStatus->apply(
                     $userBook,
                     BookStatus::from($data['status']),
-                    isset($data['started_at']) ? Carbon::parse($data['started_at']) : null,
-                    isset($data['finished_at']) ? Carbon::parse($data['finished_at']) : null,
+                    isset($data['started_at']) ? ReaderDate::parse($data['started_at'], $this->timezoneOf($userBook)) : null,
+                    isset($data['finished_at']) ? ReaderDate::parse($data['finished_at'], $this->timezoneOf($userBook)) : null,
                 );
+            }
+
+            if (array_key_exists('review_visibility', $data)) {
+                $userBook->review_visibility = QuoteVisibility::from($data['review_visibility']);
+            }
+
+            if (array_key_exists('review', $data)) {
+                $this->setReview($userBook, $data['review']);
             }
 
             $userBook->save();
@@ -56,6 +71,32 @@ class UpdateUserBook
         });
 
         return $userBook->refresh()->load('book.authors');
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function setReview(UserBook $userBook, ?string $review): void
+    {
+        $review = $review === null || trim($review) === '' ? null : trim($review);
+
+        if ($review === $userBook->review) {
+            return;
+        }
+
+        // Clearing or editing an existing review is always allowed (a book read again has one while it is "reading");
+        // writing the first one needs a book that has been read (or given up on).
+        if ($review !== null && $userBook->review === null && ! in_array($userBook->status, [BookStatus::Finished, BookStatus::Abandoned], true)) {
+            throw ValidationException::withMessages(['review' => ['library.review_not_finished']]);
+        }
+
+        $userBook->review = $review;
+        $userBook->reviewed_at = $review === null ? null : now();
+    }
+
+    private function timezoneOf(UserBook $userBook): string
+    {
+        return $userBook->user->timezone ?: User::DEFAULT_TIMEZONE;
     }
 
     /**

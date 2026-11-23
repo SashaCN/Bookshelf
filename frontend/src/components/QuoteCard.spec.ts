@@ -1,13 +1,17 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { reactive } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { quotesApi } from '@/api/quotes'
+import { useAuthStore } from '@/stores/auth'
 import { useQuotesStore } from '@/stores/quotes'
+import { socialApi } from '@/api/social'
 import { makeQuote } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
 import type { Quote } from '@/types/api'
 import QuoteCard from './QuoteCard.vue'
 
+vi.mock('@/api/social', () => ({ socialApi: { like: vi.fn(), unlike: vi.fn() } }))
 vi.mock('@/api/quotes', () => ({
   quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
 }))
@@ -49,6 +53,31 @@ describe('QuoteCard', () => {
     expect(wrapper.get('blockquote').text()).toBe('You do not rise to the level of your goals.')
     expect(wrapper.text()).toContain('Systems beat goals.')
     expect(wrapper.text()).toContain('Atomic Habits · James Clear · с. 42')
+  })
+
+  it('shows the own tags as chips that open the list filtered by the tag', async () => {
+    const { wrapper } = await mountCard(makeQuote({ tags: ['мудрість', 'звички'] }))
+
+    const chips = wrapper.findAll('ul[aria-label="Теги"] a')
+
+    expect(chips.map((chip) => chip.text())).toEqual(['#мудрість', '#звички'])
+    expect(chips.map((chip) => chip.attributes('href'))).toEqual([
+      '/quotes?tag=%D0%BC%D1%83%D0%B4%D1%80%D1%96%D1%81%D1%82%D1%8C',
+      '/quotes?tag=%D0%B7%D0%B2%D0%B8%D1%87%D0%BA%D0%B8',
+    ])
+  })
+
+  it('shows no tag list for a quote without tags', async () => {
+    const { wrapper } = await mountCard(makeQuote({ tags: [] }))
+
+    expect(wrapper.find('ul[aria-label="Теги"]').exists()).toBe(false)
+  })
+
+  it('never shows tags on somebody else\'s quote', async () => {
+    const { plugins } = createTestEnvironment()
+    const wrapper = mount(QuoteCard, { props: { quote: makeQuote({ tags: ['secret'] }), readonly: true }, global: { plugins } })
+
+    expect(wrapper.text()).not.toContain('secret')
   })
 
   it('links the title to the book', async () => {
@@ -180,6 +209,82 @@ describe('QuoteCard', () => {
       expect(quotes.items).toHaveLength(1)
       expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
       expect(wrapper.text()).not.toContain('Видалити цей запис назавжди?')
+    })
+  })
+
+  describe('likes', () => {
+    const viewer = { id: 1, name: 'Іван', email: 'ivan@example.com', timezone: 'Europe/Kyiv', username: 'ivan', is_public: true, new_followers_count: 0 }
+
+    function mountReadonly(quote: Quote, signedIn = true) {
+      const { plugins } = createTestEnvironment()
+      useAuthStore().user = signedIn ? viewer : null
+      // A reactive object, the way the lists of the social store hand quotes to the card.
+      const reactiveQuote = reactive(quote)
+      return { wrapper: mount(QuoteCard, { props: { quote: reactiveQuote, readonly: true }, global: { plugins } }), reactiveQuote }
+    }
+
+    it('toggles the heart at once and keeps it when the server agrees', async () => {
+      vi.mocked(socialApi.like).mockResolvedValue(null)
+      const { wrapper, reactiveQuote } = mountReadonly(makeQuote({ likes_count: 1, liked_by_me: false }))
+      const heart = wrapper.get('button[aria-pressed]')
+      expect(heart.attributes('aria-pressed')).toBe('false')
+      expect(heart.attributes('aria-label')).toBe('Вподобати. 1 вподобання')
+      expect(heart.classes()).toContain('min-h-11')
+
+      await heart.trigger('click')
+
+      expect(socialApi.like).toHaveBeenCalledWith(1)
+      expect(reactiveQuote).toMatchObject({ liked_by_me: true, likes_count: 2 })
+      expect(wrapper.get('button[aria-pressed]').attributes('aria-label')).toBe('Прибрати вподобання. 2 вподобання')
+      await flushPromises()
+      expect(wrapper.get('button[aria-pressed]').attributes('aria-pressed')).toBe('true')
+    })
+
+    it('shows the number next to the heart only when there are likes', () => {
+      const none = mountReadonly(makeQuote({ likes_count: 0, liked_by_me: false })).wrapper.get('button[aria-pressed]')
+      const some = mountReadonly(makeQuote({ likes_count: 3, liked_by_me: false })).wrapper.get('button[aria-pressed]')
+
+      expect(none.text()).toBe('')
+      expect(none.attributes('aria-label')).toBe('Вподобати. 0 вподобань')
+      expect(some.text()).toBe('3')
+    })
+
+    it('takes a like back', async () => {
+      vi.mocked(socialApi.unlike).mockResolvedValue(null)
+      const { wrapper, reactiveQuote } = mountReadonly(makeQuote({ likes_count: 5, liked_by_me: true }))
+
+      await wrapper.get('button[aria-pressed]').trigger('click')
+      await flushPromises()
+
+      expect(socialApi.unlike).toHaveBeenCalledWith(1)
+      expect(reactiveQuote).toMatchObject({ liked_by_me: false, likes_count: 4 })
+    })
+
+    it('puts the heart and the count back when the request fails', async () => {
+      vi.mocked(socialApi.like).mockRejectedValue(new ApiError(404, 'Not found'))
+      const { wrapper, reactiveQuote } = mountReadonly(makeQuote({ likes_count: 2, liked_by_me: false }))
+
+      await wrapper.get('button[aria-pressed]').trigger('click')
+      await flushPromises()
+
+      expect(reactiveQuote).toMatchObject({ liked_by_me: false, likes_count: 2 })
+      expect(wrapper.get('button[aria-pressed]').attributes('aria-pressed')).toBe('false')
+      expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    })
+
+    it('shows a guest the count only, without a button', () => {
+      const { wrapper } = mountReadonly(makeQuote({ likes_count: 5, liked_by_me: false }), false)
+
+      expect(wrapper.find('button').exists()).toBe(false)
+      expect(wrapper.get('[data-test="likes-count"]').text()).toBe('5 вподобань')
+    })
+
+    it('shows the likes of an own quote only when there are some', async () => {
+      const liked = await mountCard(makeQuote({ likes_count: 2 }))
+      const none = await mountCard(makeQuote({ likes_count: 0 }))
+
+      expect(liked.wrapper.get('[data-test="likes-count"]').text()).toBe('2 вподобання')
+      expect(none.wrapper.find('[data-test="likes-count"]').exists()).toBe(false)
     })
   })
 })

@@ -5,6 +5,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => null);
 
         $middleware->statefulApi();
+
+        // Changing the password signs the account out of its other sessions (see UpdateUserPassword).
+        // Sanctum's own variant: the framework one calls viaRemember(), which Sanctum's guard lacks.
+        $middleware->appendToGroup('api', AuthenticateSession::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // A normal client error, not worth a log entry.

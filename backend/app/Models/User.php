@@ -5,12 +5,15 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
-#[Fillable(['name', 'email', 'password', 'timezone'])]
+#[Fillable(['name', 'email', 'password', 'timezone', 'username', 'is_public'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -18,6 +21,17 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     public const DEFAULT_TIMEZONE = 'Europe/Kyiv';
+
+    public const NEW_FOLLOWERS_CAP = 99;
+
+    /**
+     * Defaults of a freshly created reader, mirroring the column defaults.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_public' => false,
+    ];
 
     /**
      * @return HasMany<UserBook, $this>
@@ -44,6 +58,61 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<ReaderDocument, $this>
+     */
+    public function readerDocuments(): HasMany
+    {
+        return $this->hasMany(ReaderDocument::class);
+    }
+
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function following(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'follows', 'follower_id', 'followed_id')->withPivot('created_at');
+    }
+
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function followers(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'follows', 'followed_id', 'follower_id')->withPivot('created_at');
+    }
+
+    /**
+     * Leaves out everybody the viewer has blocked and everybody who has blocked the viewer:
+     * a block hides both sides from each other. A guest has no blocks, so nothing is left out.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeVisibleTo(Builder $query, ?User $viewer): void
+    {
+        if ($viewer === null) {
+            return;
+        }
+
+        $query
+            ->whereNotIn('users.id', DB::table('user_blocks')->where('blocker_id', $viewer->id)->select('blocked_id'))
+            ->whereNotIn('users.id', DB::table('user_blocks')->where('blocked_id', $viewer->id)->select('blocker_id'));
+    }
+
+    /**
+     * Public followers who followed after the reader last looked at the list, capped at NEW_FOLLOWERS_CAP.
+     */
+    public function newFollowersCount(): int
+    {
+        $count = $this->followers()
+            ->where('users.is_public', true)
+            ->visibleTo($this)
+            ->when($this->followers_seen_at, fn ($query, $seenAt) => $query->where('follows.created_at', '>', $seenAt))
+            ->count();
+
+        return min($count, self::NEW_FOLLOWERS_CAP);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -53,6 +122,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_public' => 'boolean',
+            'followers_seen_at' => 'datetime',
         ];
     }
 }

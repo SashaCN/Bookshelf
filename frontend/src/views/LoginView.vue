@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/api/http'
 import AuthLayout from '@/components/AuthLayout.vue'
 import FormField from '@/components/FormField.vue'
+import { safeRedirect } from '@/router/redirect'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
@@ -17,12 +19,15 @@ const submitting = ref(false)
 const error = ref('')
 
 async function submit() {
+  // Enter in a field can submit again while the first request is still on its way.
+  if (submitting.value) return
+
   submitting.value = true
   error.value = ''
 
   try {
     await auth.login({ email: email.value, password: password.value })
-    await router.push({ name: 'home' })
+    await router.push(safeRedirect(route.query.redirect) ?? { name: 'home' })
   } catch (e) {
     if (e instanceof ApiError && e.status === 422) {
       error.value = t('auth.errors.invalidCredentials')
@@ -49,7 +54,19 @@ async function submit() {
         :label="$t('auth.fields.password')"
       />
 
+      <p v-if="route.query.reset === '1'" role="status" data-test="password-changed" class="rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted">
+        {{ $t('auth.login.passwordChanged') }}
+      </p>
+
+      <p v-if="route.query.deleted === '1'" role="status" data-test="account-deleted" class="rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted">
+        {{ $t('auth.login.accountDeleted') }}
+      </p>
+
       <p v-if="error" role="alert" class="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{{ error }}</p>
+
+      <RouterLink :to="{ name: 'forgot-password' }" class="self-start text-sm font-medium text-accent underline underline-offset-2">
+        {{ $t('auth.login.forgotPassword') }}
+      </RouterLink>
 
       <button
         type="submit"

@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Enums\BookStatus;
+use App\Models\User;
+use App\Rules\ReaderDate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,8 +27,13 @@ class StoreUserBookRequest extends FormRequest
             // The reader's own page count; for Open Library books it overrides the catalog value.
             'total_pages' => ['nullable', 'integer', 'min:1', 'max:20000'],
             'status' => ['nullable', Rule::enum(BookStatus::class)],
-            'started_at' => ['nullable', 'date', 'before_or_equal:now'],
-            'finished_at' => ['nullable', 'date', 'before_or_equal:now', 'after_or_equal:started_at'],
+            'started_at' => ['nullable', 'date', new ReaderDate($this->readerTimezone())],
+            'finished_at' => ['nullable', 'date', new ReaderDate($this->readerTimezone()), 'after_or_equal:started_at'],
         ];
+    }
+
+    private function readerTimezone(): string
+    {
+        return $this->user()?->timezone ?: User::DEFAULT_TIMEZONE;
     }
 }

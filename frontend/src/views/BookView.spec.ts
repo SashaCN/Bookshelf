@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
+import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
-import { makeQuote, makeUserBook } from '@/test/fixtures'
+import { makeBook, makeQuote, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
 import type { UserBook } from '@/types/api'
 import BookView from './BookView.vue'
@@ -17,6 +18,7 @@ vi.mock('@/api/library', () => ({
     update: vi.fn(),
     remove: vi.fn(),
     progress: vi.fn(),
+    reread: vi.fn(),
     logs: vi.fn(),
   },
   catalogApi: { search: vi.fn() },
@@ -48,6 +50,23 @@ describe('BookView', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(quotesApi.list).mockResolvedValue({ data: [], links: { next: null } })
+  })
+
+  it('offers to read the linked EPUB', async () => {
+    const entry = makeUserBook({ id: 3 })
+    vi.mocked(libraryApi.get).mockResolvedValue({ ...entry, reader_document_id: 9 })
+    const { wrapper } = await mountView(entry)
+
+    const link = wrapper.findAll('a').find((a) => a.text() === 'Читати EPUB')
+    expect(link?.attributes('href')).toBe('/reader/9')
+  })
+
+  it('has no EPUB button without a linked document', async () => {
+    const entry = makeUserBook({ id: 3 })
+    vi.mocked(libraryApi.get).mockResolvedValue({ ...entry, reader_document_id: null })
+    const { wrapper } = await mountView(entry)
+
+    expect(wrapper.text()).not.toContain('Читати EPUB')
   })
 
   it('shows the book, its status and its progress', async () => {
@@ -118,6 +137,73 @@ describe('BookView', () => {
 
     expect(wrapper.text()).toContain('Читаю')
     expect(wrapper.text()).not.toContain('Оновлення сторінки позначить книгу як «Читаю».')
+  })
+
+  describe('rereading', () => {
+    const finished = (extra: Partial<UserBook> = {}) =>
+      makeUserBook({ status: 'finished', allowed_statuses: ['reading'], current_page: 320, times_read: 1, ...extra })
+
+    it('asks for confirmation, then restarts the book and shows the previous pass', async () => {
+      const { wrapper, library } = await mountView(finished())
+      vi.mocked(libraryApi.reread).mockResolvedValue(
+        makeUserBook({
+          status: 'reading',
+          allowed_statuses: ['finished', 'abandoned'],
+          times_read: 1,
+          reads: [{ started_at: '2026-09-01T10:00:00+00:00', finished_at: '2026-09-20T10:00:00+00:00' }],
+        }),
+      )
+
+      await buttonWithText(wrapper, 'Перечитати').trigger('click')
+      expect(libraryApi.reread).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Прогрес повернеться на сторінку 0')
+
+      await buttonWithText(wrapper, 'Почати знову').trigger('click')
+      await flushPromises()
+
+      expect(libraryApi.reread).toHaveBeenCalledWith(1)
+      expect(library.find(1)?.status).toBe('reading')
+      expect(wrapper.text()).toContain('Прочитано 1 раз')
+      expect(wrapper.text()).toContain('Попередні прочитання')
+      expect(wrapper.text()).toContain('1 вересня')
+      expect(wrapper.text()).not.toContain('Перечитати')
+    })
+
+    it('lets the reader back out', async () => {
+      const { wrapper } = await mountView(finished())
+
+      await buttonWithText(wrapper, 'Перечитати').trigger('click')
+      await buttonWithText(wrapper, 'Скасувати').trigger('click')
+
+      expect(libraryApi.reread).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Перечитати')
+    })
+
+    it('is not offered for a book that is not finished', async () => {
+      const { wrapper } = await mountView(makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'] }))
+
+      expect(wrapper.text()).not.toContain('Перечитати')
+    })
+
+    it('says so when the server refuses', async () => {
+      const { wrapper } = await mountView(finished())
+      vi.mocked(libraryApi.reread).mockRejectedValue(new ApiError(422, { errors: { status: ['library.reread_not_finished'] } }))
+
+      await buttonWithText(wrapper, 'Перечитати').trigger('click')
+      await buttonWithText(wrapper, 'Почати знову').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Перечитувати можна лише прочитану книгу.')
+    })
+
+    it('shows the plural form of the times read', async () => {
+      const { wrapper } = await mountView(
+        finished({ times_read: 5, reads: [{ started_at: null, finished_at: '2026-01-10T10:00:00+00:00' }] }),
+      )
+
+      expect(wrapper.text()).toContain('Прочитано 5 разів')
+      expect(wrapper.text()).toContain('до 10 січня')
+    })
   })
 
   it('does not offer a page form for a finished book', async () => {
@@ -231,11 +317,39 @@ describe('BookView', () => {
     expect(libraryApi.remove).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Книга зникне з вашої бібліотеки')
 
-    await buttonWithText(wrapper, 'Видалити').trigger('click')
+    await buttonWithText(wrapper, 'Так, видалити').trigger('click')
     await flushPromises()
 
     expect(libraryApi.remove).toHaveBeenCalledWith(1)
     expect(router.currentRoute.value.name).toBe('library')
+  })
+
+  it('keeps the book and says so when removing fails', async () => {
+    const { wrapper, router } = await mountView(makeUserBook())
+    vi.mocked(libraryApi.remove).mockRejectedValue(new ApiError(500, null))
+
+    await buttonWithText(wrapper, 'Видалити з бібліотеки').trigger('click')
+    await buttonWithText(wrapper, 'Так, видалити').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+    expect(wrapper.text()).toContain('Atomic Habits')
+    expect(router.currentRoute.value.name).toBe('book')
+  })
+
+  it('offers a retry when the book cannot be loaded', async () => {
+    const { plugins, router } = createTestEnvironment()
+    vi.mocked(libraryApi.list).mockResolvedValue([])
+    vi.mocked(libraryApi.get).mockRejectedValueOnce(new ApiError(500, null)).mockResolvedValueOnce(makeUserBook({ id: 5 }))
+    vi.mocked(libraryApi.logs).mockResolvedValue({ data: [], links: { next: null } })
+    await router.push({ name: 'book', params: { id: 5 } })
+
+    const wrapper = mount(BookView, { props: { id: 5 }, global: { plugins } })
+    await flushPromises()
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Atomic Habits')
   })
 
   it('lets the reader back out of removing', async () => {
@@ -271,7 +385,7 @@ describe('BookView', () => {
     })
 
     it('offers adding a quote for this book, whatever its status', async () => {
-      const { wrapper } = await mountView(makeUserBook({ status: 'want' }))
+      const { wrapper } = await mountView(makeUserBook({ status: 'want', allowed_statuses: [] }))
 
       const add = wrapper.findAll('a').find((link) => link.text() === 'Додати цитату')
 
@@ -326,5 +440,112 @@ describe('BookView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Цієї книги немає у вашій бібліотеці.')
+  })
+
+  it('does not let a second rating tap through while the first one is being saved', async () => {
+    const { wrapper } = await mountView(makeUserBook({ status: 'finished', allowed_statuses: ['reading'] }))
+    let finish: (book: UserBook) => void = () => undefined
+    vi.mocked(libraryApi.update).mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+
+    await wrapper.findAll('[aria-label="4 / 5"]')[0]!.trigger('click')
+
+    expect(wrapper.findAll('[aria-label="5 / 5"]')[0]!.attributes('disabled')).toBeDefined()
+
+    finish(makeUserBook({ status: 'finished', rating: 4 }))
+    await flushPromises()
+
+    expect(wrapper.findAll('[aria-label="5 / 5"]')[0]!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('stops showing the previous book while the next one loads, and ignores a late answer for it', async () => {
+    const { wrapper } = await mountView(makeUserBook({ id: 1, status: 'finished', allowed_statuses: [] }))
+    let late: (book: UserBook) => void = () => undefined
+    vi.mocked(libraryApi.get).mockImplementationOnce(() => new Promise((resolve) => (late = resolve)))
+
+    await wrapper.setProps({ id: 2 })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Atomic Habits')
+    expect(wrapper.text()).toContain('Завантаження…')
+
+    late(makeUserBook({ id: 2, book: makeBook({ title: 'Deep Work' }), status: 'finished', allowed_statuses: [] }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Deep Work')
+  })
+
+  describe('review', () => {
+    const finished = (overrides: Partial<UserBook> = {}) =>
+      makeUserBook({ id: 1, status: 'finished', allowed_statuses: ['reading'], ...overrides })
+
+    it('is offered only for a finished or abandoned book', async () => {
+      expect((await mountView(makeUserBook({ status: 'reading', allowed_statuses: [] }))).wrapper.find('#book-review').exists()).toBe(false)
+      expect((await mountView(makeUserBook({ status: 'want', allowed_statuses: [] }))).wrapper.find('#book-review').exists()).toBe(false)
+      expect((await mountView(finished())).wrapper.find('#book-review').exists()).toBe(true)
+      expect((await mountView(makeUserBook({ status: 'abandoned', allowed_statuses: [] }))).wrapper.find('#book-review').exists()).toBe(true)
+    })
+
+    it('keeps an existing review reachable while the book is read again', async () => {
+      const { wrapper } = await mountView(makeUserBook({ status: 'reading', allowed_statuses: [], review: 'Колись', review_visibility: 'public' }))
+      expect(wrapper.text()).toContain('Колись')
+    })
+
+    it('counts characters, saves with the visibility and then shows the text read-only', async () => {
+      const entry = finished()
+      const { wrapper } = await mountView(entry)
+      let finish: (book: UserBook) => void = () => undefined
+      vi.mocked(libraryApi.update).mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+
+      await wrapper.get('#book-review').setValue('Чудова\nкнига')
+      expect(wrapper.get('#book-review-counter').text()).toBe('12 з 5000')
+      expect(wrapper.get('#book-review').attributes('maxlength')).toBe('5000')
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      await wrapper.get('form[class*="gap-3"]').trigger('submit')
+      expect(buttonWithText(wrapper, 'Зберігаємо…').attributes('disabled')).toBeDefined()
+      expect(libraryApi.update).toHaveBeenCalledWith(1, { review: 'Чудова\nкнига', review_visibility: 'public' })
+
+      finish({ ...entry, review: 'Чудова\nкнига', review_visibility: 'public', reviewed_at: '2026-10-05T10:00:00+00:00' })
+      await flushPromises()
+
+      expect(wrapper.find('#book-review').exists()).toBe(false)
+      expect(wrapper.get('p.whitespace-pre-line').text()).toBe('Чудова\nкнига')
+      expect(buttonWithText(wrapper, 'Редагувати')).toBeDefined()
+    })
+
+    it('shows a saved review read-only and edits it on request', async () => {
+      const { wrapper } = await mountView(finished({ review: 'Було <b>добре</b>', review_visibility: 'private' }))
+
+      expect(wrapper.text()).toContain('Було <b>добре</b>')
+      expect(wrapper.find('b').exists()).toBe(false)
+      expect(wrapper.find('#book-review').exists()).toBe(false)
+
+      await buttonWithText(wrapper, 'Редагувати').trigger('click')
+      expect((wrapper.get('#book-review').element as HTMLTextAreaElement).value).toBe('Було <b>добре</b>')
+
+      await buttonWithText(wrapper, 'Скасувати').trigger('click')
+      expect(wrapper.find('#book-review').exists()).toBe(false)
+    })
+
+    it('keeps the form and explains when the server turns the review down', async () => {
+      const { wrapper } = await mountView(finished())
+      vi.mocked(libraryApi.update).mockRejectedValue(new ApiError(422, { errors: { review: ['library.review_not_finished'] } }))
+
+      await wrapper.get('#book-review').setValue('Рано')
+      await wrapper.get('form[class*="gap-3"]').trigger('submit')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('Відгук можна написати, коли книгу прочитано або кинуто.')
+      expect((wrapper.get('#book-review').element as HTMLTextAreaElement).value).toBe('Рано')
+    })
+
+    it('warns that a public review of a private profile will not be seen', async () => {
+      const { wrapper } = await mountView(finished())
+      useAuthStore().user = { id: 1, name: 'Іван', email: 'i@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+
+      expect(wrapper.text()).toContain('Ваш профіль приватний')
+    })
   })
 })

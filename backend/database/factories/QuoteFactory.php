@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\QuoteType;
+use App\Enums\QuoteVisibility;
 use App\Models\Quote;
 use App\Models\UserBook;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -26,12 +27,18 @@ class QuoteFactory extends Factory
             'note' => null,
             'page' => null,
             'is_favorite' => false,
+            'visibility' => QuoteVisibility::Private,
         ];
     }
 
     public function favorite(): static
     {
         return $this->state(fn () => ['is_favorite' => true]);
+    }
+
+    public function public(): static
+    {
+        return $this->state(fn () => ['visibility' => QuoteVisibility::Public]);
     }
 
     public function insight(): static

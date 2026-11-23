@@ -63,3 +63,23 @@ it('rejects a duplicate email', function () {
         'password' => 'secret-password',
     ])->assertUnprocessable()->assertJsonValidationErrors('email');
 });
+
+it('throttles registrations from one address', function () {
+    foreach (range(1, 30) as $attempt) {
+        $this->postJson('/api/auth/register', [
+            'name' => 'Olena',
+            'email' => "olena{$attempt}@example.com",
+            'password' => 'secret-password',
+        ])->assertCreated();
+
+        // Registering signs the new user in, and Fortify turns signed-in callers away.
+        $this->flushSession();
+        $this->actAsGuest();
+    }
+
+    $this->postJson('/api/auth/register', [
+        'name' => 'Olena',
+        'email' => 'one-too-many@example.com',
+        'password' => 'secret-password',
+    ])->assertTooManyRequests();
+});

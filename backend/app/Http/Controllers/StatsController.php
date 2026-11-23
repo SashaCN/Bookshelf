@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Services\Stats\ReadingStatistics;
+use App\Services\Stats\YearRecap;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class StatsController extends Controller
 {
@@ -19,6 +21,7 @@ class StatsController extends Controller
         $today = $statistics->today();
         $month = $today->startOfMonth();
         $year = $today->startOfYear();
+        $chapters = $statistics->chaptersThisMonthAndYear();
 
         return response()->json(['data' => [
             'today' => [
@@ -36,6 +39,11 @@ class StatsController extends Controller
                 'books_finished' => $statistics->booksFinished($year, $today),
             ],
             'forecasts' => $statistics->forecasts(),
+            'reader' => [
+                'chapters_this_month' => $chapters['month'],
+                'chapters_this_year' => $chapters['year'],
+                'documents_in_progress' => $statistics->documentsInProgress(),
+            ],
         ]]);
     }
 
@@ -57,6 +65,10 @@ class StatsController extends Controller
             ? CarbonImmutable::parse($validated['from'])
             : $to->subDays(((int) ($validated['days'] ?? 30)) - 1);
 
+        if ($from->gt($to)) {
+            throw ValidationException::withMessages(['from' => ['stats.range_invalid']]);
+        }
+
         if ($from->diffInDays($to) > 365) {
             return response()->json([
                 'message' => 'The range is too long.',
@@ -65,10 +77,29 @@ class StatsController extends Controller
         }
 
         $days = $statistics->dailyPages($from, $to);
+        $chapters = $statistics->dailyChapters($from, $to);
 
         return response()->json([
-            'data' => collect($days)->map(fn (int $pages, string $date) => ['date' => $date, 'pages' => $pages])->values(),
+            'data' => collect($days)->map(fn (int $pages, string $date) => ['date' => $date, 'pages' => $pages, 'chapters' => $chapters[$date]])->values(),
             'meta' => ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'total_pages' => array_sum($days)],
+        ]);
+    }
+
+    /**
+     * "A year in books" of the reader. Years from the first activity to the current one exist; any other is 404.
+     * `meta.first_year` and `meta.current_year` bound the navigation between years.
+     */
+    public function year(Request $request, int $year, YearRecap $recap): JsonResponse
+    {
+        $user = $request->user();
+        $current = (new ReadingStatistics($user))->today()->year;
+        $first = $recap->firstYear($user);
+
+        abort_unless($year >= $first && $year <= $current, 404);
+
+        return response()->json([
+            'data' => $recap->handle($user, $year),
+            'meta' => ['first_year' => $first, 'current_year' => $current],
         ]);
     }
 }

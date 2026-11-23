@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import BookCover from '@/components/BookCover.vue'
+import BookReview from '@/components/BookReview.vue'
 import BookQuotes from '@/components/BookQuotes.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -13,7 +14,9 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import ReadingJournal from '@/components/ReadingJournal.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
+import { formatMoment } from '@/utils/format'
 import type { BookStatus, UserBook } from '@/types/api'
 
 const props = defineProps<{ id: number }>()
@@ -21,6 +24,7 @@ const props = defineProps<{ id: number }>()
 const { t } = useI18n()
 const router = useRouter()
 const library = useLibraryStore()
+const auth = useAuthStore()
 const errorMessage = useApiErrorMessage()
 
 const userBook = ref<UserBook | null>(null)
@@ -29,25 +33,56 @@ const error = ref('')
 const busy = ref(false)
 const pagesInput = ref('')
 const confirmingDelete = ref(false)
+const confirmingReread = ref(false)
 /** Bumped whenever the reading journal may have a new entry. */
 const journalVersion = ref(0)
+
+/** The linked EPUB, if any. The list does not carry it, so it comes from the single-entry endpoint. */
+const readerDocumentId = ref<number | null>(null)
 
 const book = computed(() => userBook.value?.book ?? null)
 const needsPages = computed(() => userBook.value !== null && !userBook.value.total_pages)
 
+let loadRequest = 0
+
 async function load() {
+  const request = ++loadRequest
   notFound.value = false
   error.value = ''
 
+  // Moving to another book must not keep showing (and editing) the previous one while this one loads.
+  if (userBook.value && userBook.value.id !== props.id) {
+    userBook.value = null
+    confirmingDelete.value = false
+    confirmingReread.value = false
+  }
+
   try {
     await library.load()
-    userBook.value = library.find(props.id) ?? (await libraryApi.get(props.id))
+    const cached = library.find(props.id)
+    const found = cached ?? (await libraryApi.get(props.id))
+    if (request === loadRequest) userBook.value = found
+    void loadReaderDocument(request, found, cached !== undefined)
   } catch (e) {
+    if (request !== loadRequest) return
+
     if (e instanceof ApiError && e.status === 404) {
       notFound.value = true
     } else {
       error.value = errorMessage(e)
     }
+  }
+}
+
+async function loadReaderDocument(request: number, found: UserBook, fetchIt: boolean) {
+  readerDocumentId.value = found.reader_document_id ?? null
+  if (!fetchIt) return
+
+  try {
+    const full = await libraryApi.get(props.id)
+    if (request === loadRequest) readerDocumentId.value = full?.reader_document_id ?? null
+  } catch {
+    // Only the "read EPUB" shortcut depends on this; the page works without it.
   }
 }
 
@@ -113,6 +148,29 @@ function savePages() {
   }
 }
 
+async function reread() {
+  if (!userBook.value) return
+
+  busy.value = true
+  error.value = ''
+
+  try {
+    // The answer is the full entry, so the previous passes are shown at once.
+    userBook.value = await library.reread(userBook.value.id)
+    journalVersion.value++
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    confirmingReread.value = false
+    busy.value = false
+  }
+}
+
+/** "5 жовтня" for a pass moment (an ISO timestamp): the calendar day in the reader's own time zone. */
+function passDay(iso: string): string {
+  return formatMoment(iso, auth.user?.timezone)
+}
+
 async function remove() {
   if (!userBook.value) return
 
@@ -167,6 +225,14 @@ function isDisabled(target: BookStatus): boolean {
       </div>
     </section>
 
+    <RouterLink
+      v-if="readerDocumentId !== null"
+      :to="{ name: 'reader-view', params: { id: readerDocumentId } }"
+      class="inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-surface px-4 font-semibold text-accent"
+    >
+      {{ $t('book.readEpub') }}
+    </RouterLink>
+
     <section v-if="userBook.total_pages && userBook.status !== 'want'" class="flex flex-col gap-2">
       <ProgressBar :percent="userBook.progress_percent" :label="$t('book.progress')" />
       <p class="text-sm tabular-nums text-ink-muted">
@@ -203,6 +269,55 @@ function isDisabled(target: BookStatus): boolean {
       </p>
     </section>
 
+    <section v-if="userBook.status === 'finished'" class="flex flex-col gap-2">
+      <button
+        v-if="!confirmingReread"
+        type="button"
+        :disabled="busy"
+        class="min-h-11 rounded-lg border border-line bg-surface px-4 font-semibold disabled:opacity-50"
+        @click="confirmingReread = true"
+      >
+        {{ $t('book.reread.action') }}
+      </button>
+      <div v-else class="flex flex-col gap-2">
+        <p class="text-sm">{{ $t('book.reread.confirm') }}</p>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            :disabled="busy"
+            class="min-h-11 flex-1 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+            @click="reread"
+          >
+            {{ $t('book.reread.yes') }}
+          </button>
+          <button
+            type="button"
+            :disabled="busy"
+            class="min-h-11 flex-1 rounded-lg border border-line bg-surface px-4 font-medium"
+            @click="confirmingReread = false"
+          >
+            {{ $t('common.cancel') }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="userBook.times_read > 0" class="flex flex-col gap-1">
+      <p class="text-sm font-medium">{{ $t('book.reread.timesRead', { n: userBook.times_read }, userBook.times_read) }}</p>
+      <template v-if="userBook.reads?.length">
+        <p class="text-sm text-ink-muted">{{ $t('book.reread.previous') }}</p>
+        <ul class="flex flex-col gap-0.5 text-sm tabular-nums text-ink-muted">
+          <li v-for="(pass, index) in userBook.reads" :key="index">
+            {{
+              pass.started_at
+                ? $t('book.reread.pass', { from: passDay(pass.started_at), to: passDay(pass.finished_at) })
+                : $t('book.reread.noStart', { to: passDay(pass.finished_at) })
+            }}
+          </li>
+        </ul>
+      </template>
+    </section>
+
     <form class="flex flex-col gap-1.5" @submit.prevent="savePages">
       <label for="total-pages" class="text-sm font-medium">{{ $t('book.totalPages') }}</label>
       <div class="flex gap-2">
@@ -230,9 +345,16 @@ function isDisabled(target: BookStatus): boolean {
       <RatingStars
         :model-value="userBook.rating"
         :label="$t('book.rating')"
+        :disabled="busy"
         @update:model-value="save({ rating: $event })"
       />
     </section>
+
+    <BookReview
+      v-if="userBook.status === 'finished' || userBook.status === 'abandoned' || userBook.review !== null"
+      :key="userBook.id"
+      :user-book="userBook"
+    />
 
     <BookQuotes :book-id="userBook.id" />
 

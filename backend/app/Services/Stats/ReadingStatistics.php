@@ -3,10 +3,16 @@
 namespace App\Services\Stats;
 
 use App\Enums\BookStatus;
+use App\Models\ReaderDocument;
 use App\Models\ReadingLog;
 use App\Models\User;
+use App\Models\UserBook;
+use App\Models\UserBookRead;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Reading statistics of one reader. Everything is counted in the reader's own time zone
@@ -61,6 +67,69 @@ final class ReadingStatistics
         return $days;
     }
 
+    /**
+     * EPUB chapters read on each day of the range, every day present. A chapter counts on the day it was first left
+     * forward (see RecordChapterReads); `read_on` is already the reader's local date.
+     *
+     * @return array<string, int> day (YYYY-MM-DD) => chapters
+     */
+    public function dailyChapters(CarbonInterface $from, CarbonInterface $to): array
+    {
+        $counts = $this->chapterReads()
+            ->whereBetween('read_on', [$from->toDateString(), $to->toDateString()])
+            ->groupBy('read_on')
+            ->selectRaw('read_on, COUNT(*) AS chapters')
+            ->pluck('chapters', 'read_on');
+
+        $days = [];
+        $last = $to->toDateString();
+
+        for ($day = CarbonImmutable::parse($from->toDateString(), 'UTC'); $day->toDateString() <= $last; $day = $day->addDay()) {
+            $key = $day->toDateString();
+            $days[$key] = (int) ($counts[$key] ?? 0);
+        }
+
+        return $days;
+    }
+
+    /**
+     * Chapters read in the current month and the current year, in one query.
+     *
+     * @return array{month: int, year: int}
+     */
+    public function chaptersThisMonthAndYear(): array
+    {
+        $today = $this->today();
+        $month = $today->startOfMonth()->toDateString();
+
+        $row = $this->chapterReads()
+            ->whereBetween('read_on', [$today->startOfYear()->toDateString(), $today->toDateString()])
+            ->selectRaw('COUNT(*) AS year_count, COALESCE(SUM(read_on >= ?), 0) AS month_count', [$month])
+            ->first();
+
+        return ['month' => (int) ($row->month_count ?? 0), 'year' => (int) ($row->year_count ?? 0)];
+    }
+
+    /**
+     * Books opened in the reader during the last 30 days. An EPUB has no "finished" state (the last chapter may be
+     * long or the reader may stop early), so recent activity is the honest meaning of "being read".
+     */
+    public function documentsInProgress(): int
+    {
+        return ReaderDocument::query()
+            ->where('user_id', $this->user->id)
+            ->where('last_read_at', '>=', now()->subDays(30))
+            ->count();
+    }
+
+    /** @return Builder */
+    private function chapterReads()
+    {
+        return DB::table('reader_chapter_reads')
+            ->join('reader_documents', 'reader_documents.id', '=', 'reader_chapter_reads.reader_document_id')
+            ->where('reader_documents.user_id', $this->user->id);
+    }
+
     public function pagesBetween(CarbonInterface $from, CarbonInterface $to): int
     {
         return array_sum($this->dailyPages($from, $to));
@@ -82,15 +151,7 @@ final class ReadingStatistics
             ->pluck('logged_on')
             ->all();
 
-        $longest = 0;
-        $run = 0;
-        $previous = null;
-
-        foreach ($readingDays as $day) {
-            $run = $previous !== null && CarbonImmutable::parse($previous)->addDay()->toDateString() === $day ? $run + 1 : 1;
-            $longest = max($longest, $run);
-            $previous = $day;
-        }
+        $longest = self::longestRun($readingDays);
 
         $read = array_flip($readingDays);
         $today = $this->today();
@@ -107,6 +168,26 @@ final class ReadingStatistics
             'longest' => $longest,
             'read_today' => isset($read[$today->toDateString()]),
         ];
+    }
+
+    /**
+     * The longest run of consecutive days in a sorted list of days (YYYY-MM-DD).
+     *
+     * @param  list<string>  $days
+     */
+    public static function longestRun(array $days): int
+    {
+        $longest = 0;
+        $run = 0;
+        $previous = null;
+
+        foreach ($days as $day) {
+            $run = $previous !== null && CarbonImmutable::parse($previous)->addDay()->toDateString() === $day ? $run + 1 : 1;
+            $longest = max($longest, $run);
+            $previous = $day;
+        }
+
+        return $longest;
     }
 
     /**
@@ -130,20 +211,92 @@ final class ReadingStatistics
     }
 
     /**
-     * Books finished on the days of the range (inclusive), by the finish date the reader has.
+     * Books finished on the days of the range (inclusive), by the finish date the reader has. A book read again counts
+     * once per finished pass: the current one plus the archived ones.
      */
     public function booksFinished(CarbonInterface $from, CarbonInterface $to): int
+    {
+        [$current, $archived] = $this->passQueries($from, $to);
+
+        return $current->count() + $archived->count();
+    }
+
+    /**
+     * The finished passes of the range, the same ones booksFinished counts: one row per pass, oldest first.
+     *
+     * @return list<array{user_book_id: int, finished_at: CarbonImmutable}>
+     */
+    public function finishedPasses(CarbonInterface $from, CarbonInterface $to): array
+    {
+        [$current, $archived] = $this->passQueries($from, $to);
+
+        $passes = [];
+        foreach ($current->get(['id', 'finished_at']) as $userBook) {
+            $passes[] = ['user_book_id' => (int) $userBook->id, 'finished_at' => $userBook->finished_at->toImmutable()];
+        }
+        foreach ($archived->get(['user_book_id', 'finished_at']) as $read) {
+            $passes[] = ['user_book_id' => (int) $read->user_book_id, 'finished_at' => $read->finished_at->toImmutable()];
+        }
+
+        usort($passes, fn (array $a, array $b) => [$a['finished_at'], $a['user_book_id']] <=> [$b['finished_at'], $b['user_book_id']]);
+
+        return $passes;
+    }
+
+    /**
+     * The two sources of finished passes in the range: current finishes and archived passes.
+     *
+     * @return array{0: \Illuminate\Database\Eloquent\Builder<UserBook>|HasMany<UserBook, User>, 1: \Illuminate\Database\Eloquent\Builder<UserBookRead>}
+     */
+    private function passQueries(CarbonInterface $from, CarbonInterface $to): array
     {
         $timezone = $this->user->timezone;
 
         // The dates are stored in UTC, while the range is in the reader's calendar.
-        return $this->user->userBooks()
+        $range = [
+            CarbonImmutable::parse($from->toDateString(), $timezone)->startOfDay()->utc(),
+            CarbonImmutable::parse($to->toDateString(), $timezone)->endOfDay()->utc(),
+        ];
+
+        $current = $this->user->userBooks()
             ->where('status', BookStatus::Finished)
-            ->whereBetween('finished_at', [
-                CarbonImmutable::parse($from->toDateString(), $timezone)->startOfDay()->utc(),
-                CarbonImmutable::parse($to->toDateString(), $timezone)->endOfDay()->utc(),
-            ])
-            ->count();
+            ->whereBetween('finished_at', $range);
+
+        $archived = UserBookRead::query()
+            ->whereIn('user_book_id', $this->user->userBooks()->select('id'))
+            ->whereBetween('finished_at', $range);
+
+        return [$current, $archived];
+    }
+
+    /**
+     * The first calendar year with any activity of the reader (reading, a finish, a quote, a chapter), or null for a
+     * reader with none. One query: the earliest moment of each source.
+     */
+    public function firstActivityYear(): ?int
+    {
+        $id = $this->user->id;
+
+        $rows = DB::select(
+            'SELECT MIN(logged_on) AS v, 0 AS utc FROM reading_logs WHERE user_id = ?
+             UNION ALL SELECT MIN(finished_at), 1 FROM user_books WHERE user_id = ? AND finished_at IS NOT NULL
+             UNION ALL SELECT MIN(finished_at), 1 FROM user_book_reads WHERE user_book_id IN (SELECT id FROM user_books WHERE user_id = ?)
+             UNION ALL SELECT MIN(created_at), 1 FROM quotes WHERE user_id = ?
+             UNION ALL SELECT MIN(read_on), 0 FROM reader_chapter_reads WHERE reader_document_id IN (SELECT id FROM reader_documents WHERE user_id = ?)',
+            [$id, $id, $id, $id, $id],
+        );
+
+        $years = [];
+        foreach ($rows as $row) {
+            if ($row->v === null) {
+                continue;
+            }
+            $years[] = $row->utc
+                ? CarbonImmutable::parse($row->v, 'UTC')->setTimezone($this->user->timezone)->year
+                : CarbonImmutable::parse($row->v)->year;
+        }
+
+        return $years === [] ? null : min($years);
     }
 
     /**
