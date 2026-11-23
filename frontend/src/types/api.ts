@@ -53,6 +53,8 @@ export interface UserBook {
   finished_at: string | null
   created_at: string | null
   book: Book
+  /** The linked EPUB read most recently; only in the response for a single entry, not in the list. */
+  reader_document_id?: number | null
 }
 
 /** One move of the bookmark in a book's reading journal. */
@@ -258,6 +260,9 @@ export interface ReaderDocument {
   id: number
   title: string
   author: string | null
+  /** The library entry this document is linked to; only a link, nothing is synced. */
+  user_book_id: number | null
+  user_book: { id: number; title: string } | null
   chapters_count: number
   position: ReaderPosition
   progress: number

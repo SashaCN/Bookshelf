@@ -42,8 +42,11 @@ interface State {
   goals: Record<number, number>
   /** Usernames of the fake readers the demo user follows. */
   following: string[]
-  documents: ReaderDocument[]
+  documents: StoredDocument[]
 }
+
+/** A document as stored: the linked book's title is looked up when it is shown. */
+type StoredDocument = Omit<ReaderDocument, 'user_book'>
 
 class HttpError extends Error {
   constructor(
@@ -206,6 +209,7 @@ function seed(): State {
         id: 1,
         title: demoBook.title,
         author: demoBook.author,
+        user_book_id: null,
         chapters_count: demoBook.chapters.length,
         position: { chapter: 0, fraction: 0 },
         progress: 0,
@@ -656,7 +660,13 @@ route('POST', '/api/library', (_p, _q, body) => {
   if (body.status && body.status !== 'want') changeStatus(entry, body.status as BookStatus)
   return ok(presentEntry(entry))
 })
-route('GET', '/api/library/(\\d+)', ([id]) => ok(presentEntry(findEntry(Number(id)))))
+route('GET', '/api/library/(\\d+)', ([id]) => {
+  const entry = findEntry(Number(id))
+  const linked = state.documents
+    .filter((doc) => doc.user_book_id === entry.id)
+    .sort(recentlyRead)[0]
+  return ok({ ...presentEntry(entry), reader_document_id: linked?.id ?? null })
+})
 route('PATCH', '/api/library/(\\d+)', ([id], _q, body) => {
   const e = findEntry(Number(id))
 
@@ -676,6 +686,7 @@ route('DELETE', '/api/library/(\\d+)', ([id]) => {
   state.library = state.library.filter((x) => x.id !== e.id)
   state.quotes = state.quotes.filter((q) => q.user_book_id !== e.id)
   delete state.logs[e.id]
+  for (const doc of state.documents) if (doc.user_book_id === e.id) doc.user_book_id = null
   return null
 })
 route('POST', '/api/library/(\\d+)/progress', ([id], _q, body) => {
@@ -845,21 +856,34 @@ route('GET', '/api/feed', (_p, query) => {
 })
 
 // Reader: the demo cannot parse uploaded files, so it ships one sample document.
-function findDocument(id: string): ReaderDocument {
+function findDocument(id: string): StoredDocument {
   const found = state.documents.find((d) => d.id === Number(id))
   if (!found) throw new HttpError(404, { message: 'Not found' })
   return found
 }
 
 // Most recently read first, never-read books after them, like the real API.
-const recentlyRead = (a: ReaderDocument, b: ReaderDocument) =>
+const recentlyRead = (a: StoredDocument, b: StoredDocument) =>
   Number(a.last_read_at === null) - Number(b.last_read_at === null) ||
   (b.last_read_at ?? '').localeCompare(a.last_read_at ?? '') ||
   b.id - a.id
 
-route('GET', '/api/reader', () => ok([...state.documents].sort(recentlyRead)))
+function presentDocument(d: StoredDocument): ReaderDocument {
+  const entry = state.library.find((e) => e.id === d.user_book_id)
+  return { ...d, user_book: entry ? { id: entry.id, title: entry.book.title } : null }
+}
+
+route('GET', '/api/reader', () => ok([...state.documents].sort(recentlyRead).map(presentDocument)))
 route('POST', '/api/reader', () => invalid('file', 'reader.invalid_epub'))
-route('GET', '/api/reader/(\\d+)', ([id]) => ok(findDocument(id)))
+route('GET', '/api/reader/(\\d+)', ([id]) => ok(presentDocument(findDocument(id))))
+route('PATCH', '/api/reader/(\\d+)', ([id], _q, body) => {
+  const doc = findDocument(id)
+  if (!('user_book_id' in body)) invalid('user_book_id', 'validation.required')
+  const userBookId = body.user_book_id === null ? null : Number(body.user_book_id)
+  if (userBookId !== null && !state.library.some((e) => e.id === userBookId)) invalid('user_book_id', 'validation.invalid')
+  doc.user_book_id = userBookId
+  return ok(presentDocument(doc))
+})
 route('DELETE', '/api/reader/(\\d+)', ([id]) => {
   const doc = findDocument(id)
   state.documents = state.documents.filter((d) => d.id !== doc.id)
@@ -874,7 +898,7 @@ route('PUT', '/api/reader/(\\d+)/position', ([id], _q, body) => {
   doc.position = { chapter, fraction }
   doc.last_read_at = new Date().toISOString()
   doc.progress = Math.round(((chapter + fraction) / doc.chapters_count) * 1000) / 10
-  return ok(doc)
+  return ok(presentDocument(doc))
 })
 route('GET', '/api/reader/(\\d+)/chapters/(\\d+)', ([id, n]) => {
   const doc = findDocument(id)

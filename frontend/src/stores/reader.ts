@@ -38,6 +38,12 @@ export const useReaderStore = defineStore('reader', () => {
     return doc
   }
 
+  async function link(id: number, userBookId: number | null): Promise<ReaderDocument> {
+    const doc = await readerApi.link(id, userBookId)
+    replace(doc)
+    return doc
+  }
+
   function chapter(id: number, index: number): Promise<ReaderChapter> {
     return readerApi.chapter(id, index)
   }
@@ -47,5 +53,5 @@ export const useReaderStore = defineStore('reader', () => {
     loaded.value = false
   }
 
-  return { items, loaded, load, get, upload, remove, savePosition, chapter, reset }
+  return { items, loaded, load, get, upload, remove, savePosition, link, chapter, reset }
 })

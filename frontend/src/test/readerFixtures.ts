@@ -5,6 +5,8 @@ export function makeReaderDoc(overrides: Partial<ReaderDocument> = {}): ReaderDo
     id: 1,
     title: 'Кобзар',
     author: 'Тарас Шевченко',
+    user_book_id: null,
+    user_book: null,
     chapters_count: 12,
     position: { chapter: 0, fraction: 0 },
     progress: 0,

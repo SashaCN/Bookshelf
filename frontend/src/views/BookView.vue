@@ -32,6 +32,9 @@ const confirmingDelete = ref(false)
 /** Bumped whenever the reading journal may have a new entry. */
 const journalVersion = ref(0)
 
+/** The linked EPUB, if any. The list does not carry it, so it comes from the single-entry endpoint. */
+const readerDocumentId = ref<number | null>(null)
+
 const book = computed(() => userBook.value?.book ?? null)
 const needsPages = computed(() => userBook.value !== null && !userBook.value.total_pages)
 
@@ -50,8 +53,10 @@ async function load() {
 
   try {
     await library.load()
-    const found = library.find(props.id) ?? (await libraryApi.get(props.id))
+    const cached = library.find(props.id)
+    const found = cached ?? (await libraryApi.get(props.id))
     if (request === loadRequest) userBook.value = found
+    void loadReaderDocument(request, found, cached !== undefined)
   } catch (e) {
     if (request !== loadRequest) return
 
@@ -60,6 +65,18 @@ async function load() {
     } else {
       error.value = errorMessage(e)
     }
+  }
+}
+
+async function loadReaderDocument(request: number, found: UserBook, fetchIt: boolean) {
+  readerDocumentId.value = found.reader_document_id ?? null
+  if (!fetchIt) return
+
+  try {
+    const full = await libraryApi.get(props.id)
+    if (request === loadRequest) readerDocumentId.value = full?.reader_document_id ?? null
+  } catch {
+    // Only the "read EPUB" shortcut depends on this; the page works without it.
   }
 }
 
@@ -178,6 +195,14 @@ function isDisabled(target: BookStatus): boolean {
         </p>
       </div>
     </section>
+
+    <RouterLink
+      v-if="readerDocumentId !== null"
+      :to="{ name: 'reader-view', params: { id: readerDocumentId } }"
+      class="inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-surface px-4 font-semibold text-accent"
+    >
+      {{ $t('book.readEpub') }}
+    </RouterLink>
 
     <section v-if="userBook.total_pages && userBook.status !== 'want'" class="flex flex-col gap-2">
       <ProgressBar :percent="userBook.progress_percent" :label="$t('book.progress')" />

@@ -36,14 +36,20 @@ describe('readerApi', () => {
     vi.mocked(http.put).mockResolvedValue({ data: makeReaderDoc() })
     vi.mocked(http.delete).mockResolvedValue(null)
 
+    vi.mocked(http.patch).mockResolvedValue({ data: makeReaderDoc({ user_book_id: 7 }) })
+
     await readerApi.get(3)
     await readerApi.remove(3)
     await readerApi.savePosition(3, { chapter: 2, fraction: 0 })
     expect((await readerApi.chapter(3, 2)).index).toBe(2)
+    expect((await readerApi.link(3, 7)).user_book_id).toBe(7)
+    await readerApi.link(3, null)
 
     expect(http.get).toHaveBeenNthCalledWith(1, '/api/reader/3')
     expect(http.delete).toHaveBeenCalledWith('/api/reader/3')
     expect(http.put).toHaveBeenCalledWith('/api/reader/3/position', { chapter: 2, fraction: 0 })
+    expect(http.patch).toHaveBeenNthCalledWith(1, '/api/reader/3', { user_book_id: 7 })
+    expect(http.patch).toHaveBeenNthCalledWith(2, '/api/reader/3', { user_book_id: null })
     expect(http.get).toHaveBeenNthCalledWith(2, '/api/reader/3/chapters/2')
   })
 })

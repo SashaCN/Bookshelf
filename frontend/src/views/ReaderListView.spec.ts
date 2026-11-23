@@ -1,13 +1,20 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
+import { libraryApi } from '@/api/library'
 import { readerApi } from '@/api/reader'
+import { makeBook, makeUserBook } from '@/test/fixtures'
 import { makeReaderDoc } from '@/test/readerFixtures'
 import { createTestEnvironment } from '@/test/utils'
 import ReaderListView from './ReaderListView.vue'
 
 vi.mock('@/api/reader', () => ({
-  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), chapter: vi.fn() },
+  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), link: vi.fn(), chapter: vi.fn() },
+}))
+
+vi.mock('@/api/library', () => ({
+  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(), logs: vi.fn() },
+  catalogApi: { search: vi.fn() },
 }))
 
 async function mountView() {
@@ -33,6 +40,55 @@ function buttonWithText(wrapper: ReturnType<typeof mount>, text: string) {
 describe('ReaderListView', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(libraryApi.list).mockResolvedValue([
+      makeUserBook({ id: 4, book: makeBook({ title: 'Бета' }) }),
+      makeUserBook({ id: 5, book: makeBook({ title: 'Альфа' }) }),
+    ])
+  })
+
+  it('offers the library books and "no book" in a select, and links the picked one', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([makeReaderDoc({ id: 1 })])
+    vi.mocked(readerApi.link).mockResolvedValue(
+      makeReaderDoc({ id: 1, user_book_id: 5, user_book: { id: 5, title: 'Альфа' } }),
+    )
+    const wrapper = await mountView()
+
+    const select = wrapper.get('select')
+    expect(select.findAll('option').map((o) => o.text())).toEqual(['Без книги', 'Альфа', 'Бета'])
+    expect(wrapper.text()).toContain('Пов’язати з книгою')
+
+    await select.setValue('5')
+    await flushPromises()
+
+    expect(readerApi.link).toHaveBeenCalledWith(1, 5)
+    const link = wrapper.findAll('a').find((a) => a.text() === 'Альфа')
+    expect(link?.attributes('href')).toBe('/library/5')
+  })
+
+  it('unlinks with "no book"', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([
+      makeReaderDoc({ id: 1, user_book_id: 5, user_book: { id: 5, title: 'Альфа' } }),
+    ])
+    vi.mocked(readerApi.link).mockResolvedValue(makeReaderDoc({ id: 1 }))
+    const wrapper = await mountView()
+
+    expect((wrapper.get('select').element as HTMLSelectElement).value).toBe('5')
+    await wrapper.get('select').setValue('')
+    await flushPromises()
+
+    expect(readerApi.link).toHaveBeenCalledWith(1, null)
+    expect(wrapper.findAll('a').some((a) => a.attributes('href') === '/library/5')).toBe(false)
+  })
+
+  it('shows an error when linking fails', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([makeReaderDoc({ id: 1 })])
+    vi.mocked(readerApi.link).mockRejectedValue(new ApiError(422, { message: 'validation.invalid' }))
+    const wrapper = await mountView()
+
+    await wrapper.get('select').setValue('5')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
   })
 
   it('lists books with author and percent', async () => {

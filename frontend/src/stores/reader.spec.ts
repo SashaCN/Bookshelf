@@ -5,7 +5,7 @@ import { makeReaderDoc } from '@/test/readerFixtures'
 import { useReaderStore } from './reader'
 
 vi.mock('@/api/reader', () => ({
-  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), chapter: vi.fn() },
+  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), link: vi.fn(), chapter: vi.fn() },
 }))
 
 describe('reader store', () => {
@@ -22,6 +22,18 @@ describe('reader store', () => {
 
     expect(reader.loaded).toBe(true)
     expect(reader.items.map((item) => item.id)).toEqual([2, 1])
+  })
+
+  it('replaces a document with its re-linked copy', async () => {
+    vi.mocked(readerApi.list).mockResolvedValue([makeReaderDoc({ id: 1 })])
+    vi.mocked(readerApi.link).mockResolvedValue(makeReaderDoc({ id: 1, user_book_id: 5, user_book: { id: 5, title: 'Альфа' } }))
+    const reader = useReaderStore()
+    await reader.load()
+
+    await reader.link(1, 5)
+
+    expect(readerApi.link).toHaveBeenCalledWith(1, 5)
+    expect(reader.items[0].user_book?.title).toBe('Альфа')
   })
 
   it('puts an uploaded book first', async () => {

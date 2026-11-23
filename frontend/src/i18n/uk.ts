@@ -103,6 +103,7 @@ export default {
     addedByHand: 'додано вручну',
     progress: 'Прогрес читання',
     pagesOf: '{current} з {total} стор.',
+    readEpub: 'Читати EPUB',
     totalPages: 'Кількість сторінок',
     needsPages: 'Щоб почати читати, вкажіть кількість сторінок.',
     rating: 'Оцінка',
@@ -339,6 +340,11 @@ export default {
     larger: 'Збільшити шрифт',
     frameTitle: 'Текст розділу',
     toc: 'Зміст',
+    link: {
+      label: 'Пов’язати з книгою',
+      none: 'Без книги',
+      linkedTo: 'Книга в бібліотеці:',
+    },
   },
   apiErrors: {
     generic: 'Не вдалося виконати запит. Спробуйте ще раз.',

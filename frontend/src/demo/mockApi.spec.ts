@@ -146,6 +146,28 @@ describe('demo mock API', () => {
     await expect(socialApi.follow('demo_reader')).rejects.toMatchObject({ status: 422 })
   })
 
+  it('links a document to a library book and exposes it on the entry', async () => {
+    const [doc] = await readerApi.list()
+    const [entry] = await libraryApi.list()
+    expect(doc.user_book).toBeNull()
+    expect((await libraryApi.get(entry.id)).reader_document_id).toBeNull()
+    expect('reader_document_id' in entry).toBe(false)
+
+    const linked = await readerApi.link(doc.id, entry.id)
+    expect(linked).toMatchObject({ user_book_id: entry.id, user_book: { id: entry.id, title: entry.book.title } })
+    expect((await readerApi.list())[0].user_book?.id).toBe(entry.id)
+    expect((await libraryApi.get(entry.id)).reader_document_id).toBe(doc.id)
+
+    await expect(readerApi.link(doc.id, 99999)).rejects.toMatchObject({ status: 422 })
+
+    await libraryApi.remove(entry.id)
+    expect((await readerApi.get(doc.id)).user_book_id).toBeNull()
+
+    const [other] = await libraryApi.list()
+    expect((await readerApi.link(doc.id, other.id)).user_book_id).toBe(other.id)
+    expect((await readerApi.link(doc.id, null)).user_book).toBeNull()
+  })
+
   it('serves the sample document, saves the position and refuses uploads', async () => {
     const [doc] = await readerApi.list()
     expect(doc.chapters_count).toBe(3)

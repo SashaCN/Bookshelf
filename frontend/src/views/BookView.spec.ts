@@ -50,6 +50,23 @@ describe('BookView', () => {
     vi.mocked(quotesApi.list).mockResolvedValue({ data: [], links: { next: null } })
   })
 
+  it('offers to read the linked EPUB', async () => {
+    const entry = makeUserBook({ id: 3 })
+    vi.mocked(libraryApi.get).mockResolvedValue({ ...entry, reader_document_id: 9 })
+    const { wrapper } = await mountView(entry)
+
+    const link = wrapper.findAll('a').find((a) => a.text() === 'Читати EPUB')
+    expect(link?.attributes('href')).toBe('/reader/9')
+  })
+
+  it('has no EPUB button without a linked document', async () => {
+    const entry = makeUserBook({ id: 3 })
+    vi.mocked(libraryApi.get).mockResolvedValue({ ...entry, reader_document_id: null })
+    const { wrapper } = await mountView(entry)
+
+    expect(wrapper.text()).not.toContain('Читати EPUB')
+  })
+
   it('shows the book, its status and its progress', async () => {
     const { wrapper } = await mountView(
       makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'], current_page: 160, progress_percent: 50 }),

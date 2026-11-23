@@ -19,7 +19,7 @@ vi.mock('@/api/quotes', () => ({
 }))
 
 vi.mock('@/api/reader', () => ({
-  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), chapter: vi.fn() },
+  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), link: vi.fn(), chapter: vi.fn() },
 }))
 
 const reading = (id: number, title: string) =>

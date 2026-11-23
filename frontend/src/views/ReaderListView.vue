@@ -6,12 +6,14 @@ import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useLibraryStore } from '@/stores/library'
 import { useReaderStore } from '@/stores/reader'
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024
 
 const { t } = useI18n()
 const reader = useReaderStore()
+const library = useLibraryStore()
 const errorMessage = useApiErrorMessage()
 
 const error = ref('')
@@ -19,6 +21,7 @@ const uploadError = ref('')
 const uploading = ref(false)
 const confirmingId = ref<number | null>(null)
 const removingId = ref<number | null>(null)
+const linkingId = ref<number | null>(null)
 const input = ref<HTMLInputElement | null>(null)
 
 async function load() {
@@ -68,11 +71,36 @@ async function remove(id: number) {
   }
 }
 
+async function link(id: number, event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  uploadError.value = ''
+  linkingId.value = id
+  try {
+    await reader.link(id, value === '' ? null : Number(value))
+  } catch (e) {
+    uploadError.value = errorMessage(e)
+  } finally {
+    linkingId.value = null
+  }
+}
+
 function pick() {
   input.value?.click()
 }
 
-onMounted(load)
+// The library only feeds the pickers; the list is usable without it.
+async function loadLibrary() {
+  try {
+    await library.load()
+  } catch {
+    // The picker stays empty; the reader can retry by reopening the page.
+  }
+}
+
+onMounted(() => {
+  void load()
+  void loadLibrary()
+})
 </script>
 
 <template>
@@ -120,6 +148,26 @@ onMounted(load)
         <p class="mt-1 text-sm text-ink-muted">
           {{ $t('reader.chapter', { n: Math.min(doc.position.chapter + 1, doc.chapters_count), total: doc.chapters_count }) }}
         </p>
+
+        <div class="mt-3 flex flex-col gap-1">
+          <p v-if="doc.user_book" class="text-sm">
+            {{ $t('reader.link.linkedTo') }}
+            <RouterLink :to="{ name: 'book', params: { id: doc.user_book.id } }" class="font-medium text-accent underline">
+              {{ doc.user_book.title }}
+            </RouterLink>
+          </p>
+          <label :for="`link-${doc.id}`" class="text-sm text-ink-muted">{{ $t('reader.link.label') }}</label>
+          <select
+            :id="`link-${doc.id}`"
+            :value="doc.user_book_id ?? ''"
+            :disabled="linkingId === doc.id"
+            class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base disabled:opacity-60"
+            @change="link(doc.id, $event)"
+          >
+            <option value="">{{ $t('reader.link.none') }}</option>
+            <option v-for="item in library.byTitle" :key="item.id" :value="item.id">{{ item.book.title }}</option>
+          </select>
+        </div>
 
         <div class="mt-3 flex items-center gap-2">
           <template v-if="confirmingId === doc.id">
