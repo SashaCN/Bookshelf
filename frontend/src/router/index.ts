@@ -18,6 +18,12 @@ export const router = createRouter({
         { path: 'library', name: 'library', component: () => import('@/views/LibraryView.vue'), meta: { tab: 'library' } },
         { path: 'library/add', name: 'library-add', component: () => import('@/views/AddBookView.vue'), meta: { tab: 'library' } },
         {
+          path: 'library/import',
+          name: 'library-import',
+          component: () => import('@/views/LibraryImportView.vue'),
+          meta: { tab: 'library' },
+        },
+        {
           path: 'library/:id(\\d+)',
           name: 'book',
           component: () => import('@/views/BookView.vue'),

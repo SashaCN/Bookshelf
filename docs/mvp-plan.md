@@ -11,7 +11,7 @@
 ### Входить
 
 - Реєстрація і вхід (email + пароль), ізоляція даних між користувачами
-- Бібліотека: книга з Open Library або вручну; статуси «хочу» / «читаю» / «прочитано» / «відкладено»; оцінка 1–5
+- Бібліотека: книга з Open Library або вручну; статуси «хочу» / «читаю» / «прочитано» / «відкладено»; оцінка 1–5; імпорт з експорту Goodreads (CSV)
 - Прогрес: швидке оновлення поточної сторінки, прогрес-бари, журнал читання
 - Цитати та інсайти з прив'язкою до книги й сторінки, улюблені, картинка-картка для поширення
 - Статистика: сторінки по днях, серія днів поспіль, темп, прогноз завершення книги
@@ -246,6 +246,7 @@ erDiagram
 | GET | `/api/catalog/search?q=` | пошук в Open Library через наш бекенд |
 | GET | `/api/library?status=` | моя бібліотека |
 | POST | `/api/library` | додати книгу: `{openlibrary_work_key}` або ручні дані |
+| POST | `/api/library/import` | імпорт з Goodreads: `file` (CSV, до 2 МБ, до 2000 рядків), 5 на годину. Стовпці за назвою (`Title`, `Author`, `Additional Authors`, `ISBN13`, `My Rating`, `Number of Pages`, `Original Publication Year`, `Date Read`, `Exclusive Shelf`, `My Review`); полиці `read` / `currently-reading` / `to-read` стають `finished` / `reading` / `want` (без сторінок `reading` стає `want`); оцінка 0 = без оцінки, відгук приватний; книги ручні, без запитів до Open Library; уже наявні (той самий ISBN або назва + перший автор) пропускаються. Відповідь `{data: {imported, skipped_existing, skipped_invalid, errors: [{row, reason}]}}` (перші 20 помилок; кожен чанк у своїй транзакції); не той файл: 422 `library.import_invalid` |
 | GET / PATCH / DELETE | `/api/library/{userBook}` | деталі; зміна статусу, оцінки, відгуку (`review`, `review_visibility`), `total_pages`; видалення. Відгук лише для прочитаної чи кинутої книги, інакше 422 `library.review_not_finished` |
 | POST | `/api/library/{userBook}/progress` | `{page}`: оновити прогрес |
 | POST | `/api/library/{userBook}/reread` | перечитати прочитану книгу: завершений прохід архівується в `user_book_reads`, статус `reading`, сторінка 0. Не `finished` → 422 `library.reread_not_finished`. Деталі книги віддають `reads` і `times_read` |

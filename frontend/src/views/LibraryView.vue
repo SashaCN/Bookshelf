@@ -85,4 +85,8 @@ onMounted(() => load())
       {{ $t('library.add') }}
     </RouterLink>
   </EmptyState>
+
+  <RouterLink :to="{ name: 'library-import' }" class="mt-6 flex min-h-11 items-center justify-center text-sm font-medium text-accent underline">
+    {{ $t('library.import') }}
+  </RouterLink>
 </template>

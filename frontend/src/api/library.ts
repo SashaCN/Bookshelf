@@ -1,6 +1,7 @@
 import type {
   AddBookPayload,
   CatalogEntry,
+  GoodreadsImportResult,
   ProgressResult,
   ReadingLogsPage,
   UpdateBookPayload,
@@ -20,6 +21,11 @@ export const libraryApi = {
   reread: (id: number) =>
     http.post<{ data: UserBook }>(`/api/library/${id}/reread`).then((response) => response.data),
   logs: (id: number, page = 1) => http.get<ReadingLogsPage>(`/api/library/${id}/logs?page=${page}`),
+  importGoodreads: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return http.post<{ data: GoodreadsImportResult }>('/api/library/import', form).then((response) => response.data)
+  },
 }
 
 export const catalogApi = {

@@ -837,6 +837,13 @@ route('POST', '/api/library', (_p, _q, body) => {
   if (body.status && body.status !== 'want') changeStatus(entry, body.status as BookStatus)
   return ok(presentEntry(entry))
 })
+// The demo has no files to read: it always answers with the same summary.
+route('POST', '/api/library/import', () => ok({
+  imported: 12,
+  skipped_existing: 3,
+  skipped_invalid: 1,
+  errors: [{ row: 7, reason: 'unknown_shelf' }],
+}))
 route('GET', '/api/library/(\\d+)', ([id]) => {
   const entry = findEntry(Number(id))
   const linked = state.documents

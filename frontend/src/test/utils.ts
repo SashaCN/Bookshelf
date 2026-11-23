@@ -12,6 +12,7 @@ export function createTestRouter() {
       { path: '/', name: 'home', component: stub, meta: { tab: 'home' } },
       { path: '/library', name: 'library', component: stub, meta: { tab: 'library' } },
       { path: '/library/add', name: 'library-add', component: stub, meta: { tab: 'library' } },
+      { path: '/library/import', name: 'library-import', component: stub, meta: { tab: 'library' } },
       { path: '/library/:id', name: 'book', component: stub, meta: { tab: 'library' } },
       { path: '/quotes', name: 'quotes', component: stub, meta: { tab: 'quotes' } },
       { path: '/quotes/new', name: 'quote-new', component: stub, meta: { tab: 'quotes' } },

@@ -65,6 +65,14 @@ describe('LibraryView', () => {
     expect(wrapper.text()).not.toContain('Want One')
   })
 
+  it('links to the Goodreads import', async () => {
+    const { wrapper } = await mountView(library)
+
+    const link = wrapper.findAll('a').find((a) => a.text() === 'Імпорт з Goodreads')
+
+    expect(link?.attributes('href')).toBe('/library/import')
+  })
+
   it('names the status filter for screen readers', async () => {
     const { wrapper } = await mountView([])
 

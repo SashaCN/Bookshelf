@@ -37,6 +37,17 @@ describe('demo mock API', () => {
     await expect(libraryApi.progress(2, 100)).rejects.toBeInstanceOf(ApiError)
   })
 
+  it('answers a Goodreads import with a fixed summary', async () => {
+    const result = await libraryApi.importGoodreads(new File(['x'], 'export.csv'))
+
+    expect(result).toEqual({
+      imported: 12,
+      skipped_existing: 3,
+      skipped_invalid: 1,
+      errors: [{ row: 7, reason: 'unknown_shelf' }],
+    })
+  })
+
   it('starts a reread: archives the pass, resets the bookmark, refuses unfinished books', async () => {
     const before = await libraryApi.get(3)
     expect(before.status).toBe('finished')
