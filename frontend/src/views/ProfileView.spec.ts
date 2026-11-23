@@ -89,7 +89,7 @@ describe('ProfileView', () => {
     const { wrapper, router, auth } = mountView()
     const logout = vi.spyOn(auth, 'logout').mockResolvedValue()
 
-    await wrapper.get('button[type="button"]').trigger('click')
+    await wrapper.get('[data-test="logout"]').trigger('click')
     await flushPromises()
 
     expect(logout).toHaveBeenCalled()
@@ -101,20 +101,20 @@ describe('ProfileView', () => {
     vi.spyOn(auth, 'logout').mockRejectedValue(new ApiError(500, null))
     await router.isReady()
 
-    await wrapper.get('button[type="button"]').trigger('click')
+    await wrapper.get('[data-test="logout"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося')
     expect(router.currentRoute.value.name).not.toBe('login')
-    expect(wrapper.get('button[type="button"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-test="logout"]').attributes('disabled')).toBeUndefined()
   })
 
   it('logs out only once when tapped twice', async () => {
     const { wrapper, auth } = mountView()
     const logout = vi.spyOn(auth, 'logout').mockReturnValue(new Promise(() => undefined))
 
-    await wrapper.get('button[type="button"]').trigger('click')
-    await wrapper.get('button[type="button"]').trigger('click')
+    await wrapper.get('[data-test="logout"]').trigger('click')
+    await wrapper.get('[data-test="logout"]').trigger('click')
 
     expect(logout).toHaveBeenCalledTimes(1)
   })
@@ -269,6 +269,7 @@ describe('ProfileView', () => {
 
   describe('password change', () => {
     async function fill(wrapper: ReturnType<typeof mountView>['wrapper'], confirmation = 'new-password') {
+      await wrapper.get('[data-test="password-toggle"]').trigger('click')
       await wrapper.get('#profile-current-password').setValue('old-password')
       await wrapper.get('#profile-new-password').setValue('new-password')
       await wrapper.get('#profile-confirm-password').setValue(confirmation)
@@ -283,8 +284,29 @@ describe('ProfileView', () => {
       await fill(wrapper)
 
       expect(change).toHaveBeenCalledWith({ current_password: 'old-password', password: 'new-password', password_confirmation: 'new-password' })
-      expect((wrapper.get('#profile-current-password').element as HTMLInputElement).value).toBe('')
-      expect(wrapper.get('[data-test="password-form"] [role="status"]').text()).toContain('Пароль змінено')
+      expect(wrapper.get('[data-test="password-done"]').text()).toContain('Пароль змінено')
+    })
+
+    it('keeps the form collapsed until opened, toggles aria-expanded and collapses after success', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'changePassword').mockResolvedValue()
+      const toggle = wrapper.get('[data-test="password-toggle"]')
+
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.find('#profile-current-password').exists()).toBe(false)
+
+      await toggle.trigger('click')
+      expect(toggle.attributes('aria-expanded')).toBe('true')
+      expect(wrapper.find('#profile-current-password').exists()).toBe(true)
+
+      await toggle.trigger('click')
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.find('#profile-current-password').exists()).toBe(false)
+
+      await fill(wrapper)
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.find('[data-test="password-form"]').exists()).toBe(false)
+      expect(wrapper.get('[data-test="password-done"]').text()).toContain('Пароль змінено')
     })
 
     it('does not send mismatching passwords', async () => {
@@ -304,7 +326,7 @@ describe('ProfileView', () => {
       await fill(wrapper)
 
       expect(wrapper.get('#profile-current-password-error').text()).toBe('Поточний пароль невірний.')
-      expect(wrapper.find('[data-test="password-form"] [role="status"]').exists()).toBe(false)
+      expect(wrapper.find('[data-test="password-done"]').exists()).toBe(false)
     })
 
     it('shows a refused new password next to its field', async () => {
