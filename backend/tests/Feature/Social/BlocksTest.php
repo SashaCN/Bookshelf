@@ -198,3 +198,64 @@ describe('the list of blocked readers', function () {
         $this->actingAs($this->user)->getJson('/api/blocks?page=2')->assertJsonCount(2, 'data');
     });
 });
+
+describe('what the answers give away', function () {
+    beforeEach(function () {
+        // The way a real server answers: with debug on, an answer carries the exception and its trace.
+        config(['app.debug' => false]);
+    });
+
+    it('answers the same to a block of a reader who has blocked me as to a handle nobody has', function () {
+        $this->olena->blockedReaders()->attach($this->user->id);
+
+        $hidden = $this->actingAs($this->user)->putJson('/api/blocks/olena_k');
+        $missing = $this->actingAs($this->user)->putJson('/api/blocks/nobody_here');
+
+        expect($hidden->getStatusCode())->toBe(404)
+            ->and($missing->getStatusCode())->toBe(404)
+            ->and($hidden->json())->toBe($missing->json());
+        expect(DB::table('blocks')->where('user_id', $this->user->id)->count())->toBe(0);
+    });
+
+    it('answers the same to a profile of a reader who has blocked me as to a handle nobody has', function () {
+        $this->olena->blockedReaders()->attach($this->user->id);
+
+        $hidden = $this->actingAs($this->user)->getJson('/api/profiles/olena_k');
+        $missing = $this->actingAs($this->user)->getJson('/api/profiles/nobody_here');
+
+        expect($hidden->getStatusCode())->toBe($missing->getStatusCode())
+            ->and($hidden->json())->toBe($missing->json());
+    });
+
+    it('does not count the readers I am blocked with in the numbers of a profile', function () {
+        $friend = User::factory()->create();
+        $blockedByMe = User::factory()->create();
+        $blockedMe = User::factory()->create();
+        foreach ([$friend, $blockedByMe, $blockedMe] as $reader) {
+            $reader->following()->attach($this->olena->id);
+            $this->olena->following()->attach($reader->id);
+            Post::factory()->create(['user_id' => $reader->id]);
+        }
+        $this->user->blockedReaders()->attach($blockedByMe->id);
+        $blockedMe->blockedReaders()->attach($this->user->id);
+
+        $this->actingAs($this->user)->getJson('/api/profiles/olena_k')
+            ->assertOk()
+            ->assertJsonPath('data.followers_count', 1)
+            ->assertJsonPath('data.following_count', 1);
+
+        // The reader with the block sees the same profile with all three.
+        $this->actingAs($friend)->getJson('/api/profiles/olena_k')
+            ->assertJsonPath('data.followers_count', 3)
+            ->assertJsonPath('data.following_count', 3);
+    });
+
+    it('does not count the posts of a reader I am blocked with', function () {
+        $blockedByMe = User::factory()->create();
+        Post::factory()->count(2)->create(['user_id' => $this->olena->id]);
+        $this->user->blockedReaders()->attach($blockedByMe->id);
+
+        $this->actingAs($this->user)->getJson('/api/profiles/olena_k')->assertJsonPath('data.posts_count', 2);
+        $this->actingAs($this->user)->getJson('/api/profiles/'.$blockedByMe->handle)->assertOk()->assertJsonPath('data.posts_count', 0);
+    });
+});

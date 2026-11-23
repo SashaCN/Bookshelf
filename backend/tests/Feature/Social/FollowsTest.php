@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Social\BlockReader;
+use App\Actions\Social\FollowReader;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -126,5 +128,35 @@ describe('unfollowing', function () {
 
     it('answers 404 for a handle nobody has', function () {
         $this->actingAs($this->user)->deleteJson('/api/profiles/nobody_here/follow')->assertNotFound();
+    });
+});
+
+describe('two requests at the same moment', function () {
+    it('do not fail when both found "not following yet"', function () {
+        // Two requests that both passed the checks: the second insert meets the row of the first.
+        $action = new FollowReader;
+        $action->follow($this->user, $this->olena);
+        $action->follow(User::query()->findOrFail($this->user->id), User::query()->findOrFail($this->olena->id));
+
+        expect(DB::table('follows')->count())->toBe(1);
+    });
+
+    it('leave one follow and no error when the same request is sent twice in a row', function () {
+        $this->actingAs($this->user);
+
+        $this->putJson('/api/profiles/olena_k/follow')->assertOk();
+        $this->putJson('/api/profiles/olena_k/follow')->assertOk();
+        $this->deleteJson('/api/profiles/olena_k/follow')->assertOk();
+        $this->deleteJson('/api/profiles/olena_k/follow')->assertOk();
+
+        expect(DB::table('follows')->count())->toBe(0);
+    });
+
+    it('do not fail when two blocks arrive together', function () {
+        $action = new BlockReader;
+        $action->block($this->user, $this->olena);
+        $action->block(User::query()->findOrFail($this->user->id), User::query()->findOrFail($this->olena->id));
+
+        expect(DB::table('blocks')->count())->toBe(1);
     });
 });

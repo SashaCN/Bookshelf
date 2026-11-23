@@ -110,7 +110,7 @@ final class EpubArchive
 
         try {
             while (! feof($stream)) {
-                $chunk = fread($stream, 65536);
+                $chunk = $this->readChunk($stream);
 
                 if ($chunk === false) {
                     throw new EpubImportException(ReaderError::Invalid, "cannot read {$name}");
@@ -141,6 +141,24 @@ final class EpubArchive
         }
 
         return $data;
+    }
+
+    /**
+     * One piece of an entry, or false when it cannot be read. A damaged compressed entry makes fread() raise a warning
+     * ("Zlib error: data error") that the framework would turn into an exception and an answer of 500: it is the file
+     * that is bad, so the warning is taken here and reported as false.
+     *
+     * @param  resource  $stream
+     */
+    private function readChunk($stream): string|false
+    {
+        set_error_handler(static fn (): bool => true);
+
+        try {
+            return fread($stream, 65536);
+        } finally {
+            restore_error_handler();
+        }
     }
 
     public function close(): void
