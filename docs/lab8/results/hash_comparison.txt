@@ -1,0 +1,32 @@
+A: Bookshelf backend: 36500 occurrences, 2028 unique names
+  linear search: 742.7 probes on average
+  hash      buckets   load probes/search  probes/name  longest  empty %
+  sum            61  33.25       23.204       17.656       51      0.0
+  poly31         61  33.25       22.640       17.633       49      0.0
+  pjw            61  33.25       20.888       17.520       44      0.0
+  sum           509   3.98        3.741        3.056       11      1.4
+  poly31        509   3.98        3.656        3.025       11      1.8
+  pjw           509   3.98        3.407        2.964       10      1.4
+  sum          4093   0.50        2.034        1.737        8     72.5
+  poly31       4093   0.50        1.387        1.265        4     61.4
+  pjw          4093   0.50        1.360        1.242        4     60.8
+  sum          4096   0.50        2.034        1.737        8     72.6
+  poly31       4096   0.50        1.252        1.237        5     60.6
+  pjw          4096   0.50        1.976        1.769       11     71.5
+
+B: Laravel (5 packages): 69496 occurrences, 5273 unique names
+  linear search: 1313.3 probes on average
+  hash      buckets   load probes/search  probes/name  longest  empty %
+  sum            61  86.44       64.046       44.150      111      0.0
+  poly31         61  86.44       66.888       44.214      107      0.0
+  pjw            61  86.44       66.500       44.224      105      0.0
+  sum           509  10.36        8.384        6.252       24      0.0
+  poly31        509  10.36        9.007        6.206       24      0.0
+  pjw           509  10.36        8.880        6.180       23      0.0
+  sum          4093   1.29        2.500        2.264       12     47.8
+  poly31       4093   1.29        1.953        1.652        7     27.6
+  pjw          4093   1.29        1.908        1.651        6     28.2
+  sum          4096   1.29        2.501        2.266       12     47.8
+  poly31       4096   1.29        1.843        1.633        6     27.7
+  pjw          4096   1.29        4.172        2.619       15     52.5
+

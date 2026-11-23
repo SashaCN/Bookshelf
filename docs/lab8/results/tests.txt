@@ -1,0 +1,204 @@
+ok     1  Hash functions             sum('ab') = 97 + 98
+ok     2  Hash functions             poly31('ab') = 97 * 31 + 98
+ok     3  Hash functions             pjw('a') = 97
+ok     4  Hash functions             pjw('ab') = (97 << 4) + 98
+ok     5  Hash functions             sum gives the same value for the anagrams abc and cba
+ok     6  Hash functions             poly31 gives different values for abc and cba
+ok     7  Hash functions             the bucket is always in 0..M-1 (3 functions, 4 keys, long and empty keys too)
+ok     8  Hash functions             an unknown hash function is refused
+ok     9  Chain table (the core)     find returns the id of an added key
+ok    10  Chain table (the core)     find of a missing key is null
+ok    11  Chain table (the core)     the newest record with the same key is found first
+ok    12  Chain table (the core)     after deleting the newest record the older one is found again
+ok    13  Chain table (the core)     has() of a deleted id is false
+ok    14  Chain table (the core)     write and read of an attribute
+ok    15  Chain table (the core)     reorganize: 100 records in 4 buckets, then in 61: the average chain is shorter
+ok    16  Chain table (the core)     reorganize does not change the ids
+ok    17  Chain table (the core)     reorganize keeps all records
+ok    18  Chain table (the core)     delete from the middle of a chain keeps the other records reachable
+ok    19  Chain table (the core)     delete of an unknown id is refused
+ok    20  Chain table (the core)     nextPrime(60) = 61
+ok    21  Type table                 18 built-in types
+ok    22  Type table                 find int
+ok    23  Type table                 find is not case-sensitive: INT
+ok    24  Type table                 find of an unknown type is null
+ok    25  Type table                 size of int is 8 bytes
+ok    26  Type table                 size of bool is 1 byte
+ok    27  Type table                 string has no fixed size
+ok    28  Type table                 resource cannot be written in a declaration
+ok    29  Type table                 kind of array is compound
+ok    30  Type table                 binary search: at most 5 probes per name for 18 types
+ok    31  Type table                 names() are sorted
+ok    32  Type table                 a new class gets the next id (after 18 built-in types and Shape)
+ok    33  Type table                 the new class is found
+ok    34  Type table                 the parent of Circle is Shape
+ok    35  Type table                 the same type declared twice is refused
+ok    36  Type table                 int is accepted where float is required
+ok    37  Type table                 float is not accepted where int is required
+ok    38  Type table                 anything is accepted where mixed is required
+ok    39  Type table                 a class is accepted where its parent is required
+ok    40  Type table                 a parent is not accepted where its child is required
+ok    41  Type table                 array is accepted where iterable is required
+ok    42  Type table                 a class is accepted where object is required
+ok    43  Type table                 acceptsAny for the union string|false
+ok    44  Type table                 a built-in type cannot be deleted
+ok    45  Type table                 a deleted user type is not found
+ok    46  Type table                 other types are still found after the delete
+ok    47  Type table                 reorganize keeps the search working
+ok    48  Constant table             17 predefined constants
+ok    49  Constant table             PHP_INT_MAX has the real value
+ok    50  Constant table             E_ALL has the real value
+ok    51  Constant table             type of M_PI is float
+ok    52  Constant table             type of PHP_EOL is string
+ok    53  Constant table             TRUE is found (true, false, null are not case-sensitive)
+ok    54  Constant table             php_int_max in the wrong case is not found
+ok    55  Constant table             the same literal is stored once
+ok    56  Constant table             the string "42" is another literal than the number 42
+ok    57  Constant table             type of the literal 1.5 is float
+ok    58  Constant table             a literal is not found as a named constant
+ok    59  Constant table             a user constant is found and has the value
+ok    60  Constant table             a constant defined twice is refused
+ok    61  Constant table             a predefined constant is read-only
+ok    62  Constant table             a predefined constant cannot be deleted
+ok    63  Constant table             a deleted user constant is not found
+ok    64  Constant table             reorganize keeps the ids
+ok    65  Operation table            70 operations
+ok    66  Operation table            ** is right-associative
+ok    67  Operation table            + is left-associative
+ok    68  Operation table            < is non-associative
+ok    69  Operation table            ?? is right-associative
+ok    70  Operation table            - has two forms: binary has arity 2
+ok    71  Operation table            - has two forms: unary has arity 1
+ok    72  Operation table            ++ prefix and postfix are different records
+ok    73  Operation table            the ternary operator has arity 3
+ok    74  Operation table            an unknown operator is not found
+ok    75  Operation table            a lexeme with a wrong form is not found: * as prefix
+ok    76  Operation table            code generator of + is gen_add
+ok    77  Operation table            result type of < is bool
+ok    78  Operation table            result type of + depends on the operands
+ok    79  Operation table            the precedence follows the PHP manual: ** * + << . < == & ^ | && || ?? = and xor or
+ok    80  Operation table            * binds tighter than +
+ok    81  Operation table            + does not bind tighter than *
+ok    82  Operation table            + binds tighter than . (PHP 8)
+ok    83  Operation table            a - b - c: the left - binds first
+ok    84  Operation table            a = b = c: the left = does not bind first
+ok    85  Operation table            ! binds tighter than *
+ok    86  Operation table            = binds tighter than and
+ok    87  Operation table            + accepts (int, float)
+ok    88  Operation table            + does not accept (string, int)
+ok    89  Operation table            . accepts (string, int)
+ok    90  Operation table            % does not accept a float
+ok    91  Operation table            ! accepts an array
+ok    92  Operation table            an operator with a wrong number of operands is refused
+ok    93  Operation table            the average search takes less than 2 probes
+ok    94  Operation table            the table is less than half full
+ok    95  Identifier table           25 keywords after the initialization
+ok    96  Identifier table           class is a keyword
+ok    97  Identifier table           keywords are not case-sensitive: FUNCTION
+ok    98  Identifier table           foo is not a keyword
+ok    99  Identifier table           group of the keyword goto is control
+ok   100  Identifier table           a declared variable is found
+ok   101  Identifier table           the type attribute is a pointer to the type table
+ok   102  Identifier table           the slot of the first variable is 0
+ok   103  Identifier table           the slot of the second variable is 1
+ok   104  Identifier table           a second declaration in the same scope is refused
+ok   105  Identifier table           write and read of an attribute
+ok   106  Identifier table           a keyword is read-only
+ok   107  Identifier table           a class cannot be named like a keyword
+ok   108  Identifier table           a variable of the outer scope is not visible in a function
+ok   109  Identifier table           a keyword is visible in a function
+ok   110  Identifier table           the same name in the function is a new record
+ok   111  Identifier table           the slot of a variable in a new scope starts from 0
+ok   112  Identifier table           a function declared inside a function goes to the global scope
+ok   113  Identifier table           depth of the scope is 1
+ok   114  Identifier table           exitScope returns the names that were deleted
+ok   115  Identifier table           after the exit the outer $x is visible again
+ok   116  Identifier table           the function declared inside survives the exit
+ok   117  Identifier table           the global scope cannot be closed
+ok   118  Identifier table           nested scopes: after both exits the table has the same size
+ok   119  Identifier table           reorganize: 300 records in 3 buckets, then in a bigger table: shorter chains
+ok   120  Identifier table           reorganize keeps the records reachable
+ok   121  Label table                a forward goto: the label is unknown yet
+ok   122  Label table                a second forward goto to the same label
+ok   123  Label table                the label is created as undefined
+ok   124  Label table                define returns the instructions to fix up
+ok   125  Label table                patch puts the address into the saved instructions
+ok   126  Label table                a backward goto gets the address at once
+ok   127  Label table                attribute addr of the label
+ok   128  Label table                attribute line of the label
+ok   129  Label table                a label defined twice is refused
+ok   130  Label table                a label that is not in the table is not found
+ok   131  Label table                reorganize sorts the labels by name
+ok   132  Label table                a closure has its own labels: the outer label is not visible
+ok   133  Label table                closing the closure reports its undefined label
+ok   134  Label table                the outer labels are back after the closure
+ok   135  Label table                closing the function reports the undefined label of the function
+ok   136  Label table                after the close the table is empty
+ok   137  Label table                write of an attribute: the address of a generated label
+ok   138  Label table                kind of a generated label
+ok   139  Procedure table            8 built-in functions
+ok   140  Procedure table            find is not case-sensitive: STRLEN
+ok   141  Procedure table            find of an unknown function is null
+ok   142  Procedure table            strlen has 1 parameter
+ok   143  Procedure table            strlen returns int
+ok   144  Procedure table            origin of strlen is builtin
+ok   145  Procedure table            count takes 1 to 2 arguments
+ok   146  Procedure table            sprintf has no upper limit (variadic)
+ok   147  Procedure table            array_map needs at least 2 arguments
+ok   148  Procedure table            json_encode returns string|false (two types)
+ok   149  Procedure table            call strlen(string) is correct
+ok   150  Procedure table            call strlen(int): the type is wrong
+ok   151  Procedure table            call strlen(): too few arguments
+ok   152  Procedure table            call strlen(string, string): too many arguments
+ok   153  Procedure table            call sprintf(string, int, float, bool) is correct (variadic mixed)
+ok   154  Procedure table            call intdiv(int, int) is correct
+ok   155  Procedure table            call intdiv(float, int): the first type is wrong
+ok   156  Procedure table            call array_map(null, array) is correct (callable|null)
+ok   157  Procedure table            an argument of an unknown type (mixed) is not checked
+ok   158  Procedure table            a user function is found and has the address
+ok   159  Procedure table            a function with a return type is a function
+ok   160  Procedure table            the link to the identifier table is kept
+ok   161  Procedure table            a function that returns void is a procedure
+ok   162  Procedure table            a function declared twice is refused
+ok   163  Procedure table            a built-in function is read-only
+ok   164  Procedure table            write of the address of a user function
+ok   165  Procedure table            a deleted function is not found
+ok   166  Procedure table            a built-in function cannot be deleted
+ok   167  Procedure table            reorganize keeps the search working
+ok   168  Scanner (all tables together) the sample has no errors
+ok   169  Scanner (all tables together) 3 user types are added
+ok   170  Scanner (all tables together) Circle extends Base
+ok   171  Scanner (all tables together) Circle has 4 members (property, constructor and 2 methods)
+ok   172  Scanner (all tables together) LIMIT is a constant of type int with the value 10
+ok   173  Scanner (all tables together) the literal 0 is stored once although it is written 3 times
+ok   174  Scanner (all tables together) function total: 1 to 2 arguments, returns int
+ok   175  Scanner (all tables together) the closure is deleted from the procedure table at the end of its body
+ok   176  Scanner (all tables together) the method Circle::area is in the procedure table
+ok   177  Scanner (all tables together) the identifier of total points to its procedure and back
+ok   178  Scanner (all tables together) the local variables of total are deleted
+ok   179  Scanner (all tables together) a global variable of the top-level code is kept
+ok   180  Scanner (all tables together) forward goto: the jump at address 13 is fixed up to the label at 17
+ok   181  Scanner (all tables together) the label table is empty at the end
+ok   182  Scanner (all tables together) the first exit is the interface Shape with its method
+ok   183  Scanner (all tables together) the operator ** (right, level 23) was met once
+ok   184  Scanner (all tables together) the language constant M_PI was used once
+ok   185  Scanner (all tables together) error: goto to a label that does not exist
+ok   186  Scanner (all tables together) error: a variable that has no value yet
+ok   187  Scanner (all tables together) error: a function declared twice
+ok   188  Scanner (all tables together) error: a call with a wrong argument type
+ok   189  Scanner (all tables together) error: a call with too many arguments
+ok   190  Scanner (all tables together) error: an unknown type
+ok   191  Scanner (all tables together) error: a constant defined twice
+ok   192  Scanner (all tables together) a label that is defined before the goto (backward jump) has no error
+
+Hash functions                  8 checks,  8 passed
+Chain table (the core)         12 checks, 12 passed
+Type table                     27 checks, 27 passed
+Constant table                 17 checks, 17 passed
+Operation table                30 checks, 30 passed
+Identifier table               26 checks, 26 passed
+Label table                    18 checks, 18 passed
+Procedure table                29 checks, 29 passed
+Scanner (all tables together)  25 checks, 25 passed
+
+Total: 192 checks, 192 passed, 0 failed

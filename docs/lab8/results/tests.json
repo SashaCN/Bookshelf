@@ -1,0 +1,1350 @@
+{
+    "total": 192,
+    "failed": 0,
+    "checks": [
+        {
+            "table": "Hash functions",
+            "case": "sum('ab') = 97 + 98",
+            "expected": "195",
+            "actual": "195",
+            "ok": true
+        },
+        {
+            "table": "Hash functions",
+            "case": "poly31('ab') = 97 * 31 + 98",
+            "expected": "3105",
+            "actual": "3105",
+            "ok": true
+        },
+        {
+            "table": "Hash functions",
+            "case": "pjw('a') = 97",
+            "expected": "97",
+            "actual": "97",
+            "ok": true
+        },
+        {
+            "table": "Hash functions",
+            "case": "pjw('ab') = (97 << 4) + 98",
+            "expected": "1650",
+            "actual": "1650",
+            "ok": true
+        },
+        {
+            "table": "Hash functions",
+            "case": "sum gives the same value for the anagrams abc and cba",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Hash functions",
+            "case": "poly31 gives different values for abc and cba",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Hash functions",
+            "case": "the bucket is always in 0..M-1 (3 functions, 4 keys, long and empty keys too)",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Hash functions",
+            "case": "an unknown hash function is refused",
+            "expected": "'InvalidArgumentException'",
+            "actual": "'InvalidArgumentException'",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "find returns the id of an added key",
+            "expected": "0",
+            "actual": "0",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "find of a missing key is null",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "the newest record with the same key is found first",
+            "expected": "2",
+            "actual": "2",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "after deleting the newest record the older one is found again",
+            "expected": "0",
+            "actual": "0",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "has() of a deleted id is false",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "write and read of an attribute",
+            "expected": "20",
+            "actual": "20",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "reorganize: 100 records in 4 buckets, then in 61: the average chain is shorter",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "reorganize does not change the ids",
+            "expected": "57",
+            "actual": "57",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "reorganize keeps all records",
+            "expected": "100",
+            "actual": "100",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "delete from the middle of a chain keeps the other records reachable",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "delete of an unknown id is refused",
+            "expected": "'OutOfBoundsException'",
+            "actual": "'OutOfBoundsException'",
+            "ok": true
+        },
+        {
+            "table": "Chain table (the core)",
+            "case": "nextPrime(60) = 61",
+            "expected": "61",
+            "actual": "61",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "18 built-in types",
+            "expected": "18",
+            "actual": "18",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "find int",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "find is not case-sensitive: INT",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "find of an unknown type is null",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "size of int is 8 bytes",
+            "expected": "8",
+            "actual": "8",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "size of bool is 1 byte",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "string has no fixed size",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "resource cannot be written in a declaration",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "kind of array is compound",
+            "expected": "'compound'",
+            "actual": "'compound'",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "binary search: at most 5 probes per name for 18 types",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "names() are sorted",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "a new class gets the next id (after 18 built-in types and Shape)",
+            "expected": "19",
+            "actual": "19",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "the new class is found",
+            "expected": "19",
+            "actual": "19",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "the parent of Circle is Shape",
+            "expected": "18",
+            "actual": "18",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "the same type declared twice is refused",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "int is accepted where float is required",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "float is not accepted where int is required",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "anything is accepted where mixed is required",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "a class is accepted where its parent is required",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "a parent is not accepted where its child is required",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "array is accepted where iterable is required",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "a class is accepted where object is required",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "acceptsAny for the union string|false",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "a built-in type cannot be deleted",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "a deleted user type is not found",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "other types are still found after the delete",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Type table",
+            "case": "reorganize keeps the search working",
+            "expected": "18",
+            "actual": "18",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "17 predefined constants",
+            "expected": "17",
+            "actual": "17",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "PHP_INT_MAX has the real value",
+            "expected": "9223372036854775807",
+            "actual": "9223372036854775807",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "E_ALL has the real value",
+            "expected": "30719",
+            "actual": "30719",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "type of M_PI is float",
+            "expected": "2",
+            "actual": "2",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "type of PHP_EOL is string",
+            "expected": "3",
+            "actual": "3",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "TRUE is found (true, false, null are not case-sensitive)",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "php_int_max in the wrong case is not found",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "the same literal is stored once",
+            "expected": "17",
+            "actual": "17",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "the string \"42\" is another literal than the number 42",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "type of the literal 1.5 is float",
+            "expected": "2",
+            "actual": "2",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "a literal is not found as a named constant",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "a user constant is found and has the value",
+            "expected": "10",
+            "actual": "10",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "a constant defined twice is refused",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "a predefined constant is read-only",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "a predefined constant cannot be deleted",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "a deleted user constant is not found",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Constant table",
+            "case": "reorganize keeps the ids",
+            "expected": "5",
+            "actual": "5",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "70 operations",
+            "expected": "70",
+            "actual": "70",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "** is right-associative",
+            "expected": "'right'",
+            "actual": "'right'",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "+ is left-associative",
+            "expected": "'left'",
+            "actual": "'left'",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "< is non-associative",
+            "expected": "'none'",
+            "actual": "'none'",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "?? is right-associative",
+            "expected": "'right'",
+            "actual": "'right'",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "- has two forms: binary has arity 2",
+            "expected": "2",
+            "actual": "2",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "- has two forms: unary has arity 1",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "++ prefix and postfix are different records",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "the ternary operator has arity 3",
+            "expected": "3",
+            "actual": "3",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "an unknown operator is not found",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "a lexeme with a wrong form is not found: * as prefix",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "code generator of + is gen_add",
+            "expected": "'gen_add'",
+            "actual": "'gen_add'",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "result type of < is bool",
+            "expected": "0",
+            "actual": "0",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "result type of + depends on the operands",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "the precedence follows the PHP manual: ** * + << . < == & ^ | && || ?? = and xor or",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "* binds tighter than +",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "+ does not bind tighter than *",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "+ binds tighter than . (PHP 8)",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "a - b - c: the left - binds first",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "a = b = c: the left = does not bind first",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "! binds tighter than *",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "= binds tighter than and",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "+ accepts (int, float)",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "+ does not accept (string, int)",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": ". accepts (string, int)",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "% does not accept a float",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "! accepts an array",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "an operator with a wrong number of operands is refused",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "the average search takes less than 2 probes",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Operation table",
+            "case": "the table is less than half full",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "25 keywords after the initialization",
+            "expected": "25",
+            "actual": "25",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "class is a keyword",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "keywords are not case-sensitive: FUNCTION",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "foo is not a keyword",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "group of the keyword goto is control",
+            "expected": "'control'",
+            "actual": "'control'",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "a declared variable is found",
+            "expected": "25",
+            "actual": "25",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "the type attribute is a pointer to the type table",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "the slot of the first variable is 0",
+            "expected": "0",
+            "actual": "0",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "the slot of the second variable is 1",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "a second declaration in the same scope is refused",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "write and read of an attribute",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "a keyword is read-only",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "a class cannot be named like a keyword",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "a variable of the outer scope is not visible in a function",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "a keyword is visible in a function",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "the same name in the function is a new record",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "the slot of a variable in a new scope starts from 0",
+            "expected": "0",
+            "actual": "0",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "a function declared inside a function goes to the global scope",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "depth of the scope is 1",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "exitScope returns the names that were deleted",
+            "expected": "[\"$x\"]",
+            "actual": "[\"$x\"]",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "after the exit the outer $x is visible again",
+            "expected": "25",
+            "actual": "25",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "the function declared inside survives the exit",
+            "expected": "28",
+            "actual": "28",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "the global scope cannot be closed",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "nested scopes: after both exits the table has the same size",
+            "expected": "28",
+            "actual": "28",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "reorganize: 300 records in 3 buckets, then in a bigger table: shorter chains",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Identifier table",
+            "case": "reorganize keeps the records reachable",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "a forward goto: the label is unknown yet",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "a second forward goto to the same label",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "the label is created as undefined",
+            "expected": "false",
+            "actual": "false",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "define returns the instructions to fix up",
+            "expected": "[5,9]",
+            "actual": "[5,9]",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "patch puts the address into the saved instructions",
+            "expected": "[20,20]",
+            "actual": "[20,20]",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "a backward goto gets the address at once",
+            "expected": "20",
+            "actual": "20",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "attribute addr of the label",
+            "expected": "20",
+            "actual": "20",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "attribute line of the label",
+            "expected": "7",
+            "actual": "7",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "a label defined twice is refused",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "a label that is not in the table is not found",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "reorganize sorts the labels by name",
+            "expected": "[\"alpha\",\"end\",\"lost\"]",
+            "actual": "[\"alpha\",\"end\",\"lost\"]",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "a closure has its own labels: the outer label is not visible",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "closing the closure reports its undefined label",
+            "expected": "[\"inner\"]",
+            "actual": "[\"inner\"]",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "the outer labels are back after the closure",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "closing the function reports the undefined label of the function",
+            "expected": "[\"lost\"]",
+            "actual": "[\"lost\"]",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "after the close the table is empty",
+            "expected": "0",
+            "actual": "0",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "write of an attribute: the address of a generated label",
+            "expected": "4",
+            "actual": "4",
+            "ok": true
+        },
+        {
+            "table": "Label table",
+            "case": "kind of a generated label",
+            "expected": "'generated'",
+            "actual": "'generated'",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "8 built-in functions",
+            "expected": "8",
+            "actual": "8",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "find is not case-sensitive: STRLEN",
+            "expected": "0",
+            "actual": "0",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "find of an unknown function is null",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "strlen has 1 parameter",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "strlen returns int",
+            "expected": "[1]",
+            "actual": "[1]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "origin of strlen is builtin",
+            "expected": "'builtin'",
+            "actual": "'builtin'",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "count takes 1 to 2 arguments",
+            "expected": "[1,2]",
+            "actual": "[1,2]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "sprintf has no upper limit (variadic)",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "array_map needs at least 2 arguments",
+            "expected": "2",
+            "actual": "2",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "json_encode returns string|false (two types)",
+            "expected": "[3,12]",
+            "actual": "[3,12]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "call strlen(string) is correct",
+            "expected": "[]",
+            "actual": "[]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "call strlen(int): the type is wrong",
+            "expected": "[\"argument 1 of strlen(): int is not accepted\"]",
+            "actual": "[\"argument 1 of strlen(): int is not accepted\"]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "call strlen(): too few arguments",
+            "expected": "[\"strlen() needs at least 1 arguments, 0 given\"]",
+            "actual": "[\"strlen() needs at least 1 arguments, 0 given\"]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "call strlen(string, string): too many arguments",
+            "expected": "[\"strlen() takes at most 1 arguments, 2 given\"]",
+            "actual": "[\"strlen() takes at most 1 arguments, 2 given\"]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "call sprintf(string, int, float, bool) is correct (variadic mixed)",
+            "expected": "[]",
+            "actual": "[]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "call intdiv(int, int) is correct",
+            "expected": "[]",
+            "actual": "[]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "call intdiv(float, int): the first type is wrong",
+            "expected": "[\"argument 1 of intdiv(): float is not accepted\"]",
+            "actual": "[\"argument 1 of intdiv(): float is not accepted\"]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "call array_map(null, array) is correct (callable|null)",
+            "expected": "[]",
+            "actual": "[]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "an argument of an unknown type (mixed) is not checked",
+            "expected": "[]",
+            "actual": "[]",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "a user function is found and has the address",
+            "expected": "10",
+            "actual": "10",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "a function with a return type is a function",
+            "expected": "'function'",
+            "actual": "'function'",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "the link to the identifier table is kept",
+            "expected": "7",
+            "actual": "7",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "a function that returns void is a procedure",
+            "expected": "'procedure'",
+            "actual": "'procedure'",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "a function declared twice is refused",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "a built-in function is read-only",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "write of the address of a user function",
+            "expected": "55",
+            "actual": "55",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "a deleted function is not found",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "a built-in function cannot be deleted",
+            "expected": "'LogicException'",
+            "actual": "'LogicException'",
+            "ok": true
+        },
+        {
+            "table": "Procedure table",
+            "case": "reorganize keeps the search working",
+            "expected": "8",
+            "actual": "8",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the sample has no errors",
+            "expected": "[]",
+            "actual": "[]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "3 user types are added",
+            "expected": "21",
+            "actual": "21",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "Circle extends Base",
+            "expected": "19",
+            "actual": "19",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "Circle has 4 members (property, constructor and 2 methods)",
+            "expected": "4",
+            "actual": "4",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "LIMIT is a constant of type int with the value 10",
+            "expected": "[10,1]",
+            "actual": "[10,1]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the literal 0 is stored once although it is written 3 times",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "function total: 1 to 2 arguments, returns int",
+            "expected": "[1,2,[1]]",
+            "actual": "[1,2,[1]]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the closure is deleted from the procedure table at the end of its body",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the method Circle::area is in the procedure table",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the identifier of total points to its procedure and back",
+            "expected": "13",
+            "actual": "13",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the local variables of total are deleted",
+            "expected": "NULL",
+            "actual": "NULL",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "a global variable of the top-level code is kept",
+            "expected": "true",
+            "actual": "true",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "forward goto: the jump at address 13 is fixed up to the label at 17",
+            "expected": "17",
+            "actual": "17",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the label table is empty at the end",
+            "expected": "0",
+            "actual": "0",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the first exit is the interface Shape with its method",
+            "expected": "[\"class Shape\",[\"area\"]]",
+            "actual": "[\"class Shape\",[\"area\"]]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the operator ** (right, level 23) was met once",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "the language constant M_PI was used once",
+            "expected": "1",
+            "actual": "1",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "error: goto to a label that does not exist",
+            "expected": "[\"label missing is used but never defined (in f)\"]",
+            "actual": "[\"label missing is used but never defined (in f)\"]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "error: a variable that has no value yet",
+            "expected": "[\"variable $x is used before it gets a value (line 1)\"]",
+            "actual": "[\"variable $x is used before it gets a value (line 1)\"]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "error: a function declared twice",
+            "expected": "[\"Function F is already declared (line 1)\"]",
+            "actual": "[\"Function F is already declared (line 1)\"]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "error: a call with a wrong argument type",
+            "expected": "[\"argument 1 of strlen(): int is not accepted (line 1)\"]",
+            "actual": "[\"argument 1 of strlen(): int is not accepted (line 1)\"]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "error: a call with too many arguments",
+            "expected": "[\"intdiv() takes at most 2 arguments, 3 given (line 1)\"]",
+            "actual": "[\"intdiv() takes at most 2 arguments, 3 given (line 1)\"]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "error: an unknown type",
+            "expected": "[\"unknown type Decimal (line 1)\"]",
+            "actual": "[\"unknown type Decimal (line 1)\"]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "error: a constant defined twice",
+            "expected": "[\"Constant A is already defined (line 1)\"]",
+            "actual": "[\"Constant A is already defined (line 1)\"]",
+            "ok": true
+        },
+        {
+            "table": "Scanner (all tables together)",
+            "case": "a label that is defined before the goto (backward jump) has no error",
+            "expected": "[]",
+            "actual": "[]",
+            "ok": true
+        }
+    ]
+}

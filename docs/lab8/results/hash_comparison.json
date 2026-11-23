@@ -1,0 +1,232 @@
+{
+    "A: Bookshelf backend": {
+        "occurrences": 36500,
+        "unique": 2028,
+        "linear": 742.7,
+        "tables": [
+            {
+                "hash": "sum",
+                "buckets": 61,
+                "load": 33.25,
+                "avg_probes": 23.204,
+                "avg_unique": 17.656,
+                "longest": 51,
+                "empty_pct": 0
+            },
+            {
+                "hash": "poly31",
+                "buckets": 61,
+                "load": 33.25,
+                "avg_probes": 22.64,
+                "avg_unique": 17.633,
+                "longest": 49,
+                "empty_pct": 0
+            },
+            {
+                "hash": "pjw",
+                "buckets": 61,
+                "load": 33.25,
+                "avg_probes": 20.888,
+                "avg_unique": 17.52,
+                "longest": 44,
+                "empty_pct": 0
+            },
+            {
+                "hash": "sum",
+                "buckets": 509,
+                "load": 3.98,
+                "avg_probes": 3.741,
+                "avg_unique": 3.056,
+                "longest": 11,
+                "empty_pct": 1.4
+            },
+            {
+                "hash": "poly31",
+                "buckets": 509,
+                "load": 3.98,
+                "avg_probes": 3.656,
+                "avg_unique": 3.025,
+                "longest": 11,
+                "empty_pct": 1.8
+            },
+            {
+                "hash": "pjw",
+                "buckets": 509,
+                "load": 3.98,
+                "avg_probes": 3.407,
+                "avg_unique": 2.964,
+                "longest": 10,
+                "empty_pct": 1.4
+            },
+            {
+                "hash": "sum",
+                "buckets": 4093,
+                "load": 0.5,
+                "avg_probes": 2.034,
+                "avg_unique": 1.737,
+                "longest": 8,
+                "empty_pct": 72.5
+            },
+            {
+                "hash": "poly31",
+                "buckets": 4093,
+                "load": 0.5,
+                "avg_probes": 1.387,
+                "avg_unique": 1.265,
+                "longest": 4,
+                "empty_pct": 61.4
+            },
+            {
+                "hash": "pjw",
+                "buckets": 4093,
+                "load": 0.5,
+                "avg_probes": 1.36,
+                "avg_unique": 1.242,
+                "longest": 4,
+                "empty_pct": 60.8
+            },
+            {
+                "hash": "sum",
+                "buckets": 4096,
+                "load": 0.5,
+                "avg_probes": 2.034,
+                "avg_unique": 1.737,
+                "longest": 8,
+                "empty_pct": 72.6
+            },
+            {
+                "hash": "poly31",
+                "buckets": 4096,
+                "load": 0.5,
+                "avg_probes": 1.252,
+                "avg_unique": 1.237,
+                "longest": 5,
+                "empty_pct": 60.6
+            },
+            {
+                "hash": "pjw",
+                "buckets": 4096,
+                "load": 0.5,
+                "avg_probes": 1.976,
+                "avg_unique": 1.769,
+                "longest": 11,
+                "empty_pct": 71.5
+            }
+        ]
+    },
+    "B: Laravel (5 packages)": {
+        "occurrences": 69496,
+        "unique": 5273,
+        "linear": 1313.3,
+        "tables": [
+            {
+                "hash": "sum",
+                "buckets": 61,
+                "load": 86.44,
+                "avg_probes": 64.046,
+                "avg_unique": 44.15,
+                "longest": 111,
+                "empty_pct": 0
+            },
+            {
+                "hash": "poly31",
+                "buckets": 61,
+                "load": 86.44,
+                "avg_probes": 66.888,
+                "avg_unique": 44.214,
+                "longest": 107,
+                "empty_pct": 0
+            },
+            {
+                "hash": "pjw",
+                "buckets": 61,
+                "load": 86.44,
+                "avg_probes": 66.5,
+                "avg_unique": 44.224,
+                "longest": 105,
+                "empty_pct": 0
+            },
+            {
+                "hash": "sum",
+                "buckets": 509,
+                "load": 10.36,
+                "avg_probes": 8.384,
+                "avg_unique": 6.252,
+                "longest": 24,
+                "empty_pct": 0
+            },
+            {
+                "hash": "poly31",
+                "buckets": 509,
+                "load": 10.36,
+                "avg_probes": 9.007,
+                "avg_unique": 6.206,
+                "longest": 24,
+                "empty_pct": 0
+            },
+            {
+                "hash": "pjw",
+                "buckets": 509,
+                "load": 10.36,
+                "avg_probes": 8.88,
+                "avg_unique": 6.18,
+                "longest": 23,
+                "empty_pct": 0
+            },
+            {
+                "hash": "sum",
+                "buckets": 4093,
+                "load": 1.29,
+                "avg_probes": 2.5,
+                "avg_unique": 2.264,
+                "longest": 12,
+                "empty_pct": 47.8
+            },
+            {
+                "hash": "poly31",
+                "buckets": 4093,
+                "load": 1.29,
+                "avg_probes": 1.953,
+                "avg_unique": 1.652,
+                "longest": 7,
+                "empty_pct": 27.6
+            },
+            {
+                "hash": "pjw",
+                "buckets": 4093,
+                "load": 1.29,
+                "avg_probes": 1.908,
+                "avg_unique": 1.651,
+                "longest": 6,
+                "empty_pct": 28.2
+            },
+            {
+                "hash": "sum",
+                "buckets": 4096,
+                "load": 1.29,
+                "avg_probes": 2.501,
+                "avg_unique": 2.266,
+                "longest": 12,
+                "empty_pct": 47.8
+            },
+            {
+                "hash": "poly31",
+                "buckets": 4096,
+                "load": 1.29,
+                "avg_probes": 1.843,
+                "avg_unique": 1.633,
+                "longest": 6,
+                "empty_pct": 27.7
+            },
+            {
+                "hash": "pjw",
+                "buckets": 4096,
+                "load": 1.29,
+                "avg_probes": 4.172,
+                "avg_unique": 2.619,
+                "longest": 15,
+                "empty_pct": 52.5
+            }
+        ]
+    }
+}

@@ -1,0 +1,92 @@
+Translator tables for sample.php
+
+Log of the translation
+  class Shape -> type #18
+  method Shape::area(0 params) -> proc #8
+  class Base -> type #19
+  method Base::name(0 params) -> proc #9
+  class Circle extends Base -> type #20
+  method Circle::__construct(1 params) -> proc #10
+  method Circle::area(0 params) -> proc #11
+  method Circle::name(0 params) -> proc #12
+  function total(2 params) -> proc #13
+  global $config -> identifier #43
+  call of strlen() with 1 arguments: ok
+  closure {closure}#1(1 params) -> proc #14
+  label done defined at address 17, fix-up of goto at 13
+  call of intdiv() with 2 arguments: ok
+  call of sprintf() with 2 arguments: ok
+
+== Identifier table (keywords not shown; 34 records in all) ==
+id | name | kind | scope | type | ref | addr | flags | init
+25 | App\Demo | namespace | 0 | - | - | - | - | yes
+26 | LIMIT | constant | 0 | - | 17 | - | - | yes
+27 | Shape | class | 0 | Shape | 18 | - | interface | yes
+29 | Base | class | 0 | Base | 19 | - | class,abstract | yes
+33 | Circle | class | 0 | Circle | 20 | - | class,final | yes
+39 | total | function | 0 | int | 13 | - | - | yes
+43 | $config | variable | 0 | - | - | 0 | - | no
+51 | $count | variable | 0 | - | - | 1 | - | yes
+52 | $text | variable | 0 | - | - | 2 | - | yes
+
+== Scope exits (records deleted) ==
+scope | removed
+class Shape | area
+class Base | VERSION, $id, name
+function Circle::__construct | $r
+function Circle::area | 
+function Circle::name | 
+class Circle | $r, __construct, area, name
+closure {closure}#1 | $x, $sum
+function total | $items, $limit, $calls, $config, $sum, $i, $item, $double
+
+== Type table: user types (21 types in all) ==
+id | name | kind | parent | members
+18 | Shape | class | - | 1
+19 | Base | class | - | 3
+20 | Circle | class | Base | 4
+
+== Constant table: user constants and literals (26 records in all) ==
+id | name | kind | type | value
+17 | LIMIT | user | int | 10
+18 | int:10 | literal | int | 10
+19 | Base::VERSION | user | string | '1.0'
+20 | string:'1.0' | literal | string | '1.0'
+21 | int:0 | literal | int | 0
+22 | int:2 | literal | int | 2
+23 | string:'circle' | literal | string | 'circle'
+24 | int:3 | literal | int | 3
+25 | string:'%d items' | literal | string | '%d items'
+
+== Procedure table: user functions (14 records in all, built-in ones included) ==
+id | name | kind | params | min | max | returns | addr
+8 | Shape::area | function | - | 0 | 0 | float | -
+9 | Base::name | function | - | 0 | 0 | string | -
+10 | Circle::__construct | function | float $r | 1 | 1 | mixed | 7
+11 | Circle::area | function | - | 0 | 0 | float | 8
+12 | Circle::name | function | - | 0 | 0 | string | 9
+13 | total | function | array $items, int $limit? | 1 | 2 | int | 10
+
+== Label table (jumps and fix-ups) ==
+pc | op | label | target
+13 | goto | done | 17
+
+== Operators met (from the operation table) ==
+operator | count | precedence | associativity
+= (infix) | 9 | 6 | right
+-> (infix) | 2 | 25 | left
+* (infix) | 2 | 19 | left
+** (infix) | 1 | 23 | right
+> (infix) | 1 | 15 | none
++= (infix) | 1 | 6 | right
++ (infix) | 1 | 18 | left
+?? (infix) | 1 | 8 | right
+
+Constants of the language used: {"M_PI":1,"LIMIT":1}
+Errors found: none
+
+Statistics of the hash tables (chains)
+  identifiers: {"records":34,"buckets":61,"longest":2,"empty":33,"avg_probes":1.176}
+  constants: {"records":26,"buckets":31,"longest":2,"empty":9,"avg_probes":1.154}
+  procedures: {"records":14,"buckets":31,"longest":2,"empty":18,"avg_probes":1.071}
+  operations: 70 records, load 0.272

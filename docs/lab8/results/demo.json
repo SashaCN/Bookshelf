@@ -1,0 +1,431 @@
+{
+    "identifiers": [
+        [
+            25,
+            "App\\Demo",
+            "namespace",
+            0,
+            "-",
+            null,
+            null,
+            [],
+            true
+        ],
+        [
+            26,
+            "LIMIT",
+            "constant",
+            0,
+            "-",
+            17,
+            null,
+            [],
+            true
+        ],
+        [
+            27,
+            "Shape",
+            "class",
+            0,
+            "Shape",
+            18,
+            null,
+            [
+                "interface"
+            ],
+            true
+        ],
+        [
+            29,
+            "Base",
+            "class",
+            0,
+            "Base",
+            19,
+            null,
+            [
+                "class",
+                "abstract"
+            ],
+            true
+        ],
+        [
+            33,
+            "Circle",
+            "class",
+            0,
+            "Circle",
+            20,
+            null,
+            [
+                "class",
+                "final"
+            ],
+            true
+        ],
+        [
+            39,
+            "total",
+            "function",
+            0,
+            "int",
+            13,
+            null,
+            [],
+            true
+        ],
+        [
+            43,
+            "$config",
+            "variable",
+            0,
+            "-",
+            null,
+            0,
+            [],
+            false
+        ],
+        [
+            51,
+            "$count",
+            "variable",
+            0,
+            "-",
+            null,
+            1,
+            [],
+            true
+        ],
+        [
+            52,
+            "$text",
+            "variable",
+            0,
+            "-",
+            null,
+            2,
+            [],
+            true
+        ]
+    ],
+    "user_types": [
+        {
+            "id": 18,
+            "name": "Shape",
+            "key": "shape",
+            "kind": "class",
+            "size": null,
+            "declarable": true,
+            "builtin": false,
+            "parent": null,
+            "members": 1
+        },
+        {
+            "id": 19,
+            "name": "Base",
+            "key": "base",
+            "kind": "class",
+            "size": null,
+            "declarable": true,
+            "builtin": false,
+            "parent": null,
+            "members": 3
+        },
+        {
+            "id": 20,
+            "name": "Circle",
+            "key": "circle",
+            "kind": "class",
+            "size": null,
+            "declarable": true,
+            "builtin": false,
+            "parent": 19,
+            "members": 4
+        }
+    ],
+    "constants": [
+        {
+            "id": 17,
+            "name": "LIMIT",
+            "kind": "user",
+            "type": 1,
+            "value": 10
+        },
+        {
+            "id": 18,
+            "name": "int:10",
+            "kind": "literal",
+            "type": 1,
+            "value": 10
+        },
+        {
+            "id": 19,
+            "name": "Base::VERSION",
+            "kind": "user",
+            "type": 3,
+            "value": "1.0"
+        },
+        {
+            "id": 20,
+            "name": "string:'1.0'",
+            "kind": "literal",
+            "type": 3,
+            "value": "1.0"
+        },
+        {
+            "id": 21,
+            "name": "int:0",
+            "kind": "literal",
+            "type": 1,
+            "value": 0
+        },
+        {
+            "id": 22,
+            "name": "int:2",
+            "kind": "literal",
+            "type": 1,
+            "value": 2
+        },
+        {
+            "id": 23,
+            "name": "string:'circle'",
+            "kind": "literal",
+            "type": 3,
+            "value": "circle"
+        },
+        {
+            "id": 24,
+            "name": "int:3",
+            "kind": "literal",
+            "type": 1,
+            "value": 3
+        },
+        {
+            "id": 25,
+            "name": "string:'%d items'",
+            "kind": "literal",
+            "type": 3,
+            "value": "%d items"
+        }
+    ],
+    "procedures": [
+        {
+            "id": 8,
+            "name": "Shape::area",
+            "kind": "function",
+            "origin": "user",
+            "params": [],
+            "min": 0,
+            "max": 0,
+            "returns": [
+                2
+            ],
+            "addr": null,
+            "ident": 28
+        },
+        {
+            "id": 9,
+            "name": "Base::name",
+            "kind": "function",
+            "origin": "user",
+            "params": [],
+            "min": 0,
+            "max": 0,
+            "returns": [
+                3
+            ],
+            "addr": null,
+            "ident": 32
+        },
+        {
+            "id": 10,
+            "name": "Circle::__construct",
+            "kind": "function",
+            "origin": "user",
+            "params": [
+                {
+                    "type": [
+                        2
+                    ],
+                    "optional": false,
+                    "variadic": false,
+                    "byRef": false,
+                    "name": "r"
+                }
+            ],
+            "min": 1,
+            "max": 1,
+            "returns": [
+                11
+            ],
+            "addr": 7,
+            "ident": 35
+        },
+        {
+            "id": 11,
+            "name": "Circle::area",
+            "kind": "function",
+            "origin": "user",
+            "params": [],
+            "min": 0,
+            "max": 0,
+            "returns": [
+                2
+            ],
+            "addr": 8,
+            "ident": 37
+        },
+        {
+            "id": 12,
+            "name": "Circle::name",
+            "kind": "function",
+            "origin": "user",
+            "params": [],
+            "min": 0,
+            "max": 0,
+            "returns": [
+                3
+            ],
+            "addr": 9,
+            "ident": 38
+        },
+        {
+            "id": 13,
+            "name": "total",
+            "kind": "function",
+            "origin": "user",
+            "params": [
+                {
+                    "type": [
+                        4
+                    ],
+                    "optional": false,
+                    "variadic": false,
+                    "byRef": false,
+                    "name": "items"
+                },
+                {
+                    "type": [
+                        1
+                    ],
+                    "optional": true,
+                    "variadic": false,
+                    "byRef": false,
+                    "name": "limit"
+                }
+            ],
+            "min": 1,
+            "max": 2,
+            "returns": [
+                1
+            ],
+            "addr": 10,
+            "ident": 39
+        }
+    ],
+    "jumps": {
+        "13": {
+            "op": "goto",
+            "label": "done",
+            "target": 17
+        }
+    },
+    "errors": [],
+    "operators": {
+        "= (infix)": 9,
+        "-> (infix)": 2,
+        "* (infix)": 2,
+        "** (infix)": 1,
+        "> (infix)": 1,
+        "+= (infix)": 1,
+        "+ (infix)": 1,
+        "?? (infix)": 1
+    },
+    "constant_uses": {
+        "M_PI": 1,
+        "LIMIT": 1
+    },
+    "scope_exits": [
+        {
+            "scope": "class Shape",
+            "removed": [
+                "area"
+            ]
+        },
+        {
+            "scope": "class Base",
+            "removed": [
+                "VERSION",
+                "$id",
+                "name"
+            ]
+        },
+        {
+            "scope": "function Circle::__construct",
+            "removed": [
+                "$r"
+            ]
+        },
+        {
+            "scope": "function Circle::area",
+            "removed": []
+        },
+        {
+            "scope": "function Circle::name",
+            "removed": []
+        },
+        {
+            "scope": "class Circle",
+            "removed": [
+                "$r",
+                "__construct",
+                "area",
+                "name"
+            ]
+        },
+        {
+            "scope": "closure {closure}#1",
+            "removed": [
+                "$x",
+                "$sum"
+            ]
+        },
+        {
+            "scope": "function total",
+            "removed": [
+                "$items",
+                "$limit",
+                "$calls",
+                "$config",
+                "$sum",
+                "$i",
+                "$item",
+                "$double"
+            ]
+        }
+    ],
+    "stats": {
+        "identifiers": {
+            "records": 34,
+            "buckets": 61,
+            "longest": 2,
+            "empty": 33,
+            "avg_probes": 1.176
+        },
+        "constants": {
+            "records": 26,
+            "buckets": 31,
+            "longest": 2,
+            "empty": 9,
+            "avg_probes": 1.154
+        },
+        "procedures": {
+            "records": 14,
+            "buckets": 31,
+            "longest": 2,
+            "empty": 18,
+            "avg_probes": 1.071
+        },
+        "operations_load": 0.272
+    }
+}
