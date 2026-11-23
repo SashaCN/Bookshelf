@@ -74,6 +74,14 @@ class ReaderDocument extends Model
     }
 
     /**
+     * @return HasMany<ReaderChapterRead, $this>
+     */
+    public function chapterReads(): HasMany
+    {
+        return $this->hasMany(ReaderChapterRead::class)->orderBy('chapter');
+    }
+
+    /**
      * How far the reader is through the whole book, in percent.
      */
     public function progress(): float

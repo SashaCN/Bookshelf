@@ -34,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
         // An import writes up to 2,000 books in one request.
         RateLimiter::for('library-import', fn (Request $request) => Limit::perHour(5)->by((string) $request->user()->id));
 
+        // An export reads everything the reader owns.
+        RateLimiter::for('data-export', fn (Request $request) => Limit::perHour(3)->by((string) $request->user()->id));
+
         // Posting is cheap but spammable: a reader may leave a handful of comments a minute.
         RateLimiter::for('comments', fn (Request $request) => Limit::perMinute(10)->by((string) $request->user()->id));
 

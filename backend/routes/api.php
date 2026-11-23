@@ -33,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/me', [MeController::class, 'show'])->name('me.show');
     Route::patch('/me', [MeController::class, 'update'])->name('me.update');
     Route::delete('/me', [MeController::class, 'destroy'])->middleware('throttle:password-confirm')->name('me.destroy');
+    Route::get('/me/export', [MeController::class, 'export'])->middleware('throttle:data-export')->name('me.export');
     Route::post('/me/followers-seen', [MeController::class, 'followersSeen'])->name('me.followers-seen');
 
     Route::get('/catalog/search', CatalogSearchController::class)
