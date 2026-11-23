@@ -91,6 +91,14 @@ describe('LibraryView', () => {
     expect(wrapper.findAll('a').some((link) => link.attributes('href') === '/library/add')).toBe(true)
   })
 
+  it('links to the Goodreads import', async () => {
+    const { wrapper } = await mountView(library)
+
+    const link = wrapper.findAll('a').find((a) => a.text() === 'Імпорт з Goodreads')
+
+    expect(link?.attributes('href')).toBe('/library/import')
+  })
+
   it('offers a retry when the library cannot be loaded', async () => {
     const { plugins, router } = createTestEnvironment()
     vi.mocked(libraryApi.list).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(library)

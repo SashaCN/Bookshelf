@@ -111,3 +111,56 @@ it('reports an unavailable catalog for an unexpected response shape', function (
     expect(fn () => app(OpenLibraryClient::class)->search('atomic habits'))
         ->toThrow(CatalogUnavailableException::class);
 });
+
+it('trims what the catalog gives us to what a library entry can hold', function () {
+    fakeOpenLibrary([openLibraryDoc([
+        'title' => str_repeat('Я', 300),
+        'subtitle' => str_repeat('s', 300),
+        'author_name' => array_map(fn (int $i) => "Author {$i}", range(1, 300)),
+        'number_of_pages_median' => 90000,
+        'first_publish_year' => 70000,
+    ])]);
+
+    $entry = app(OpenLibraryClient::class)->search('anthology')[0];
+
+    expect(mb_strlen($entry->title))->toBe(255)
+        ->and(mb_strlen($entry->subtitle))->toBe(255)
+        ->and($entry->authors)->toHaveCount(10)
+        ->and($entry->pageCount)->toBeNull()
+        ->and($entry->publishedYear)->toBeNull();
+});
+
+it('skips works whose key is not a plain work id', function () {
+    fakeOpenLibrary([
+        openLibraryDoc(['key' => '/works/'.str_repeat('X', 400)]),
+        openLibraryDoc(['key' => '/works/OL1W/../../x']),
+    ]);
+
+    expect(app(OpenLibraryClient::class)->search('weird'))->toBe([]);
+});
+
+it('does not retry a request the catalog rejected as wrong', function () {
+    Http::fake(['openlibrary.org/search.json*' => Http::response('', 422)]);
+
+    expect(fn () => app(OpenLibraryClient::class)->search('atomic habits'))
+        ->toThrow(CatalogUnavailableException::class);
+
+    Http::assertSentCount(1);
+});
+
+it('searches by the ISBN-13 field when the query is a valid ISBN', function (string $query) {
+    fakeOpenLibrary([openLibraryDoc()]);
+
+    $entries = app(OpenLibraryClient::class)->search($query);
+
+    expect($entries)->toHaveCount(1);
+    Http::assertSent(fn (Request $request) => $request['q'] === 'isbn:9780306406157');
+})->with(['9780306406157', '978-0-306-40615-7', '0-306-40615-2', '0306406152']);
+
+it('treats a number with a wrong checksum as plain text', function () {
+    fakeOpenLibrary([openLibraryDoc()]);
+
+    app(OpenLibraryClient::class)->search('9780306406158');
+
+    Http::assertSent(fn (Request $request) => $request['q'] === '9780306406158');
+});

@@ -1,4 +1,5 @@
 import account from './account.uk'
+import libraryImport from './libraryImport.uk'
 import quoteTools from './quotes.uk'
 import recap from './recap.uk'
 import reader, { apiErrors as readerApiErrors } from './reader.uk'
@@ -9,6 +10,7 @@ export default {
   social,
   reader,
   account,
+  libraryImport,
   recap,
   app: {
     name: 'Bookshelf',
@@ -100,6 +102,7 @@ export default {
   library: {
     title: 'Бібліотека',
     add: 'Додати книгу',
+    import: 'Імпорт з Goodreads',
     search: {
       label: 'Пошук у бібліотеці',
       placeholder: 'Назва або автор',
@@ -124,13 +127,25 @@ export default {
   },
   add: {
     title: 'Додати книгу',
-    searchLabel: 'Назва або автор',
+    searchLabel: 'Назва, автор або ISBN',
     searchPlaceholder: 'Наприклад, Атомні звички',
     searching: 'Шукаємо…',
     noResults: 'Нічого не знайшли.',
     notFound: 'Не знайшли свою книгу?',
     manualLink: 'Додати вручну',
     backToSearch: 'Шукати в каталозі',
+    scan: {
+      button: 'Сканувати ISBN',
+      title: 'Сканування ISBN',
+      hint: 'Наведіть камеру на штрихкод на звороті книги.',
+      video: 'Зображення з камери',
+      close: 'Закрити',
+      found: 'Знайдено ISBN {isbn}',
+      starting: 'Вмикаємо камеру…',
+      denied: { title: 'Немає доступу до камери', hint: 'Дозвольте доступ до камери в налаштуваннях браузера або введіть ISBN вручну.' },
+      noCamera: { title: 'Камеру не знайдено', hint: 'На цьому пристрої немає камери. Введіть ISBN вручну.' },
+      failed: { title: 'Не вдалося запустити камеру', hint: 'Спробуйте ще раз або введіть ISBN вручну.' },
+    },
     add: 'Додати',
     adding: 'Додаємо…',
     inLibrary: 'У бібліотеці',
@@ -330,6 +345,7 @@ export default {
     offline: 'Немає зв’язку із сервером. Перевірте інтернет і спробуйте ще раз.',
     library: {
       already_added: 'Ця книга вже є у вашій бібліотеці.',
+      import_invalid: 'Це не схоже на експорт Goodreads: потрібен файл CSV до 2 МБ, не більше 2000 книг, зі стовпцями Title, Author і Exclusive Shelf.',
       invalid_transition: 'З поточного статусу не можна перейти до цього.',
       total_pages_required: 'Вкажіть кількість сторінок.',
       total_pages_below_current: 'Сторінок не може бути менше, ніж уже прочитано.',

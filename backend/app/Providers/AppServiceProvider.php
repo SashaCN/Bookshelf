@@ -45,6 +45,9 @@ class AppServiceProvider extends ServiceProvider
         // The reader saves the place every 15 seconds and when it is left; 120 a minute is far more than that.
         RateLimiter::for('reader-position', fn (Request $request) => Limit::perMinute(120)->by($perReader($request)));
 
+        // An import writes up to 2,000 books in one request.
+        RateLimiter::for('library-import', fn (Request $request) => Limit::perHour(5)->by($perReader($request)));
+
         // A report is stored with "post" or "comment" as its type, not with the name of a class.
         Relation::morphMap(['post' => Post::class, 'comment' => Comment::class]);
     }

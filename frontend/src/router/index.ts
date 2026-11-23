@@ -16,6 +16,7 @@ import RegisterView from '@/views/RegisterView.vue'
 import StatsView from '@/views/StatsView.vue'
 import { redirectFor } from './access'
 import { accountRoutes } from './account'
+import { libraryImportRoutes } from './libraryImport'
 import { readerRoutes } from './reader'
 import { socialRoutes } from './social'
 import { statsRoutes } from './stats'
@@ -62,6 +63,7 @@ export const router = createRouter({
         { path: 'stats', name: 'stats', component: StatsView, meta: { tab: 'stats', title: 'stats.title' } },
         { path: 'profile', name: 'profile', component: ProfileView, meta: { title: 'profile.title' } },
         ...statsRoutes,
+        ...libraryImportRoutes,
         ...socialRoutes,
         // Last: anything that matched nothing above. Inside the layout, so the reader keeps the tab bar.
         { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundView, meta: { title: 'notFound.title' } },

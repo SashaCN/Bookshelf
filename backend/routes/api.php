@@ -44,3 +44,4 @@ Route::middleware('auth:sanctum')->group(function (): void {
 // Each area of the app keeps its routes in a file of its own.
 Route::middleware('auth:sanctum')->group(base_path('routes/social.php'));
 Route::middleware('auth:sanctum')->group(base_path('routes/reader.php'));
+Route::middleware('auth:sanctum')->group(base_path('routes/library-import.php'));
