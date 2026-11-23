@@ -4,6 +4,7 @@ namespace App\Actions\Fortify;
 
 use App\Actions\Social\GenerateHandle;
 use App\Models\User;
+use App\Support\TimeZones;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -27,6 +28,10 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
+        if (array_key_exists('timezone', $input)) {
+            $input['timezone'] = TimeZones::normalize($input['timezone']);
+        }
+
         Validator::make($input, [
             'name' => ['required', 'string', 'max:100'],
             'email' => [

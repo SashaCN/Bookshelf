@@ -61,7 +61,7 @@ it('rejects a duplicate email', function () {
     ])->assertUnprocessable()->assertJsonValidationErrors('email');
 });
 
-it('accepts a legacy time zone name that some browsers still report', function () {
+it('accepts a legacy time zone name that some browsers still report and stores the canonical one', function () {
     $this->postJson('/api/auth/register', [
         'name' => 'Olena',
         'email' => 'olena@example.com',
@@ -69,7 +69,7 @@ it('accepts a legacy time zone name that some browsers still report', function (
         'timezone' => 'Europe/Kiev',
     ])->assertCreated();
 
-    expect(User::first()->timezone)->toBe('Europe/Kiev');
+    expect(User::first()->timezone)->toBe('Europe/Kyiv');
 });
 
 it('throttles registrations from one address', function () {

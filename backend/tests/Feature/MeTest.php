@@ -41,6 +41,15 @@ it('updates the name and time zone', function () {
         ->timezone->toBe('America/New_York');
 });
 
+it('stores a legacy time zone name under its canonical one', function () {
+    $user = User::factory()->create(['timezone' => 'America/New_York']);
+
+    $this->actingAs($user)->patchJson('/api/me', ['timezone' => 'Europe/Kiev'])
+        ->assertOk()->assertJsonPath('data.timezone', 'Europe/Kyiv');
+
+    expect($user->fresh()->timezone)->toBe('Europe/Kyiv');
+});
+
 it('limits the name to 100 characters', function () {
     $user = User::factory()->create();
 

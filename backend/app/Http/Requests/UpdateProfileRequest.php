@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\TimeZones;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -14,6 +15,10 @@ class UpdateProfileRequest extends FormRequest
     {
         if (is_string($this->input('handle'))) {
             $this->merge(['handle' => mb_strtolower(trim($this->input('handle')))]);
+        }
+
+        if ($this->has('timezone')) {
+            $this->merge(['timezone' => TimeZones::normalize($this->input('timezone'))]);
         }
     }
 
