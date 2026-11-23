@@ -28,6 +28,7 @@ class UserBookController extends Controller
 
         $userBooks = $request->user()->userBooks()
             ->with('book.authors', 'bookText')
+            ->withCount('reads')
             ->when($validated['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
             ->latest('updated_at')
             ->latest('id')
@@ -48,7 +49,7 @@ class UserBookController extends Controller
     {
         Gate::authorize('view', $userBook);
 
-        return new UserBookResource($userBook->load('book.authors', 'bookText'));
+        return (new UserBookResource($userBook->load('book.authors', 'bookText', 'reads')->loadCount('reads')))->withReads();
     }
 
     /**

@@ -23,3 +23,19 @@ export function signed(value: number): string {
 export function formatNumber(value: number): string {
   return numberFormat.format(value)
 }
+
+/** An ISO timestamp (UTC) as "5 жовтня" on the calendar of the given time zone, or of the browser by default. */
+export function formatMoment(iso: string, timeZone?: string): string {
+  try {
+    return new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'long', timeZone }).format(new Date(iso))
+  } catch {
+    return formatDay(iso.slice(0, 10))
+  }
+}
+
+const monthFormat = new Intl.DateTimeFormat('uk-UA', { month: 'long', timeZone: 'UTC' })
+
+/** A month number (1-12) by its name in the nominative: "травень". Without a day, Intl gives the standalone form, not "травня". */
+export function monthName(month: number): string {
+  return monthFormat.format(new Date(Date.UTC(2000, month - 1, 1)))
+}

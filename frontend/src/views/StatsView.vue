@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { statsApi } from '@/api/stats'
 import EmptyState from '@/components/EmptyState.vue'
@@ -22,6 +22,9 @@ const summary = ref<StatsSummary | null>(null)
 const goal = ref<GoalProgress | null>(null)
 const days = ref<DailyPages[]>([])
 const range = ref<(typeof RANGES)[number]>(30)
+
+/** The year of the recap link: the reader's own current year. */
+const recapYear = computed(() => Number(summary.value?.today.date.slice(0, 4)))
 
 const failed = ref(false)
 const chartError = ref('')
@@ -133,6 +136,15 @@ onMounted(load)
         :hint="t('stats.books', { n: summary.year.books_finished }, summary.year.books_finished)"
       />
     </div>
+
+    <nav class="flex flex-wrap gap-x-4 gap-y-1" :aria-label="$t('recap.pageTitle')">
+      <RouterLink :to="{ name: 'year-recap', params: { year: recapYear } }" class="inline-flex min-h-11 items-center font-semibold text-accent">
+        {{ $t('recap.link') }}
+      </RouterLink>
+      <RouterLink :to="{ name: 'year-recap', params: { year: recapYear - 1 } }" class="inline-flex min-h-11 items-center text-ink-muted underline">
+        {{ $t('recap.linkYear', { year: recapYear - 1 }) }}
+      </RouterLink>
+    </nav>
 
     <section class="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
       <div class="flex items-center justify-between gap-3">

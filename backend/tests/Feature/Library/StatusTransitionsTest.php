@@ -178,3 +178,48 @@ it('lets a finished book be rated in the same request that finishes it', functio
 
     changeStatus($userBook, 'finished', ['rating' => 5])->assertOk()->assertJsonPath('data.rating', 5);
 });
+
+describe('dates given by the reader', function () {
+    it('keeps a date-only finish on the reader\'s own day, far from UTC', function () {
+        $user = User::factory()->create(['timezone' => 'America/Los_Angeles']);
+        $userBook = UserBook::factory()->for($user)->create();
+
+        test()->actingAs($user)->patchJson("/api/library/{$userBook->id}", [
+            'status' => 'finished', 'started_at' => '2026-03-01', 'finished_at' => '2026-03-20',
+        ])->assertOk();
+
+        $fresh = $userBook->fresh();
+        expect($fresh->finished_at->setTimezone('America/Los_Angeles')->toDateString())->toBe('2026-03-20')
+            ->and($fresh->started_at->setTimezone('America/Los_Angeles')->toDateString())->toBe('2026-03-01');
+    });
+
+    it('accepts today\'s date for a reader whose day is ahead of UTC', function () {
+        $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
+        // 23:30 in UTC is already the next day in Kyiv.
+        test()->travelTo(Carbon::parse('2026-10-05 23:30:00', 'UTC'));
+        $userBook = UserBook::factory()->for($user)->create();
+
+        changeStatus($userBook, 'finished', ['finished_at' => '2026-10-06'])->assertOk();
+
+        expect($userBook->fresh()->finished_at->lessThanOrEqualTo(now()))->toBeTrue();
+    });
+
+    it('still refuses a date after the reader\'s today', function () {
+        $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
+        test()->travelTo(Carbon::parse('2026-10-05 23:30:00', 'UTC'));
+        $userBook = UserBook::factory()->for($user)->create();
+
+        changeStatus($userBook, 'finished', ['finished_at' => '2026-10-07'])
+            ->assertUnprocessable()->assertJsonValidationErrors('finished_at');
+    });
+
+    it('applies the same rule when a book is added to the library', function () {
+        $user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
+        test()->travelTo(Carbon::parse('2026-10-05 23:30:00', 'UTC'));
+
+        test()->actingAs($user)->postJson('/api/library', ['title' => 'Late', 'total_pages' => 10, 'status' => 'finished', 'finished_at' => '2026-10-06'])
+            ->assertSuccessful();
+        test()->actingAs($user)->postJson('/api/library', ['title' => 'Future', 'total_pages' => 10, 'status' => 'finished', 'finished_at' => '2026-10-07'])
+            ->assertUnprocessable()->assertJsonValidationErrors('finished_at');
+    });
+});

@@ -1,4 +1,5 @@
 import account from './account.uk'
+import recap from './recap.uk'
 import reader, { apiErrors as readerApiErrors } from './reader.uk'
 import social, { apiErrors as socialApiErrors } from './social.uk'
 
@@ -7,6 +8,7 @@ export default {
   social,
   reader,
   account,
+  recap,
   app: {
     name: 'Bookshelf',
     tagline: 'Трекер читання і цитат',
@@ -97,6 +99,21 @@ export default {
   library: {
     title: 'Бібліотека',
     add: 'Додати книгу',
+    search: {
+      label: 'Пошук у бібліотеці',
+      placeholder: 'Назва або автор',
+      clear: 'Очистити пошук',
+      noResults: 'Нічого не знайдено за запитом «{query}»',
+      noResultsText: 'Спробуйте інше слово або перевірте іншу вкладку.',
+    },
+    sort: {
+      label: 'Сортування',
+      recent: 'Нещодавно додані',
+      title: 'Назва А–Я',
+      author: 'Автор А–Я',
+      rating: 'Оцінка',
+      finished: 'Нещодавно прочитані',
+    },
     empty: {
       want: { title: 'Список порожній', text: 'Додайте книги, які хочете прочитати.' },
       reading: { title: 'Нічого не читаєте', text: 'Тут будуть книги, які ви зараз читаєте.' },
@@ -135,6 +152,16 @@ export default {
     totalPages: 'Кількість сторінок',
     needsPages: 'Щоб почати читати, вкажіть кількість сторінок.',
     rating: 'Оцінка',
+    reread: {
+      action: 'Перечитати',
+      confirm: 'Прогрес повернеться на сторінку 0, а попереднє прочитання збережеться в історії книги.',
+      yes: 'Почати знову',
+      timesRead: 'Прочитано {n} раз | Прочитано {n} рази | Прочитано {n} разів',
+      previous: 'Попередні прочитання',
+      pass: '{from} — {to}',
+      noStart: 'до {to}',
+      badge: 'Прочитано разів: {n}',
+    },
     remove: 'Видалити з бібліотеки',
     removeConfirm: 'Книга зникне з вашої бібліотеки разом із прогресом.',
     removeYes: 'Видалити',
@@ -305,6 +332,11 @@ export default {
       total_pages_below_current: 'Сторінок не може бути менше, ніж уже прочитано.',
       progress_finished: 'Книга вже прочитана. Поверніть її в «Читаю», щоб оновлювати прогрес.',
       page_above_total: 'У книзі немає такої сторінки.',
+      reread_not_finished: 'Перечитувати можна лише прочитану книгу.',
+    },
+    stats: {
+      range_too_long: 'Можна показати не більше року.',
+      range_invalid: 'Початок періоду не може бути пізніше за кінець.',
     },
     quotes: {
       page_above_total: 'На цій сторінці немає такої цитати: у книзі менше сторінок.',

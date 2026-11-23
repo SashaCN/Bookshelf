@@ -218,3 +218,12 @@ describe('isolation', function () {
         expect(ReadingGoal::query()->sole())->user_id->toBe($this->stranger->id)->target_books->toBe(50);
     });
 });
+
+it('answers 404 for a year that is not four digits', function (string $method, string $year) {
+    $this->actingAs($this->user)->json($method, "/api/goals/{$year}", ['target_books' => 5])->assertNotFound();
+})->with([
+    'huge' => ['GET', '99999999999999999999'],
+    'short' => ['GET', '26'],
+    'huge delete' => ['DELETE', '99999999999999999999'],
+    'huge put' => ['PUT', '99999999999999999999'],
+]);

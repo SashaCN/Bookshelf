@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Library\StartRereading;
 use App\Actions\Library\UpdateProgress;
 use App\Http\Requests\UpdateProgressRequest;
 use App\Http\Resources\ReadingLogResource;
@@ -29,6 +30,16 @@ class ReadingProgressController extends Controller
                 'streak' => (new ReadingStatistics($request->user()))->streak()['current'],
             ],
         ]);
+    }
+
+    /**
+     * Start another pass through a finished book: progress goes back to page 0, the finished pass is kept.
+     */
+    public function reread(UserBook $userBook, StartRereading $startRereading): UserBookResource
+    {
+        Gate::authorize('update', $userBook);
+
+        return (new UserBookResource($startRereading->handle($userBook)->loadCount('reads')))->withReads();
     }
 
     /**

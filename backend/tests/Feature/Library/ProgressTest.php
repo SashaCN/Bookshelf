@@ -1,10 +1,12 @@
 <?php
 
+use App\Actions\Library\UpdateUserBook;
 use App\Enums\BookStatus;
 use App\Models\ReadingLog;
 use App\Models\User;
 use App\Models\UserBook;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     $this->user = User::factory()->create(['timezone' => 'Europe/Kyiv']);
@@ -253,4 +255,17 @@ describe('isolation', function () {
         $this->actingAs($this->user)->postJson("/api/library/{$theirs->id}/progress", ['page' => 'ten'])->assertNotFound();
         $this->actingAs($this->user)->patchJson("/api/library/{$theirs->id}", ['status' => 'nonsense'])->assertNotFound();
     });
+});
+
+it('decides an edit on the stored entry, not on a copy loaded earlier', function () {
+    $user = User::factory()->create();
+    $userBook = UserBook::factory()->for($user)->reading()->create(['total_pages' => 300, 'current_page' => 10]);
+    $stale = UserBook::find($userBook->id);
+
+    // A progress tap lands while the edit is on its way.
+    UserBook::whereKey($userBook->id)->update(['current_page' => 200]);
+
+    expect(fn () => app(UpdateUserBook::class)->handle($stale, ['total_pages' => 100]))
+        ->toThrow(ValidationException::class);
+    expect($userBook->fresh()->total_pages)->toBe(300);
 });

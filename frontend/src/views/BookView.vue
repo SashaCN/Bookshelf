@@ -16,14 +16,17 @@ import BookTextBlock from '@/components/reader/BookTextBlock.vue'
 import ReadingJournal from '@/components/ReadingJournal.vue'
 import SkeletonList from '@/components/SkeletonList.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
-import type { BookStatus, UserBook } from '@/types/api'
+import { formatMoment } from '@/utils/format'
+import type { BookStatus, ReadPass, UserBook } from '@/types/api'
 
 const props = defineProps<{ id: number }>()
 
 const { t } = useI18n()
 const router = useRouter()
 const library = useLibraryStore()
+const auth = useAuthStore()
 const errorMessage = useApiErrorMessage()
 
 const userBook = ref<UserBook | null>(null)
@@ -32,8 +35,38 @@ const error = ref('')
 const busy = ref(false)
 const pagesInput = ref('')
 const confirmingDelete = ref(false)
+const confirmingReread = ref(false)
 /** Bumped whenever the reading journal may have a new entry. */
 const journalVersion = ref(0)
+
+/** Earlier finished passes; the current one, when finished, is not among them. */
+const archivedCount = computed(() => (userBook.value?.times_read ?? 0) - (userBook.value?.status === 'finished' ? 1 : 0))
+/**
+ * The list of the library only counts the passes, the single entry has them in full; so they are fetched here once
+ * the count says there are any, and kept apart from the entry, which later updates replace without them.
+ */
+const reads = ref<ReadPass[]>([])
+
+watch(
+  () => [userBook.value?.id, archivedCount.value] as const,
+  async ([id, count]) => {
+    if (id === undefined || count <= 0) {
+      reads.value = []
+      return
+    }
+    if (userBook.value?.reads) {
+      reads.value = userBook.value.reads
+      return
+    }
+    try {
+      const full = await libraryApi.get(id)
+      if (userBook.value?.id === id) reads.value = full.reads ?? []
+    } catch {
+      reads.value = []
+    }
+  },
+  { immediate: true },
+)
 
 const book = computed(() => userBook.value?.book ?? null)
 const needsPages = computed(() => userBook.value !== null && !userBook.value.total_pages)
@@ -55,7 +88,10 @@ async function load() {
 }
 
 onMounted(load)
-watch(() => props.id, load)
+watch(() => props.id, () => {
+  confirmingReread.value = false
+  return load()
+})
 
 // Keep the page in sync with the store, which receives every saved change.
 watch(
@@ -114,6 +150,29 @@ function savePages() {
   if (Number.isFinite(pages)) {
     return save({ total_pages: pages })
   }
+}
+
+async function reread() {
+  if (!userBook.value) return
+
+  busy.value = true
+  error.value = ''
+
+  try {
+    // The answer is the full entry, so the previous passes are shown at once.
+    userBook.value = await library.reread(userBook.value.id)
+    journalVersion.value++
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    confirmingReread.value = false
+    busy.value = false
+  }
+}
+
+/** "5 жовтня" for a pass moment (an ISO timestamp): the calendar day in the reader's own time zone. */
+function passDay(iso: string): string {
+  return formatMoment(iso, auth.user?.timezone)
 }
 
 async function remove() {
@@ -206,6 +265,55 @@ function isDisabled(target: BookStatus): boolean {
       <p v-if="needsPages && userBook.allowed_statuses.includes('reading')" class="text-sm text-ink-muted">
         {{ $t('book.needsPages') }}
       </p>
+    </section>
+
+    <section v-if="userBook.status === 'finished'" class="flex flex-col gap-2">
+      <button
+        v-if="!confirmingReread"
+        type="button"
+        :disabled="busy"
+        class="min-h-11 rounded-lg border border-line bg-surface px-4 font-semibold disabled:opacity-50"
+        @click="confirmingReread = true"
+      >
+        {{ $t('book.reread.action') }}
+      </button>
+      <div v-else class="flex flex-col gap-2">
+        <p class="text-sm">{{ $t('book.reread.confirm') }}</p>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            :disabled="busy"
+            class="min-h-11 flex-1 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+            @click="reread"
+          >
+            {{ $t('book.reread.yes') }}
+          </button>
+          <button
+            type="button"
+            :disabled="busy"
+            class="min-h-11 flex-1 rounded-lg border border-line bg-surface px-4 font-medium"
+            @click="confirmingReread = false"
+          >
+            {{ $t('common.cancel') }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="userBook.times_read > 0" class="flex flex-col gap-1">
+      <p class="text-sm font-medium">{{ $t('book.reread.timesRead', { n: userBook.times_read }, userBook.times_read) }}</p>
+      <template v-if="reads.length">
+        <p class="text-sm text-ink-muted">{{ $t('book.reread.previous') }}</p>
+        <ul class="flex flex-col gap-0.5 text-sm tabular-nums text-ink-muted">
+          <li v-for="(pass, index) in reads" :key="index">
+            {{
+              pass.started_at
+                ? $t('book.reread.pass', { from: passDay(pass.started_at), to: passDay(pass.finished_at) })
+                : $t('book.reread.noStart', { to: passDay(pass.finished_at) })
+            }}
+          </li>
+        </ul>
+      </template>
     </section>
 
     <form class="flex flex-col gap-1.5" @submit.prevent="savePages">

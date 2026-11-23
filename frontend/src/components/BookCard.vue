@@ -23,7 +23,14 @@ const showsProgress = computed(
     <BookCover :title="userBook.book.title" :cover-url="userBook.book.cover_url" />
 
     <div class="flex min-w-0 flex-col justify-center gap-1">
-      <p class="truncate font-semibold leading-snug">{{ userBook.book.title }}</p>
+      <p class="flex items-center gap-2 font-semibold leading-snug">
+        <span class="truncate">{{ userBook.book.title }}</span>
+        <span
+          v-if="userBook.times_read >= 2"
+          class="shrink-0 rounded-full bg-sunken px-2 py-0.5 text-xs font-medium tabular-nums text-ink-muted"
+          :title="t('book.reread.badge', { n: userBook.times_read })"
+        >×{{ userBook.times_read }}</span>
+      </p>
       <p v-if="authors" class="truncate text-sm text-ink-muted">{{ authors }}</p>
 
       <template v-if="showsProgress && userBook.total_pages">

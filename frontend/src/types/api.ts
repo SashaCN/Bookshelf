@@ -42,6 +42,12 @@ export interface Book {
   source: 'openlibrary' | 'manual'
 }
 
+/** An earlier, finished pass through a book that was read again. */
+export interface ReadPass {
+  started_at: string | null
+  finished_at: string
+}
+
 /** A book in the reader's own library, with their progress. */
 export interface UserBook {
   id: number
@@ -59,6 +65,10 @@ export interface UserBook {
   finished_at: string | null
   created_at: string | null
   book: Book
+  /** Finished passes through the book, the current one included when it is finished. */
+  times_read: number
+  /** Archived earlier passes, newest first; only in the response for a single entry, not in the list. */
+  reads?: ReadPass[]
 }
 
 /** One move of the bookmark in a book's reading journal. */

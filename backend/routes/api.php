@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::apiResource('library', UserBookController::class)->parameters(['library' => 'userBook']);
 
     Route::post('/library/{userBook}/progress', [ReadingProgressController::class, 'store'])->name('library.progress');
+    Route::post('/library/{userBook}/reread', [ReadingProgressController::class, 'reread'])->name('library.reread');
     Route::get('/library/{userBook}/logs', [ReadingProgressController::class, 'index'])->name('library.logs');
 
     Route::post('/library/{userBook}/quotes', [QuoteController::class, 'store'])->name('library.quotes.store');
@@ -30,10 +31,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('/stats/summary', [StatsController::class, 'summary'])->name('stats.summary');
     Route::get('/stats/daily', [StatsController::class, 'daily'])->name('stats.daily');
+    Route::get('/stats/year/{year}', [StatsController::class, 'year'])->where('year', '[0-9]{4}')->name('stats.year');
 
-    Route::get('/goals/{year}', [GoalController::class, 'show'])->whereNumber('year')->name('goals.show');
-    Route::put('/goals/{year}', [GoalController::class, 'update'])->whereNumber('year')->name('goals.update');
-    Route::delete('/goals/{year}', [GoalController::class, 'destroy'])->whereNumber('year')->name('goals.destroy');
+    Route::get('/goals/{year}', [GoalController::class, 'show'])->where('year', '[0-9]{4}')->name('goals.show');
+    Route::put('/goals/{year}', [GoalController::class, 'update'])->where('year', '[0-9]{4}')->name('goals.update');
+    Route::delete('/goals/{year}', [GoalController::class, 'destroy'])->where('year', '[0-9]{4}')->name('goals.destroy');
 });
 
 // Each area of the app keeps its routes in a file of its own.

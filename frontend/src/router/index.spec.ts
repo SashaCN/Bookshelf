@@ -30,6 +30,18 @@ describe('the app router', () => {
     expect(document.title).toBe('Профіль · Bookshelf')
   })
 
+  it('opens the recap of a year inside the stats tab, and not an address with a malformed year', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/stats/year/2025')
+    expect(router.currentRoute.value.name).toBe('year-recap')
+    expect(router.currentRoute.value.meta.tab).toBe('stats')
+    expect(document.title).toBe('Рік у книгах · Bookshelf')
+
+    await router.push('/stats/year/25')
+    expect(router.currentRoute.value.name).toBe('not-found')
+  })
+
   it('shows a page of its own for an address that does not exist, inside the app', async () => {
     vi.mocked(authApi.me).mockResolvedValue(user)
 
