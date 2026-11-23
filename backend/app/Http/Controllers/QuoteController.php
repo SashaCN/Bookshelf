@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class QuoteController extends Controller
 {
     /**
-     * The reader's quotes, newest first, optionally only favorites, one type, or one library entry.
+     * The reader's quotes, newest first (best match first when searching), optionally only favorites, one type, one library entry, or a text.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -99,7 +99,7 @@ class QuoteController extends Controller
     }
 
     /**
-     * The reader's quotes narrowed by the favorite, book and type filters of the request.
+     * The reader's quotes narrowed by the favorite, book, type and text-search (q) filters of the request.
      *
      * @return Builder<Quote>
      */
@@ -109,11 +109,13 @@ class QuoteController extends Controller
             'favorite' => ['nullable', 'boolean'],
             'book' => ['nullable', 'integer'],
             'type' => ['nullable', Rule::enum(QuoteType::class)],
+            'q' => ['nullable', 'string', 'min:2', 'max:100'],
         ]);
 
         return Quote::query()->whereBelongsTo($request->user())
             ->when($request->boolean('favorite'), fn ($query) => $query->where('is_favorite', true))
             ->when($filters['book'] ?? null, fn ($query, int $book) => $query->where('user_book_id', $book))
-            ->when($filters['type'] ?? null, fn ($query, string $type) => $query->where('type', $type));
+            ->when($filters['type'] ?? null, fn ($query, string $type) => $query->where('type', $type))
+            ->when($filters['q'] ?? null, fn ($query, string $search) => $query->search($search));
     }
 }

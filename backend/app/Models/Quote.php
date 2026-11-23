@@ -94,6 +94,38 @@ class Quote extends Model
     }
 
     /**
+     * Quotes whose text or note contains every word of the search (FULLTEXT index with the ngram parser), most relevant
+     * first. The input is reduced to letters, digits and spaces, so it can never carry boolean-mode operators; words of
+     * one character cannot be found by the index, so a search made only of such words falls back to LIKE.
+     *
+     * @param  Builder<Quote>  $query
+     */
+    #[Scope]
+    protected function search(Builder $query, string $search): void
+    {
+        $clean = trim((string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', $search));
+        $words = array_values(array_filter(explode(' ', $clean), fn (string $word) => mb_strlen($word) >= 2));
+
+        if ($words === []) {
+            // Only letters and digits are left, so there is nothing to escape.
+            $like = "%{$clean}%";
+            $query->where(fn (Builder $inner) => $inner->where('content', 'like', $like)->orWhere('note', 'like', $like));
+
+            if ($clean === '') {
+                $query->whereRaw('1 = 0');
+            }
+
+            return;
+        }
+
+        $boolean = implode(' ', array_map(fn (string $word) => '+'.$word, $words));
+
+        $query
+            ->whereRaw('MATCH (content, note) AGAINST (? IN BOOLEAN MODE)', [$boolean])
+            ->orderByRaw('MATCH (content, note) AGAINST (? IN BOOLEAN MODE) DESC', [$boolean]);
+    }
+
+    /**
      * Quotes the viewer may like and comment on: public, from a public profile, with no block either way.
      * The same rule as the feed and profiles.
      *

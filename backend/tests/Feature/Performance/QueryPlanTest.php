@@ -195,6 +195,9 @@ function perfEndpoints(array $seed): array
         ['search name', '/api/users?q=Reader', 200],
         ['quotes list', '/api/quotes', 200],
         ['quotes filtered', '/api/quotes?favorite=1&type=quote', 200],
+        // Rows inserted in the test transaction are invisible to the FULLTEXT index, but the plan must still use it.
+        ['quotes search', '/api/quotes?q=quote', 200],
+        ['quotes search filtered', '/api/quotes?q=quote+text&favorite=1', 200],
         ['comments', "/api/quotes/{$seed['quote']}/comments", 200],
         ['stats summary', '/api/stats/summary', 200],
         ['stats daily', '/api/stats/daily?days=365', 200],
