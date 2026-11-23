@@ -926,12 +926,20 @@ route('GET', '/api/quotes/daily', () => {
   const index = dayNumber(today()) % state.quotes.length
   return ok(presentQuote(state.quotes[index]))
 })
+/** The demo's search: every word of the query is a substring of the text or the note (case-insensitive). */
+function matchesSearch(q: StoredQuote, search: string | null): boolean {
+  const words = (search ?? '').toLowerCase().split(/\s+/).filter(Boolean)
+  const haystack = `${q.content} ${q.note ?? ''}`.toLowerCase()
+  return words.every((word) => haystack.includes(word))
+}
+
 // Simple on purpose: the real export escapes Markdown, the demo only has to hand over a believable file.
 route('GET', '/api/quotes/export', (_p, query) => {
   const chosen = state.quotes
     .filter((q) => query.get('favorite') !== '1' || q.is_favorite)
     .filter((q) => !query.get('book') || q.user_book_id === Number(query.get('book')))
     .filter((q) => !query.get('type') || q.type === query.get('type'))
+    .filter((q) => matchesSearch(q, query.get('q')))
     .sort((a, b) => a.id - b.id)
 
   const byBook = new Map<string, string[]>()
@@ -954,6 +962,7 @@ route('GET', '/api/quotes', (_p, query) => {
     .filter((q) => query.get('favorite') !== '1' || q.is_favorite)
     .filter((q) => !query.get('book') || q.user_book_id === Number(query.get('book')))
     .filter((q) => !query.get('type') || q.type === query.get('type'))
+    .filter((q) => matchesSearch(q, query.get('q')))
     .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
   const { data, links } = paginate(all, page, '/api/quotes')
   return { data: data.map((q) => ({ ...presentQuote(q), likes_count: withLikes(q).likes_count })), links }

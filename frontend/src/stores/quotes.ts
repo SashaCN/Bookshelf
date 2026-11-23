@@ -4,7 +4,7 @@ import { quotesApi } from '@/api/quotes'
 import type { Quote, QuoteFilters, QuotePayload } from '@/types/api'
 
 function sameFilters(a: QuoteFilters, b: QuoteFilters): boolean {
-  return Boolean(a.favorite) === Boolean(b.favorite) && a.book === b.book && a.type === b.type
+  return Boolean(a.favorite) === Boolean(b.favorite) && a.book === b.book && a.type === b.type && (a.q ?? '') === (b.q ?? '')
 }
 
 export const useQuotesStore = defineStore('quotes', () => {
@@ -27,7 +27,9 @@ export const useQuotesStore = defineStore('quotes', () => {
 
   /** Whether a quote belongs in the list that is on screen. */
   function matches(quote: Quote): boolean {
-    const { favorite, book, type } = filters.value
+    const { favorite, book, type, q } = filters.value
+    // Whether a quote contains the words is for the server's index to say.
+    if (q) return false
     return (!favorite || quote.is_favorite) && (book === undefined || quote.user_book_id === book) && (type === undefined || quote.type === type)
   }
 

@@ -81,6 +81,20 @@ describe('demo mock API', () => {
     expect(await quotesApi.daily()).not.toBeNull()
   })
 
+  it('searches the text and notes, every word, ignoring case, together with the filters', async () => {
+    const byText = (await quotesApi.list({ q: 'ЗОРКО' })).data
+    expect(byText.map((q) => q.content)).toEqual(['Зорко одне лише серце. Найголовнішого очима не побачиш.'])
+
+    const byNote = (await quotesApi.list({ q: 'ОРВЕЛЛОМ цикл' })).data
+    expect(byNote).toHaveLength(1)
+    expect(byNote[0].note).toContain('Орвеллом')
+
+    expect((await quotesApi.list({ q: 'зорко орвеллом' })).data).toEqual([])
+    expect((await quotesApi.list({ q: 'зорко', favorite: true })).data.every((q) => q.is_favorite)).toBe(true)
+    expect(await (await quotesApi.exportMarkdown({ q: 'зорко' })).text()).not.toContain('Свобода')
+    expect(await (await quotesApi.exportMarkdown({ q: 'ніщонемає' })).text()).toContain('Цитат поки немає.')
+  })
+
   it('exports the quotes as Markdown, honouring the filters', async () => {
     const all = await (await quotesApi.exportMarkdown()).text()
     expect(all.startsWith('# Мої цитати\n')).toBe(true)

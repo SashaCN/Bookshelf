@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
@@ -199,6 +199,134 @@ describe('QuotesView', () => {
 
       expect(router.currentRoute.value.query).toEqual({})
       expect(wrapper.findAll('blockquote')).toHaveLength(1)
+    })
+  })
+
+  describe('search', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function type(wrapper: ReturnType<typeof mount>, text: string) {
+      await wrapper.get('#quotes-search').setValue(text)
+    }
+
+    async function settle() {
+      await vi.advanceTimersByTimeAsync(300)
+      await flushPromises()
+    }
+
+    it('has a labelled search field', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.get('#quotes-search').attributes('type')).toBe('search')
+      expect(wrapper.get('label[for="quotes-search"]').text()).toBe('Пошук у цитатах')
+    })
+
+    it('waits 300 ms after the last keystroke, then searches and remembers the text in the URL', async () => {
+      const { wrapper, router } = await mountView()
+      vi.mocked(quotesApi.list).mockClear()
+
+      await type(wrapper, 'щас')
+      await type(wrapper, 'щастя')
+      await vi.advanceTimersByTimeAsync(299)
+      expect(quotesApi.list).not.toHaveBeenCalled()
+
+      await settle()
+
+      expect(quotesApi.list).toHaveBeenCalledTimes(1)
+      expect(quotesApi.list).toHaveBeenLastCalledWith({ q: 'щастя' }, 1)
+      expect(router.currentRoute.value.query).toEqual({ q: 'щастя' })
+    })
+
+    it('does not search for a single character', async () => {
+      const { wrapper, router } = await mountView()
+      vi.mocked(quotesApi.list).mockClear()
+
+      await type(wrapper, 'щ')
+      await settle()
+
+      expect(quotesApi.list).not.toHaveBeenCalled()
+      expect(router.currentRoute.value.query).toEqual({})
+    })
+
+    it('starts from the text in the URL and works with the other filters', async () => {
+      const { wrapper, router } = await mountView({ q: 'зорі', favorite: '1' })
+
+      expect((wrapper.get('#quotes-search').element as HTMLInputElement).value).toBe('зорі')
+      expect(quotesApi.list).toHaveBeenLastCalledWith({ favorite: true, q: 'зорі' }, 1)
+
+      await wrapper.get('#quotes-book').setValue(2)
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1', book: '2', q: 'зорі' })
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ book: '2', q: 'зорі' })
+    })
+
+    it('keeps the book and favorites when the search changes', async () => {
+      const { wrapper, router } = await mountView({ favorite: '1', book: '2' })
+
+      await type(wrapper, 'небо')
+      await settle()
+
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1', book: '2', q: 'небо' })
+    })
+
+    it('clears the search at once with the button', async () => {
+      const { wrapper, router } = await mountView({ q: 'зорі' })
+      vi.mocked(quotesApi.list).mockClear()
+
+      await wrapper.get('button[aria-label="Очистити пошук"]').trigger('click')
+      await flushPromises()
+
+      expect((wrapper.get('#quotes-search').element as HTMLInputElement).value).toBe('')
+      expect(router.currentRoute.value.query).toEqual({})
+      expect(quotesApi.list).toHaveBeenLastCalledWith({}, 1)
+      expect(wrapper.find('button[aria-label="Очистити пошук"]').exists()).toBe(false)
+    })
+
+    it('says nothing was found, which is not the empty-library message', async () => {
+      const { wrapper } = await mountView({ q: 'зорі' }, page([]))
+
+      expect(wrapper.text()).toContain('Нічого не знайдено')
+      expect(wrapper.text()).toContain('«зорі»')
+      expect(wrapper.text()).not.toContain('Ще немає цитат')
+    })
+
+    it('shows only the answer to the latest search', async () => {
+      const { wrapper } = await mountView()
+      let answerFirst: (value: QuotesPage) => void = () => {}
+      vi.mocked(quotesApi.list)
+        .mockReturnValueOnce(new Promise<QuotesPage>((resolve) => (answerFirst = resolve)))
+        .mockResolvedValueOnce(page([makeQuote({ id: 8, content: 'Newest' })]))
+
+      await type(wrapper, 'перше')
+      await settle()
+      await type(wrapper, 'друге')
+      await settle()
+      answerFirst(page([makeQuote({ id: 7, content: 'Stale' })]))
+      await flushPromises()
+
+      expect(wrapper.findAll('blockquote').map((quote) => quote.text())).toEqual(['Newest'])
+    })
+
+    it('exports with the search', async () => {
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn().mockReturnValue('blob:x') })
+      Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+      vi.mocked(quotesApi.exportMarkdown).mockResolvedValue(new Blob(['x']))
+      const { wrapper } = await mountView({ q: 'зорі' })
+
+      await buttonWithText(wrapper, 'Експорт у Markdown').trigger('click')
+      await flushPromises()
+
+      expect(quotesApi.exportMarkdown).toHaveBeenCalledWith({ q: 'зорі' })
     })
   })
 

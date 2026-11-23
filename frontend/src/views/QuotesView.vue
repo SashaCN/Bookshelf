@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
@@ -26,6 +26,9 @@ const exporting = ref(false)
 const exportError = ref('')
 
 const REVOKE_DELAY_MS = 10_000
+const SEARCH_DELAY_MS = 300
+const MIN_QUERY_LENGTH = 2
+const MAX_QUERY_LENGTH = 100
 
 // The filters live in the URL, so going back from a quote returns to the same list.
 const favoritesOnly = computed(() => route.query.favorite === '1')
@@ -33,24 +36,67 @@ const bookFilter = computed(() => {
   const id = Number(route.query.book)
   return Number.isInteger(id) && id > 0 ? id : undefined
 })
+// A search shorter than the server accepts is not a search yet.
+const searchFilter = computed(() => {
+  const text = typeof route.query.q === 'string' ? route.query.q.trim() : ''
+  return text.length >= MIN_QUERY_LENGTH ? text.slice(0, MAX_QUERY_LENGTH) : undefined
+})
 const filters = computed(() => {
   const result: QuoteFilters = {}
   if (favoritesOnly.value) result.favorite = true
   if (bookFilter.value !== undefined) result.book = bookFilter.value
+  if (searchFilter.value !== undefined) result.q = searchFilter.value
   return result
 })
-const hasFilters = computed(() => favoritesOnly.value || bookFilter.value !== undefined)
+const hasFilters = computed(() => favoritesOnly.value || bookFilter.value !== undefined || searchFilter.value !== undefined)
 
-function select(next: { favorite?: boolean; book?: number }) {
+function select(next: { favorite?: boolean; book?: number; q?: string }) {
   const query: Record<string, string> = {}
   if (next.favorite) query.favorite = '1'
   if (next.book !== undefined) query.book = String(next.book)
+  if (next.q) query.q = next.q
   router.replace({ name: 'quotes', query })
 }
 
+// --- search -----------------------------------------------------------------------------------------------------
+
+// What is typed; it reaches the URL (and so the list) 300 ms after the last keystroke. Only the newest request counts:
+// the store drops the answer of any list the reader has already moved on from.
+const search = ref(searchFilter.value ?? (typeof route.query.q === 'string' ? route.query.q : ''))
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+
+function applySearch() {
+  const text = search.value.trim()
+  select({ favorite: favoritesOnly.value, book: bookFilter.value, q: text.length >= MIN_QUERY_LENGTH ? text : undefined })
+}
+
+watch(search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(applySearch, SEARCH_DELAY_MS)
+})
+
+function clearSearch() {
+  clearTimeout(searchTimer)
+  search.value = ''
+  select({ favorite: favoritesOnly.value, book: bookFilter.value })
+}
+
+// Back and forward change the URL under the field.
+watch(searchFilter, (value) => {
+  const typed = search.value.trim()
+  if ((value ?? '') !== (typed.length >= MIN_QUERY_LENGTH ? typed : '')) {
+    clearTimeout(searchTimer)
+    search.value = value ?? ''
+    // Setting the field above queued another update of the URL; it would only repeat this one.
+    clearTimeout(searchTimer)
+  }
+})
+
+onBeforeUnmount(() => clearTimeout(searchTimer))
+
 const book = computed({
   get: () => bookFilter.value ?? '',
-  set: (value: number | '') => select({ favorite: favoritesOnly.value, book: value === '' ? undefined : value }),
+  set: (value: number | '') => select({ favorite: favoritesOnly.value, book: value === '' ? undefined : value, q: searchFilter.value }),
 })
 
 async function load() {
@@ -65,7 +111,7 @@ async function load() {
 }
 
 watch(
-  () => `${favoritesOnly.value}:${bookFilter.value}`,
+  () => `${favoritesOnly.value}:${bookFilter.value}:${searchFilter.value ?? ''}`,
   () => {
     // While the reader leaves for another screen the route already holds that screen's query.
     if (route.name === 'quotes') load()
@@ -113,13 +159,35 @@ onMounted(() => {
   </PageHeader>
 
   <div class="mb-4 flex flex-col gap-3">
+    <div class="relative">
+      <label for="quotes-search" class="sr-only">{{ $t('quotes.search.label') }}</label>
+      <input
+        id="quotes-search"
+        v-model="search"
+        type="search"
+        :maxlength="MAX_QUERY_LENGTH"
+        :placeholder="$t('quotes.search.label')"
+        autocomplete="off"
+        class="min-h-11 w-full rounded-lg border border-line bg-surface px-3 pr-12 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 [&::-webkit-search-cancel-button]:hidden"
+      >
+      <button
+        v-if="search"
+        type="button"
+        :aria-label="$t('quotes.search.clear')"
+        class="absolute right-0 top-0 inline-flex size-11 items-center justify-center text-ink-muted"
+        @click="clearSearch"
+      >
+        <span aria-hidden="true">✕</span>
+      </button>
+    </div>
+
     <div role="group" :aria-label="$t('quotes.filters.label')" class="flex gap-2">
       <button
         type="button"
         :aria-pressed="!favoritesOnly"
         class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium"
         :class="!favoritesOnly ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
-        @click="select({ book: bookFilter })"
+        @click="select({ book: bookFilter, q: searchFilter })"
       >
         {{ $t('quotes.filters.all') }}
       </button>
@@ -128,7 +196,7 @@ onMounted(() => {
         :aria-pressed="favoritesOnly"
         class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium"
         :class="favoritesOnly ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
-        @click="select({ favorite: true, book: bookFilter })"
+        @click="select({ favorite: true, book: bookFilter, q: searchFilter })"
       >
         {{ $t('quotes.filters.favorites') }}
       </button>
@@ -172,6 +240,21 @@ onMounted(() => {
         <QuoteCard :quote="quote" />
       </li>
     </ul>
+
+    <EmptyState
+      v-else-if="searchFilter !== undefined"
+      class="mt-4"
+      :title="$t('quotes.search.emptyTitle')"
+      :text="$t('quotes.search.emptyText', { q: searchFilter })"
+    >
+      <button
+        type="button"
+        class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium"
+        @click="clearSearch"
+      >
+        {{ $t('quotes.search.clear') }}
+      </button>
+    </EmptyState>
 
     <EmptyState
       v-else-if="hasFilters"

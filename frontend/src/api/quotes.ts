@@ -6,6 +6,7 @@ function filterParams(filters: QuoteFilters): URLSearchParams {
   if (filters.favorite) params.set('favorite', '1')
   if (filters.book !== undefined) params.set('book', String(filters.book))
   if (filters.type) params.set('type', filters.type)
+  if (filters.q) params.set('q', filters.q)
   return params
 }
 

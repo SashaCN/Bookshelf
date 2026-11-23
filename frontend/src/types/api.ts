@@ -188,6 +188,8 @@ export interface QuoteFilters {
   /** The id of a library entry (user book). */
   book?: number
   type?: QuoteType
+  /** Full-text search over the text and notes of the reader's quotes (2 to 100 characters). */
+  q?: string
 }
 
 /** A public review of a book, as other readers see it. */
