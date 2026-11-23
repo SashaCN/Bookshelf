@@ -20,6 +20,8 @@ class User extends Authenticatable
 
     public const DEFAULT_TIMEZONE = 'Europe/Kyiv';
 
+    public const NEW_FOLLOWERS_CAP = 99;
+
     /**
      * Defaults of a freshly created reader, mirroring the column defaults.
      *
@@ -78,6 +80,19 @@ class User extends Authenticatable
     }
 
     /**
+     * Public followers who followed after the reader last looked at the list, capped at NEW_FOLLOWERS_CAP.
+     */
+    public function newFollowersCount(): int
+    {
+        $count = $this->followers()
+            ->where('users.is_public', true)
+            ->when($this->followers_seen_at, fn ($query, $seenAt) => $query->where('follows.created_at', '>', $seenAt))
+            ->count();
+
+        return min($count, self::NEW_FOLLOWERS_CAP);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -88,6 +103,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_public' => 'boolean',
+            'followers_seen_at' => 'datetime',
         ];
     }
 }

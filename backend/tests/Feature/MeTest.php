@@ -25,6 +25,7 @@ it('returns the authenticated user', function () {
             'timezone' => 'Europe/Kyiv',
             'username' => null,
             'is_public' => false,
+            'new_followers_count' => 0,
         ]]);
 });
 

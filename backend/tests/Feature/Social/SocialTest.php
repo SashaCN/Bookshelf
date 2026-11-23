@@ -601,3 +601,86 @@ describe('quote likes', function () {
         }
     });
 });
+
+describe('new followers', function () {
+    function followedBy(User $followee, User $follower, string $at = 'now'): void
+    {
+        DB::table('follows')->insert([
+            'follower_id' => $follower->id,
+            'followed_id' => $followee->id,
+            'created_at' => now()->modify($at),
+        ]);
+    }
+
+    it('counts public followers after the seen mark, all of them when never seen', function () {
+        followedBy($this->me, $this->alice, '-2 days');
+        followedBy($this->me, $this->hidden, '-1 day');
+        followedBy($this->me, User::factory()->public()->create(['username' => 'bob']), '-1 hour');
+
+        $this->actingAs($this->me)->getJson('/api/me')->assertJsonPath('data.new_followers_count', 2);
+
+        $this->me->forceFill(['followers_seen_at' => now()->subDay()])->save();
+
+        $this->actingAs($this->me)->getJson('/api/me')->assertJsonPath('data.new_followers_count', 1);
+    });
+
+    it('caps the count at 99', function () {
+        User::factory()->public()->count(100)->create()->each(fn (User $u) => followedBy($this->me, $u));
+
+        $this->actingAs($this->me)->getJson('/api/me')->assertJsonPath('data.new_followers_count', 99);
+    });
+
+    it('resets the count once the list is marked as seen', function () {
+        followedBy($this->me, $this->alice);
+
+        $this->actingAs($this->me)->postJson('/api/me/followers-seen')->assertNoContent();
+
+        expect($this->me->fresh()->followers_seen_at)->not->toBeNull();
+        $this->actingAs($this->me)->getJson('/api/me')->assertJsonPath('data.new_followers_count', 0);
+    });
+
+    it('requires authentication to mark followers as seen', function () {
+        $this->postJson('/api/me/followers-seen')->assertUnauthorized();
+    });
+
+    it('flags new followers for the profile owner only', function () {
+        $this->alice->forceFill(['is_public' => true, 'followers_seen_at' => now()->subDay()])->save();
+        $old = User::factory()->public()->create(['username' => 'old']);
+        followedBy($this->alice, $old, '-2 days');
+        followedBy($this->alice, $this->me->forceFill(['username' => 'me', 'is_public' => true]));
+        $this->me->save();
+
+        $this->actingAs($this->alice)->getJson('/api/users/alice/followers')
+            ->assertOk()
+            ->assertJsonPath('data.0.username', 'me')
+            ->assertJsonPath('data.0.is_new', true)
+            ->assertJsonPath('data.1.username', 'old')
+            ->assertJsonPath('data.1.is_new', false);
+    });
+
+    it('does not reveal is_new to other readers', function () {
+        followedBy($this->alice, User::factory()->public()->create(['username' => 'fan']));
+
+        $response = $this->actingAs($this->me)->getJson('/api/users/alice/followers')->assertOk();
+
+        expect($response->json('data.0'))->not->toHaveKey('is_new');
+    });
+
+    it('does not run a query per follower', function () {
+        foreach (range(1, 5) as $i) {
+            followedBy($this->alice, User::factory()->public()->create());
+        }
+
+        DB::enableQueryLog();
+        $this->actingAs($this->alice)->getJson('/api/users/alice/followers')->assertOk();
+        $count = count(DB::getQueryLog());
+
+        foreach (range(1, 5) as $i) {
+            followedBy($this->alice, User::factory()->public()->create());
+        }
+        DB::flushQueryLog();
+        $this->actingAs($this->alice)->getJson('/api/users/alice/followers')->assertOk();
+
+        expect(count(DB::getQueryLog()))->toBe($count);
+    });
+});

@@ -16,9 +16,16 @@ class ProfileMemberResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $member = [
             'username' => $this->username,
             'name' => $this->name,
         ];
+
+        // Set by the controller for the owner's own followers list only.
+        if (array_key_exists('is_new', $this->resource->getAttributes())) {
+            $member['is_new'] = (bool) $this->resource->getAttribute('is_new');
+        }
+
+        return $member;
     }
 }

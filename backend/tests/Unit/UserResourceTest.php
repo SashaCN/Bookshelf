@@ -24,5 +24,6 @@ it('exposes only the public profile fields', function () {
         'timezone' => 'Europe/Kyiv',
         'username' => null,
         'is_public' => false,
+        'new_followers_count' => 0,
     ]);
 });

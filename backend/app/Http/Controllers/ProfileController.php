@@ -11,6 +11,7 @@ use App\Http\Resources\PublicReviewResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Carbon;
 
 class ProfileController extends Controller
 {
@@ -35,7 +36,22 @@ class ProfileController extends Controller
 
     public function followers(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
     {
-        return ProfileMemberResource::collection($query->followers($find->handle($request->user('sanctum'), $username)));
+        $viewer = $request->user('sanctum');
+        $profile = $find->handle($viewer, $username);
+        $followers = $query->followers($profile);
+
+        // Only the owner learns which followers are new; the seen mark is theirs alone.
+        if ($viewer?->is($profile)) {
+            $seenAt = $profile->followers_seen_at;
+            foreach ($followers->items() as $follower) {
+                $follower->setAttribute(
+                    'is_new',
+                    $seenAt === null || Carbon::parse($follower->pivot->getAttribute('created_at'))->greaterThan($seenAt),
+                );
+            }
+        }
+
+        return ProfileMemberResource::collection($followers);
     }
 
     public function following(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
