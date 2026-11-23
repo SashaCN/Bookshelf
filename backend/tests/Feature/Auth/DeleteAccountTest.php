@@ -91,7 +91,7 @@ it('answers 401 to a guest', function () {
 it('cannot log in after deletion', function () {
     $this->actingAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertNoContent();
 
-    $this->app['auth']->forgetGuards();
+    $this->actAsGuest();
 
     $this->postJson('/api/auth/login', ['email' => $this->user->email, 'password' => 'password'])
         ->assertUnprocessable();

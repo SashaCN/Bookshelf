@@ -18,17 +18,6 @@ function blockQuote(User $user, bool $public = true): Quote
     return ($public ? $factory->public() : $factory)->create();
 }
 
-/**
- * Acts as the user with fresh guards: Sanctum's request guard caches the first user it resolved
- * for the lifetime of the application, which a test that switches actors would otherwise hit.
- */
-function actAs($test, ?User $user)
-{
-    auth()->forgetGuards();
-
-    return $user === null ? $test : $test->actingAs($user);
-}
-
 function blockUsernames($response): array
 {
     return collect($response->json('data'))->pluck('username')->all();
@@ -44,7 +33,7 @@ it('requires authentication for the block endpoints', function (string $method, 
 
 describe('blocking', function () {
     it('blocks and unblocks idempotently', function () {
-        actAs($this, $this->alice);
+        $this->actAs($this->alice);
 
         $this->postJson('/api/users/bob/block')->assertNoContent();
         $this->postJson('/api/users/bob/block')->assertNoContent();
@@ -56,23 +45,23 @@ describe('blocking', function () {
     });
 
     it('answers 404 for an unknown handle', function (string $method) {
-        actAs($this, $this->alice)->json($method, '/api/users/nobody/block')->assertNotFound();
+        $this->actAs($this->alice)->json($method, '/api/users/nobody/block')->assertNotFound();
     })->with(['POST', 'DELETE']);
 
     it('is case-insensitive about the handle', function () {
-        actAs($this, $this->alice)->postJson('/api/users/BOB/block')->assertNoContent();
+        $this->actAs($this->alice)->postJson('/api/users/BOB/block')->assertNoContent();
         expect(DB::table('user_blocks')->where('blocked_id', $this->bob->id)->exists())->toBeTrue();
     });
 
     it('can block a private profile', function () {
         $hidden = User::factory()->create(['username' => 'hidden', 'is_public' => false]);
 
-        actAs($this, $this->alice)->postJson('/api/users/hidden/block')->assertNoContent();
+        $this->actAs($this->alice)->postJson('/api/users/hidden/block')->assertNoContent();
         expect(DB::table('user_blocks')->where('blocked_id', $hidden->id)->exists())->toBeTrue();
     });
 
     it('refuses to block yourself', function () {
-        actAs($this, $this->alice)->postJson('/api/users/alice/block')
+        $this->actAs($this->alice)->postJson('/api/users/alice/block')
             ->assertUnprocessable()
             ->assertJsonPath('errors.username.0', 'block.self');
 
@@ -80,7 +69,7 @@ describe('blocking', function () {
     });
 
     it('lists the blocked readers, newest block first, paginated', function () {
-        actAs($this, $this->alice);
+        $this->actAs($this->alice);
         $this->postJson('/api/users/bob/block');
         $this->travel(1)->minute();
         $this->postJson('/api/users/carol/block');
@@ -104,9 +93,9 @@ describe('blocking', function () {
     });
 
     it('does not list who blocked you', function () {
-        actAs($this, $this->alice)->postJson('/api/users/bob/block');
+        $this->actAs($this->alice)->postJson('/api/users/bob/block');
 
-        actAs($this, $this->bob)->getJson('/api/me/blocks')->assertOk()->assertJsonCount(0, 'data');
+        $this->actAs($this->bob)->getJson('/api/me/blocks')->assertOk()->assertJsonCount(0, 'data');
     });
 
     it('removes follows in both directions and likes in both directions, in one go', function () {
@@ -120,7 +109,7 @@ describe('blocking', function () {
             DB::table('quote_likes')->insert(['user_id' => $user->id, 'quote_id' => $quote->id, 'created_at' => now()]);
         }
 
-        actAs($this, $this->alice)->postJson('/api/users/bob/block')->assertNoContent();
+        $this->actAs($this->alice)->postJson('/api/users/bob/block')->assertNoContent();
 
         expect(DB::table('follows')->get()->map(fn ($f) => [$f->follower_id, $f->followed_id])->all())
             ->toEqualCanonicalizing([[$this->alice->id, $this->carol->id], [$this->bob->id, $this->carol->id]]);
@@ -131,11 +120,11 @@ describe('blocking', function () {
     it('keeps the counts of third parties consistent', function () {
         $this->carol->following()->attach([$this->alice->id, $this->bob->id]);
         $this->alice->following()->attach($this->bob->id);
-        actAs($this, $this->carol)->getJson('/api/users/bob')->assertJsonPath('data.followers_count', 2);
+        $this->actAs($this->carol)->getJson('/api/users/bob')->assertJsonPath('data.followers_count', 2);
 
-        actAs($this, $this->alice)->postJson('/api/users/bob/block');
+        $this->actAs($this->alice)->postJson('/api/users/bob/block');
 
-        actAs($this, $this->carol)->getJson('/api/users/bob')->assertJsonPath('data.followers_count', 1);
+        $this->actAs($this->carol)->getJson('/api/users/bob')->assertJsonPath('data.followers_count', 1);
         $this->getJson('/api/users/bob/followers')->assertJsonCount(1, 'data');
     });
 
@@ -147,22 +136,22 @@ describe('visibility when A blocks B', function () {
         $this->aliceQuote = blockQuote($this->alice);
         $this->bobQuote = blockQuote($this->bob);
         $this->carolQuote = blockQuote($this->carol);
-        actAs($this, $this->alice)->postJson('/api/users/bob/block')->assertNoContent();
+        $this->actAs($this->alice)->postJson('/api/users/bob/block')->assertNoContent();
     });
 
     it('hides the profile and its tabs from both sides', function (string $suffix) {
-        actAs($this, $this->bob)->getJson("/api/users/alice{$suffix}")->assertNotFound();
-        actAs($this, $this->alice)->getJson("/api/users/bob{$suffix}")->assertNotFound();
-        actAs($this, $this->carol)->getJson("/api/users/alice{$suffix}")->assertOk();
-        actAs($this, $this->carol)->getJson("/api/users/bob{$suffix}")->assertOk();
+        $this->actAs($this->bob)->getJson("/api/users/alice{$suffix}")->assertNotFound();
+        $this->actAs($this->alice)->getJson("/api/users/bob{$suffix}")->assertNotFound();
+        $this->actAs($this->carol)->getJson("/api/users/alice{$suffix}")->assertOk();
+        $this->actAs($this->carol)->getJson("/api/users/bob{$suffix}")->assertOk();
     })->with(['', '/quotes', '/reviews', '/followers', '/following']);
 
     it('refuses follow and like in both directions', function () {
-        actAs($this, $this->bob);
+        $this->actAs($this->bob);
         $this->postJson('/api/users/alice/follow')->assertNotFound();
         $this->postJson("/api/quotes/{$this->aliceQuote->id}/like")->assertNotFound();
 
-        actAs($this, $this->alice);
+        $this->actAs($this->alice);
         $this->postJson('/api/users/bob/follow')->assertNotFound();
         $this->postJson("/api/quotes/{$this->bobQuote->id}/like")->assertNotFound();
 
@@ -170,14 +159,14 @@ describe('visibility when A blocks B', function () {
     });
 
     it('does not keep a like that is taken back after the block', function () {
-        actAs($this, $this->bob)->deleteJson("/api/quotes/{$this->aliceQuote->id}/like")->assertNotFound();
+        $this->actAs($this->bob)->deleteJson("/api/quotes/{$this->aliceQuote->id}/like")->assertNotFound();
     });
 
     it('leaves each other out of search', function () {
-        expect(blockUsernames(actAs($this, $this->bob)->getJson('/api/users?q=al')))->not->toContain('alice');
-        expect(blockUsernames(actAs($this, $this->bob)->getJson('/api/users?q=ca')))->toContain('carol');
-        expect(blockUsernames(actAs($this, $this->alice)->getJson('/api/users?q=bo')))->not->toContain('bob');
-        expect(blockUsernames(actAs($this, $this->carol)->getJson('/api/users?q=bo')))->toContain('bob');
+        expect(blockUsernames($this->actAs($this->bob)->getJson('/api/users?q=al')))->not->toContain('alice');
+        expect(blockUsernames($this->actAs($this->bob)->getJson('/api/users?q=ca')))->toContain('carol');
+        expect(blockUsernames($this->actAs($this->alice)->getJson('/api/users?q=bo')))->not->toContain('bob');
+        expect(blockUsernames($this->actAs($this->carol)->getJson('/api/users?q=bo')))->toContain('bob');
     });
 
     it('leaves each other out of the feed', function () {
@@ -189,8 +178,8 @@ describe('visibility when A blocks B', function () {
             ['follower_id' => $this->alice->id, 'followed_id' => $this->carol->id, 'created_at' => now()],
         ]);
 
-        actAs($this, $this->bob)->getJson('/api/feed')->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $this->carolQuote->id);
-        actAs($this, $this->alice)->getJson('/api/feed')->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $this->carolQuote->id);
+        $this->actAs($this->bob)->getJson('/api/feed')->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $this->carolQuote->id);
+        $this->actAs($this->alice)->getJson('/api/feed')->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $this->carolQuote->id);
     });
 
     it('leaves each other out of the lists of a third party', function () {
@@ -201,12 +190,12 @@ describe('visibility when A blocks B', function () {
             ['follower_id' => $this->carol->id, 'followed_id' => $this->bob->id, 'created_at' => now()],
         ]);
 
-        actAs($this, $this->bob);
+        $this->actAs($this->bob);
         expect(blockUsernames($this->getJson('/api/users/carol/followers')))->toBe(['bob'])
             ->and(blockUsernames($this->getJson('/api/users/carol/following')))->toBe(['bob']);
         $this->getJson('/api/users/carol')->assertJsonPath('data.followers_count', 1)->assertJsonPath('data.following_count', 1);
 
-        actAs($this, $this->alice);
+        $this->actAs($this->alice);
         expect(blockUsernames($this->getJson('/api/users/carol/followers')))->toBe(['alice']);
 
     });
@@ -214,11 +203,11 @@ describe('visibility when A blocks B', function () {
     it('does not count the blocked in the new-follower badge', function () {
         DB::table('follows')->insert(['follower_id' => $this->bob->id, 'followed_id' => $this->alice->id, 'created_at' => now()]);
 
-        actAs($this, $this->alice)->getJson('/api/me')->assertJsonPath('data.new_followers_count', 0);
+        $this->actAs($this->alice)->getJson('/api/me')->assertJsonPath('data.new_followers_count', 0);
     });
 
     it('leaves guests unaffected', function () {
-        actAs($this, null);
+        $this->actAsGuest();
 
         $this->getJson('/api/users/alice')->assertOk();
         $this->getJson('/api/users/bob')->assertOk();
@@ -227,23 +216,23 @@ describe('visibility when A blocks B', function () {
     });
 
     it('restores visibility on unblock but not the deleted follows or likes', function () {
-        actAs($this, $this->alice)->deleteJson('/api/users/bob/block')->assertNoContent();
+        $this->actAs($this->alice)->deleteJson('/api/users/bob/block')->assertNoContent();
 
-        actAs($this, $this->bob)->getJson('/api/users/alice')->assertOk()->assertJsonPath('data.is_following', false);
-        actAs($this, $this->alice)->getJson('/api/users/bob')->assertOk();
+        $this->actAs($this->bob)->getJson('/api/users/alice')->assertOk()->assertJsonPath('data.is_following', false);
+        $this->actAs($this->alice)->getJson('/api/users/bob')->assertOk();
         expect(blockUsernames($this->getJson('/api/users?q=bob')))->toContain('bob');
-        actAs($this, $this->bob)->postJson("/api/quotes/{$this->aliceQuote->id}/like")->assertNoContent();
+        $this->actAs($this->bob)->postJson("/api/quotes/{$this->aliceQuote->id}/like")->assertNoContent();
         expect(DB::table('follows')->count())->toBe(0);
     });
 
     it('does not let the blocked reader undo a block by unblocking', function () {
-        actAs($this, $this->bob)->deleteJson('/api/users/alice/block')->assertNoContent();
+        $this->actAs($this->bob)->deleteJson('/api/users/alice/block')->assertNoContent();
 
-        actAs($this, $this->bob)->getJson('/api/users/alice')->assertNotFound();
+        $this->actAs($this->bob)->getJson('/api/users/alice')->assertNotFound();
     });
 
     it('does not run a query per quote in the feed', function () {
-        actAs($this, $this->carol);
+        $this->actAs($this->carol);
         $this->carol->following()->attach($this->alice->id);
         foreach (range(1, 10) as $i) {
             blockQuote($this->alice);

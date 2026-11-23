@@ -567,7 +567,7 @@ describe('quote likes', function () {
     it('shows counts to a guest, who has liked nothing', function () {
         $quote = quoteOf($this->alice);
         $this->actingAs($this->me)->postJson("/api/quotes/{$quote->id}/like");
-        app('auth')->forgetGuards();
+        $this->actAsGuest();
 
         $this->getJson('/api/users/alice/quotes')->assertOk()
             ->assertJsonPath('data.0.likes_count', 1)

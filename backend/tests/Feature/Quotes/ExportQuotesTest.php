@@ -31,7 +31,7 @@ beforeEach(function () {
 afterEach(fn () => Carbon::setTestNow());
 
 it('requires authentication', function () {
-    auth()->forgetGuards();
+    $this->actAsGuest();
 
     $this->getJson('/api/quotes/export')->assertUnauthorized();
 });
