@@ -31,6 +31,9 @@ class AppServiceProvider extends ServiceProvider
         // Each upload is unzipped and parsed, which costs far more than a normal request.
         RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(10)->by((string) ($request->user()->id ?? $request->ip())));
 
+        // An import writes up to 2,000 books in one request.
+        RateLimiter::for('library-import', fn (Request $request) => Limit::perHour(5)->by((string) $request->user()->id));
+
         // Posting is cheap but spammable: a reader may leave a handful of comments a minute.
         RateLimiter::for('comments', fn (Request $request) => Limit::perMinute(10)->by((string) $request->user()->id));
 

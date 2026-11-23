@@ -5,6 +5,7 @@ use App\Http\Controllers\CatalogSearchController;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\FollowController;
 use App\Http\Controllers\GoalController;
+use App\Http\Controllers\LibraryImportController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuoteCommentController;
@@ -36,6 +37,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/catalog/search', CatalogSearchController::class)
         ->middleware('throttle:catalog')
         ->name('catalog.search');
+
+    Route::post('/library/import', [LibraryImportController::class, 'store'])
+        ->middleware('throttle:library-import')
+        ->name('library.import');
 
     Route::apiResource('library', UserBookController::class)->parameters(['library' => 'userBook']);
 
