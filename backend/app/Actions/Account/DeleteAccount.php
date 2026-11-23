@@ -16,7 +16,13 @@ class DeleteAccount
     {
         $paths = $user->readerDocuments()->pluck('path')->all();
 
-        DB::transaction(fn () => $user->delete());
+        DB::transaction(function () use ($user): void {
+            // Neither table has a foreign key: other devices must not keep a session, nor an old reset link a live token.
+            DB::table('sessions')->where('user_id', $user->id)->delete();
+            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+
+            $user->delete();
+        });
 
         // Files that are already missing are fine.
         Storage::disk('local')->delete($paths);

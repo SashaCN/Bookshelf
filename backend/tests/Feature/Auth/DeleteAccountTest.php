@@ -107,3 +107,31 @@ it('throttles wrong passwords and keeps the account', function () {
     $this->actAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertTooManyRequests();
     expect(User::find($this->user->id))->not->toBeNull();
 });
+
+it('also removes comments, blocks, chapter reads, other sessions and reset tokens', function () {
+    [$quote, $document] = populate($this->user);
+    $theirs = Quote::factory()->public()->create();
+    DB::table('quote_comments')->insert([
+        ['quote_id' => $quote->id, 'user_id' => $this->other->id, 'body' => 'on mine', 'created_at' => now(), 'updated_at' => now()],
+        ['quote_id' => $theirs->id, 'user_id' => $this->user->id, 'body' => 'by me', 'created_at' => now(), 'updated_at' => now()],
+    ]);
+    DB::table('user_blocks')->insert([
+        ['blocker_id' => $this->user->id, 'blocked_id' => $this->other->id, 'created_at' => now()],
+        ['blocker_id' => $this->other->id, 'blocked_id' => $this->user->id, 'created_at' => now()],
+    ]);
+    DB::table('reader_chapter_reads')->insert(['reader_document_id' => $document->id, 'chapter' => 0, 'read_on' => '2026-11-01', 'created_at' => now()]);
+    DB::table('sessions')->insert(['id' => 'other-device', 'user_id' => $this->user->id, 'payload' => '', 'last_activity' => time()]);
+    DB::table('sessions')->insert(['id' => 'stranger', 'user_id' => $this->other->id, 'payload' => '', 'last_activity' => time()]);
+    DB::table('password_reset_tokens')->insert([
+        ['email' => $this->user->email, 'token' => 'x', 'created_at' => now()],
+        ['email' => $this->other->email, 'token' => 'y', 'created_at' => now()],
+    ]);
+
+    $this->actingAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertNoContent();
+
+    foreach (['quote_comments', 'user_blocks', 'reader_chapter_reads'] as $table) {
+        expect(DB::table($table)->count())->toBe(0, $table);
+    }
+    expect(DB::table('sessions')->pluck('id')->all())->toBe(['stranger']);
+    expect(DB::table('password_reset_tokens')->pluck('email')->all())->toBe([$this->other->email]);
+});
