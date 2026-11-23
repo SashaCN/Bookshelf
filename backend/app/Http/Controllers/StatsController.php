@@ -20,6 +20,7 @@ class StatsController extends Controller
         $today = $statistics->today();
         $month = $today->startOfMonth();
         $year = $today->startOfYear();
+        $chapters = $statistics->chaptersThisMonthAndYear();
 
         return response()->json(['data' => [
             'today' => [
@@ -37,6 +38,11 @@ class StatsController extends Controller
                 'books_finished' => $statistics->booksFinished($year, $today),
             ],
             'forecasts' => $statistics->forecasts(),
+            'reader' => [
+                'chapters_this_month' => $chapters['month'],
+                'chapters_this_year' => $chapters['year'],
+                'documents_in_progress' => $statistics->documentsInProgress(),
+            ],
         ]]);
     }
 
@@ -70,9 +76,10 @@ class StatsController extends Controller
         }
 
         $days = $statistics->dailyPages($from, $to);
+        $chapters = $statistics->dailyChapters($from, $to);
 
         return response()->json([
-            'data' => collect($days)->map(fn (int $pages, string $date) => ['date' => $date, 'pages' => $pages])->values(),
+            'data' => collect($days)->map(fn (int $pages, string $date) => ['date' => $date, 'pages' => $pages, 'chapters' => $chapters[$date]])->values(),
             'meta' => ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'total_pages' => array_sum($days)],
         ]);
     }

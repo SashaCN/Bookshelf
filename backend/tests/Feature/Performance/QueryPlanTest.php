@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
  * Set PERF_REPORT=1 to print the timings of each endpoint to stderr.
  */
 
-const PERF_BIG_TABLES = ['quotes', 'follows', 'quote_likes', 'quote_comments', 'reading_logs', 'user_books'];
+const PERF_BIG_TABLES = ['quotes', 'follows', 'quote_likes', 'quote_comments', 'reading_logs', 'user_books', 'reader_chapter_reads', 'reader_documents'];
 
 /** @param  list<array<string, mixed>>  $rows */
 function perfInsert(string $table, array $rows): void
@@ -158,6 +158,27 @@ function perfSeed(): array
         $logs[] = ['user_book_id' => $myBook, 'user_id' => 1, 'from_page' => 1, 'to_page' => 11, 'logged_on' => $day, 'created_at' => $now];
     }
     perfInsert('reading_logs', $logs);
+
+    // Reader: 5 EPUBs for "me", 1000 for the others, and 20000 chapter reads, a third of them "mine".
+    $documents = [];
+    for ($i = 1; $i <= 1005; $i++) {
+        $documents[] = [
+            'user_id' => $i <= 5 ? 1 : mt_rand(2, $users), 'title' => "Epub $i", 'path' => "reader/perf/$i.epub",
+            'chapters' => '[]', 'chapters_count' => 400, 'position_chapter' => 3, 'position_fraction' => 0.5,
+            'created_at' => $now, 'updated_at' => $now,
+        ];
+    }
+    perfInsert('reader_documents', $documents);
+    $firstDocument = (int) DB::table('reader_documents')->min('id');
+
+    $reads = [];
+    for ($i = 0; $i < 20000; $i++) {
+        $document = $i < 7000 ? $firstDocument + ($i % 5) : $firstDocument + 5 + ($i % 1000);
+        $reads["$document-".intdiv($i, 5)] = [
+            'reader_document_id' => $document, 'chapter' => intdiv($i, 5), 'read_on' => now('Europe/Kyiv')->subDays($i % 400)->toDateString(), 'created_at' => $now,
+        ];
+    }
+    perfInsert('reader_chapter_reads', array_values($reads));
 
     return ['me' => User::findOrFail(1), 'star' => 'reader3', 'quote' => $quote];
 }

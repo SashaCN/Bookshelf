@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Reader\ImportEpub;
 use App\Actions\Reader\LinkReaderDocument;
+use App\Actions\Reader\RecordChapterReads;
 use App\Http\Requests\StoreReaderDocumentRequest;
 use App\Http\Requests\UpdateReaderDocumentRequest;
 use App\Http\Requests\UpdateReaderPositionRequest;
@@ -57,8 +58,10 @@ class ReaderDocumentController extends Controller
         return response()->noContent();
     }
 
-    public function position(UpdateReaderPositionRequest $request, ReaderDocument $readerDocument): ReaderDocumentResource
+    public function position(UpdateReaderPositionRequest $request, ReaderDocument $readerDocument, RecordChapterReads $record): ReaderDocumentResource
     {
+        $record->handle($readerDocument, $request->user(), $readerDocument->position_chapter, $request->integer('chapter'));
+
         $readerDocument->update([
             'position_chapter' => $request->integer('chapter'),
             'position_fraction' => $request->float('fraction'),
