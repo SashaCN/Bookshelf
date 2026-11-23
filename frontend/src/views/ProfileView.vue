@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { authApi } from '@/api/auth'
 import { isApiErrorCode } from '@/api/errors'
 import { ApiError } from '@/api/http'
 import DeleteAccountDialog from '@/components/DeleteAccountDialog.vue'
@@ -12,6 +13,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useAuthStore } from '@/stores/auth'
 
+/** Revoking the link at once can cancel the download in some browsers. */
+const REVOKE_DELAY_MS = 10_000
 const BIO_MAX = 280
 
 const { t, te } = useI18n()
@@ -126,6 +129,33 @@ async function changePassword() {
     }
   } finally {
     changingPassword.value = false
+  }
+}
+
+const exporting = ref(false)
+const exportError = ref('')
+
+async function downloadData() {
+  if (exporting.value) return
+
+  exporting.value = true
+  exportError.value = ''
+
+  try {
+    const file = await authApi.exportData()
+    const url = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `bookshelf-export-${new Date().toLocaleDateString('sv-SE')}.json`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS)
+  } catch (e) {
+    // The limit is three an hour, so the generic "try in a minute" would mislead.
+    exportError.value = e instanceof ApiError && e.status === 429 ? t('account.data.tooMany') : errorMessage(e)
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -320,6 +350,22 @@ function closeDelete() {
       </button>
       <p v-if="passwordChanged" role="status" class="text-sm text-ink-muted">{{ $t('account.password.done') }}</p>
     </form>
+  </section>
+
+  <section class="mt-8 border-t border-line pt-4" aria-labelledby="profile-data-title">
+    <h2 id="profile-data-title" class="mb-1 text-lg font-semibold">{{ $t('account.data.title') }}</h2>
+    <p id="profile-data-hint" class="mb-3 text-sm text-ink-muted">{{ $t('account.data.hint') }}</p>
+    <ErrorNotice v-if="exportError" :message="exportError" class="mb-3" />
+    <button
+      type="button"
+      data-test="export-data"
+      :disabled="exporting"
+      aria-describedby="profile-data-hint"
+      class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
+      @click="downloadData"
+    >
+      {{ exporting ? $t('account.data.downloading') : $t('account.data.download') }}
+    </button>
   </section>
 
   <section class="mt-8 border-t border-line pt-4" aria-labelledby="profile-danger-title">

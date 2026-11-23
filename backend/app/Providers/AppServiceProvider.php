@@ -48,6 +48,9 @@ class AppServiceProvider extends ServiceProvider
         // An import writes up to 2,000 books in one request.
         RateLimiter::for('library-import', fn (Request $request) => Limit::perHour(5)->by($perReader($request)));
 
+        // An export reads everything the reader owns.
+        RateLimiter::for('data-export', fn (Request $request) => Limit::perHour(3)->by($perReader($request)));
+
         // A report is stored with "post" or "comment" as its type, not with the name of a class.
         Relation::morphMap(['post' => Post::class, 'comment' => Comment::class]);
     }

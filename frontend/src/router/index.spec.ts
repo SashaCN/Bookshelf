@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '@/api/auth'
-import { ApiError } from '@/api/http'
+import { ApiError, NetworkError } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { router } from './index'
 
@@ -15,6 +15,9 @@ describe('the app router', () => {
     vi.resetAllMocks()
     // Every test starts outside of the app and with nobody signed in.
     await router.replace('/login').catch(() => undefined)
+    // That visit made the store ask the API; start the test with one that has not asked yet.
+    setActivePinia(createPinia())
+    vi.resetAllMocks()
   })
 
   it('names the screen in the browser tab', async () => {
@@ -79,5 +82,46 @@ describe('the app router', () => {
     await router.push('/forgot-password')
 
     expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('sends a guest from a private page to the sign-in form', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
+
+    await router.push('/library')
+
+    expect(router.currentRoute.value.name).toBe('login')
+  })
+
+  it('lets a signed-in reader open a private page', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/stats')
+
+    expect(router.currentRoute.value.name).toBe('stats')
+  })
+
+  it('sends a signed-in reader away from the guest-only pages', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/register')
+
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('does not send anybody away while the server cannot be reached', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new NetworkError())
+
+    await router.push('/quotes')
+
+    expect(router.currentRoute.value.name).toBe('quotes')
+    expect(useAuthStore().unreachable).toBe(true)
+  })
+
+  it('treats an unexpected answer of the server as a guest', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new Error('Unexpected'))
+
+    await router.push('/quotes')
+
+    expect(router.currentRoute.value.name).toBe('login')
   })
 })

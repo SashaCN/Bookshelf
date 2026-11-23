@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Account\DeleteAccount;
+use App\Actions\Account\ExportUserData;
 use App\Http\Requests\DeleteAccountRequest;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
@@ -11,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MeController extends Controller
 {
@@ -41,6 +43,21 @@ class MeController extends Controller
         }
 
         return new UserResource($user);
+    }
+
+    /**
+     * Everything the reader owns as a JSON file for download (without the text of uploaded books).
+     */
+    public function export(Request $request, ExportUserData $export): StreamedResponse
+    {
+        $user = $request->user();
+        $filename = 'bookshelf-export-'.now($user->timezone)->toDateString().'.json';
+
+        return response()->streamDownload(function () use ($export, $user) {
+            foreach ($export->handle($user) as $piece) {
+                echo $piece;
+            }
+        }, $filename, ['Content-Type' => 'application/json; charset=UTF-8']);
     }
 
     /**
