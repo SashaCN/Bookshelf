@@ -1,0 +1,2 @@
+$ php artisan moderation:reports
+INFO  There are no open reports.

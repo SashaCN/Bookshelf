@@ -1,0 +1,10 @@
+POST /api/library/27/progress {"page": 700}
+HTTP 422
+{
+  "message": "library.page_above_total",
+  "errors": {
+    "page": [
+      "library.page_above_total"
+    ]
+  }
+}

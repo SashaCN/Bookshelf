@@ -1,0 +1,10 @@
+$ php artisan moderation:reports
++--------+---------+--------+-----------------+-----------------+--------+-----------------------------+---------------------+
+| Report | About   | Reason | By              | Note            | State  | Text                        | Reported            |
++--------+---------+--------+-----------------+-----------------+--------+-----------------------------+---------------------+
+| 1      | post 14 | spam   | @taras_melnyk   | looks like spam | hidden | Fight on, and you will win! | 2026-11-03 13:12:32 |
+| 2      | post 14 | spam   | @ivan_bondar    | looks like spam | hidden | Fight on, and you will win! | 2026-11-03 13:12:32 |
+| 3      | post 14 | spam   | @marta_shevchuk | looks like spam | hidden | Fight on, and you will win! | 2026-11-03 13:12:32 |
++--------+---------+--------+-----------------+-----------------+--------+-----------------------------+---------------------+
+
+   INFO  3 open reports. Next: moderation:hide, moderation:restore or moderation:resolve.
