@@ -688,6 +688,9 @@ route('POST', '/api/auth/register', (_p, _q, body) => {
   state.user = { ...state.user, name: String(body.name ?? 'Читач'), email: String(body.email ?? ''), timezone: String(body.timezone ?? 'Europe/Kyiv'), username: null, is_public: false, new_followers_count: 0 }
   return null
 })
+// No mail is sent in the demo: both steps of the reset succeed.
+route('POST', '/api/auth/forgot-password', () => ({ message: 'We have emailed your password reset link.' }))
+route('POST', '/api/auth/reset-password', () => ({ message: 'Your password has been reset.' }))
 route('PUT', '/api/auth/user/password', (_p, _q, body) => {
   if (!body.current_password) invalid('current_password', 'The current password is incorrect.')
   const next = String(body.password ?? '')

@@ -234,6 +234,8 @@ erDiagram
 | Метод | Шлях | Що робить |
 |---|---|---|
 | POST | `/api/auth/register`, `/api/auth/login`, `/api/auth/logout` | Fortify |
+| POST | `/api/auth/forgot-password` | запит листа для відновлення пароля (Fortify): `email`; завжди 200 з однаковою відповіддю, навіть для невідомого email, щоб не розкривати наявність акаунта; ліміт 5 на хвилину на пару IP + email, далі 429 |
+| POST | `/api/auth/reset-password` | новий пароль за токеном із листа (Fortify): `token`, `email`, `password`, `password_confirmation`; недійсний або прострочений токен: 422 (помилка в `email`); інші сесії розлогінюються |
 | PUT | `/api/auth/user/password` | змінити пароль (Fortify): `current_password`, `password`, `password_confirmation`; неправильний поточний або слабкий новий: 422; інші сесії розлогінюються |
 | GET / PATCH | `/api/me` | поточний юзер (з `new_followers_count`: публічні підписники після `followers_seen_at`, не більше 99); змінити ім'я та часовий пояс |
 | DELETE | `/api/me` | видалити акаунт: тіло `{password}`, неправильний пароль: 422 на `password`; видаляє всі дані й EPUB-файли, завершує сесію (204) |
@@ -268,6 +270,8 @@ erDiagram
 | GET | `/api/reader/{id}/chapters/{n}` | один розділ (`n` від 0) як недовірений HTML |
 | GET / POST | `/api/reader/{id}/bookmarks` | закладки розділів за порядком; додати `{chapter, note?}` (201) або змінити нотатку, якщо розділ уже в закладках (200) |
 | DELETE | `/api/reader/{id}/bookmarks/{bookmark}` | прибрати закладку (чужа або з іншого документа: 404) |
+
+Лист для відновлення пароля веде на сторінку SPA `/reset-password/{token}?email=…`. У dev-середовищі листи не відправляються (`MAIL_MAILER=log`): посилання шукайте в журналі застосунку (`backend/storage/logs/laravel.log`).
 
 ### Open Library
 

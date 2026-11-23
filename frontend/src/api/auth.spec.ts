@@ -19,6 +19,17 @@ describe('authApi', () => {
     expect(http.post).toHaveBeenCalledWith('/api/me/followers-seen')
   })
 
+  it('asks for a reset link and resets the password through Fortify', async () => {
+    vi.mocked(http.post).mockResolvedValue({})
+    const payload = { token: 'abc', email: 'a@b.test', password: 'new-password', password_confirmation: 'new-password' }
+
+    await authApi.forgotPassword('a@b.test')
+    await authApi.resetPassword(payload)
+
+    expect(http.post).toHaveBeenNthCalledWith(1, '/api/auth/forgot-password', { email: 'a@b.test' })
+    expect(http.post).toHaveBeenNthCalledWith(2, '/api/auth/reset-password', payload)
+  })
+
   it('changes the password through Fortify', async () => {
     vi.mocked(http.put).mockResolvedValue({})
     const payload = { current_password: 'old-password', password: 'new-password', password_confirmation: 'new-password' }

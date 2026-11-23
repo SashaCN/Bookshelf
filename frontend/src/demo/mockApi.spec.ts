@@ -277,6 +277,13 @@ describe('demo mock API', () => {
     await expect(socialApi.reviews('nobody')).rejects.toMatchObject({ status: 404 })
   })
 
+  it('accepts both password reset steps', async () => {
+    await expect(authApi.forgotPassword('anyone@example.com')).resolves.not.toThrow()
+    await expect(
+      authApi.resetPassword({ token: 't', email: 'anyone@example.com', password: 'new-password', password_confirmation: 'new-password' }),
+    ).resolves.not.toThrow()
+  })
+
   it('accepts a valid password change and refuses a short or unconfirmed one', async () => {
     await expect(authApi.changePassword({ current_password: 'x', password: 'new-password', password_confirmation: 'new-password' })).resolves.not.toThrow()
     await expect(authApi.changePassword({ current_password: 'x', password: 'short', password_confirmation: 'short' })).rejects.toMatchObject({ status: 422 })

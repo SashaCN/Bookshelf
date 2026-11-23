@@ -67,6 +67,22 @@ describe('router guards', () => {
     expect(router.currentRoute.value.name).toBe('home')
   })
 
+  it('opens the password reset pages for a guest', async () => {
+    await router.push('/reset-password/abc?email=a%40b.test')
+    expect(router.currentRoute.value.name).toBe('reset-password')
+
+    await router.push('/forgot-password')
+    expect(router.currentRoute.value.name).toBe('forgot-password')
+  })
+
+  it('sends a signed-in reader away from the password reset pages', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/forgot-password')
+
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
   it('opens the social pages for a signed-in reader and guards them from guests', async () => {
     vi.mocked(authApi.me).mockResolvedValue(user)
     await router.push('/u/olena/followers')

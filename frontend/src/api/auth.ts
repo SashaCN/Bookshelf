@@ -1,4 +1,4 @@
-import type { ChangePasswordPayload, LoginPayload, RegisterPayload, UpdateProfilePayload, User } from '@/types/api'
+import type { ChangePasswordPayload, LoginPayload, RegisterPayload, ResetPasswordPayload, UpdateProfilePayload, User } from '@/types/api'
 import { http } from './http'
 
 export const authApi = {
@@ -10,5 +10,7 @@ export const authApi = {
   followersSeen: () => http.post<null>('/api/me/followers-seen'),
   login: (payload: LoginPayload) => http.post<unknown>('/api/auth/login', payload),
   register: (payload: RegisterPayload) => http.post<unknown>('/api/auth/register', payload),
+  forgotPassword: (email: string) => http.post<unknown>('/api/auth/forgot-password', { email }),
+  resetPassword: (payload: ResetPasswordPayload) => http.post<unknown>('/api/auth/reset-password', payload),
   logout: () => http.post<unknown>('/api/auth/logout'),
 }

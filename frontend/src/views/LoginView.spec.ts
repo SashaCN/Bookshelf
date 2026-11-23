@@ -17,6 +17,7 @@ function mountView() {
       { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/login', name: 'login', component: LoginView },
       { path: '/register', name: 'register', component: { template: '<div />' } },
+      { path: '/forgot-password', name: 'forgot-password', component: { template: '<div />' } },
     ],
   })
   router.push('/login')
@@ -108,9 +109,23 @@ describe('LoginView', () => {
     expect(wrapper.get('[data-test="account-deleted"]').text()).toBe('Акаунт видалено')
   })
 
+  it('says the password was changed after a reset', async () => {
+    const { wrapper, router } = mountView()
+    await router.push('/login?reset=1')
+
+    expect(wrapper.get('[data-test="password-changed"]').text()).toBe('Пароль змінено, увійдіть з новим паролем')
+  })
+
+  it('links to the password reset', () => {
+    const { wrapper } = mountView()
+
+    expect(wrapper.text()).toContain('Забули пароль?')
+  })
+
   it('has no such note on a normal visit', () => {
     const { wrapper } = mountView()
 
     expect(wrapper.find('[data-test="account-deleted"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="password-changed"]').exists()).toBe(false)
   })
 })
