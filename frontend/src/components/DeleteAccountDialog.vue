@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ref } from 'vue'
+import BaseDialog from '@/components/BaseDialog.vue'
 import FormField from '@/components/FormField.vue'
 
 const props = defineProps<{
@@ -14,36 +15,6 @@ const emit = defineEmits<{
 }>()
 
 const password = ref('')
-const dialog = ref<HTMLElement | null>(null)
-/** Whatever had the focus when the dialog opened gets it back when the dialog goes away. */
-let opener: HTMLElement | null = null
-
-onMounted(async () => {
-  opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
-  await nextTick()
-  dialog.value?.querySelector<HTMLElement>('input')?.focus()
-})
-
-onBeforeUnmount(() => {
-  opener?.focus()
-})
-
-/** Keeps Tab inside the dialog, since the page behind it is not meant to be reached. */
-function trapTab(event: KeyboardEvent) {
-  const focusable = [...(dialog.value?.querySelectorAll<HTMLElement>('input, button:not(:disabled)') ?? [])]
-  if (!focusable.length) return
-
-  const first = focusable[0]
-  const last = focusable[focusable.length - 1]
-
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first.focus()
-  }
-}
 
 function submit() {
   if (!password.value || props.pending) return
@@ -52,20 +23,9 @@ function submit() {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-    <div
-      ref="dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="delete-account-title"
-      aria-describedby="delete-account-text"
-      class="flex max-h-full w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-lg"
-      @keydown.esc.stop="emit('cancel')"
-      @keydown.tab="trapTab"
-    >
-      <h2 id="delete-account-title" class="text-lg font-semibold">{{ $t('profile.danger.dialogTitle') }}</h2>
-
-      <div id="delete-account-text" class="flex flex-col gap-2 text-sm">
+  <BaseDialog :title="$t('profile.danger.dialogTitle')" initial-focus="input" @cancel="emit('cancel')">
+    <template #default="{ descriptionId }">
+      <div :id="descriptionId" class="flex flex-col gap-2 text-sm">
         <p>{{ $t('profile.danger.dialogIntro') }}</p>
         <ul class="list-disc pl-5">
           <li v-for="item in ['library', 'quotes', 'reviews', 'files', 'followers']" :key="item">
@@ -93,7 +53,7 @@ function submit() {
             class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium"
             @click="emit('cancel')"
           >
-            {{ $t('profile.danger.cancel') }}
+            {{ $t('common.cancel') }}
           </button>
           <button
             type="submit"
@@ -104,6 +64,6 @@ function submit() {
           </button>
         </div>
       </form>
-    </div>
-  </div>
+    </template>
+  </BaseDialog>
 </template>
