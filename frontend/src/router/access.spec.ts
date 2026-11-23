@@ -2,8 +2,8 @@ import type { RouteLocationNormalized } from 'vue-router'
 import { describe, expect, it } from 'vitest'
 import { redirectFor } from './access'
 
-function route(meta: Record<string, boolean>): RouteLocationNormalized {
-  return { meta } as unknown as RouteLocationNormalized
+function route(meta: Record<string, boolean>, extra: Record<string, unknown> = {}): RouteLocationNormalized {
+  return { meta, ...extra } as unknown as RouteLocationNormalized
 }
 
 const guest = { isAuthenticated: false, unreachable: false }
@@ -11,7 +11,7 @@ const reader = { isAuthenticated: true, unreachable: false }
 
 describe('redirectFor', () => {
   it('sends a guest from the app to the sign-in form', () => {
-    expect(redirectFor(route({ requiresAuth: true }), guest)).toEqual({ name: 'login' })
+    expect(redirectFor(route({ requiresAuth: true }), guest)).toEqual({ name: 'login', query: {} })
   })
 
   it('lets a signed-in reader into the app', () => {
@@ -36,5 +36,19 @@ describe('redirectFor', () => {
 
     expect(redirectFor(route({ requiresAuth: true }), unknown)).toBeNull()
     expect(redirectFor(route({ guestOnly: true }), unknown)).toBeNull()
+  })
+
+  it('remembers the page a guest wanted, except the home screen', () => {
+    expect(redirectFor(route({ requiresAuth: true }, { fullPath: '/library/7?x=1' }), guest)).toEqual({
+      name: 'login',
+      query: { redirect: '/library/7?x=1' },
+    })
+    expect(redirectFor(route({ requiresAuth: true }, { fullPath: '/' }), guest)).toEqual({ name: 'login', query: {} })
+  })
+
+  it('sends a signed-in reader back to the wanted in-app page, and ignores a foreign one', () => {
+    expect(redirectFor(route({ guestOnly: true }, { query: { redirect: '/stats' } }), reader)).toBe('/stats')
+    expect(redirectFor(route({ guestOnly: true }, { query: { redirect: 'https://evil.example' } }), reader)).toEqual({ name: 'home' })
+    expect(redirectFor(route({ guestOnly: true }, { query: { redirect: '//evil.example' } }), reader)).toEqual({ name: 'home' })
   })
 })

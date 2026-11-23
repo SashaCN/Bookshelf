@@ -48,6 +48,27 @@ describe('LoginView', () => {
     expect(router.currentRoute.value.name).toBe('home')
   })
 
+  it('returns to the page the reader was sent away from', async () => {
+    const { wrapper, router, auth } = mountView()
+    vi.spyOn(auth, 'login').mockResolvedValue()
+    await router.replace('/login?redirect=%2Fstats')
+    router.addRoute({ path: '/stats', name: 'stats', component: { template: '<div />' } })
+
+    await fillAndSubmit(wrapper)
+
+    expect(router.currentRoute.value.fullPath).toBe('/stats')
+  })
+
+  it('ignores a redirect that leads outside of the app', async () => {
+    const { wrapper, router, auth } = mountView()
+    vi.spyOn(auth, 'login').mockResolvedValue()
+    await router.replace('/login?redirect=https%3A%2F%2Fevil.example')
+
+    await fillAndSubmit(wrapper)
+
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
   it('shows a localized message for wrong credentials', async () => {
     const { wrapper, auth } = mountView()
     vi.spyOn(auth, 'login').mockRejectedValue(new ApiError(422, { errors: { email: ['These credentials do not match.'] } }))

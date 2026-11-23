@@ -46,7 +46,7 @@ describe('LibraryView', () => {
   it('opens on the "want" tab and shows how many books each tab holds', async () => {
     const { wrapper } = await mountView(library)
 
-    const tabs = wrapper.findAll('[role="tab"]').map((tab) => tab.text().replace(/\s+/g, ' '))
+    const tabs = wrapper.findAll('[aria-pressed]').map((tab) => tab.text().replace(/\s+/g, ' '))
 
     expect(tabs).toEqual(['Хочу 2', 'Читаю 1', 'Прочитано 1', 'Відкладено 0'])
     expect(wrapper.text()).toContain('Want One')
@@ -57,7 +57,7 @@ describe('LibraryView', () => {
   it('switches tabs and remembers the choice in the URL', async () => {
     const { wrapper, router } = await mountView(library)
 
-    await wrapper.findAll('[role="tab"]')[1]!.trigger('click')
+    await wrapper.findAll('[aria-pressed]')[1]!.trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.query.status).toBe('reading')
@@ -68,14 +68,14 @@ describe('LibraryView', () => {
   it('restores the tab from the URL', async () => {
     const { wrapper } = await mountView(library, { status: 'finished' })
 
-    expect(wrapper.get('[aria-selected="true"]').text()).toContain('Прочитано')
+    expect(wrapper.get('[aria-pressed="true"]').text()).toContain('Прочитано')
     expect(wrapper.text()).toContain('Finished One')
   })
 
   it('falls back to "want" for an unknown tab in the URL', async () => {
     const { wrapper } = await mountView(library, { status: 'bogus' })
 
-    expect(wrapper.get('[aria-selected="true"]').text()).toContain('Хочу')
+    expect(wrapper.get('[aria-pressed="true"]').text()).toContain('Хочу')
   })
 
   it('shows reading progress on a card', async () => {
@@ -191,7 +191,7 @@ describe('LibraryView', () => {
       expect((wrapper.get('input[type="search"]').element as HTMLInputElement).value).toBe('пам')
       expect(titles(wrapper)).toHaveLength(1)
 
-      await wrapper.findAll('[role="tab"]')[2]!.trigger('click')
+      await wrapper.findAll('[aria-pressed]')[2]!.trigger('click')
       await flushPromises()
 
       expect(router.currentRoute.value.query).toMatchObject({ status: 'finished', q: 'пам' })

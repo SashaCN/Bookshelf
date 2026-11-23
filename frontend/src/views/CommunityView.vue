@@ -169,7 +169,7 @@ onMounted(() => {
     <template #action>
       <RouterLink
         :to="{ name: 'community-new' }"
-        class="inline-flex min-h-10 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent"
+        class="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent"
       >
         {{ $t('social.write') }}
       </RouterLink>

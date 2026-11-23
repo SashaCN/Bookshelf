@@ -2,18 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/components/AppLayout.vue'
 import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
-import AddBookView from '@/views/AddBookView.vue'
-import BookView from '@/views/BookView.vue'
 import HomeView from '@/views/HomeView.vue'
-import LibraryView from '@/views/LibraryView.vue'
 import LoginView from '@/views/LoginView.vue'
-import NotFoundView from '@/views/NotFoundView.vue'
-import ProfileView from '@/views/ProfileView.vue'
-import QuoteFormView from '@/views/QuoteFormView.vue'
-import QuoteShareView from '@/views/QuoteShareView.vue'
-import QuotesView from '@/views/QuotesView.vue'
-import RegisterView from '@/views/RegisterView.vue'
-import StatsView from '@/views/StatsView.vue'
 import { redirectFor } from './access'
 import { accountRoutes } from './account'
 import { libraryImportRoutes } from './libraryImport'
@@ -30,49 +20,49 @@ export const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         { path: '', name: 'home', component: HomeView, meta: { tab: 'home', title: 'tabs.reading' } },
-        { path: 'library', name: 'library', component: LibraryView, meta: { tab: 'library', title: 'library.title' } },
-        { path: 'library/add', name: 'library-add', component: AddBookView, meta: { tab: 'library', title: 'add.title' } },
+        { path: 'library', name: 'library', component: () => import('@/views/LibraryView.vue'), meta: { tab: 'library', title: 'library.title' } },
+        { path: 'library/add', name: 'library-add', component: () => import('@/views/AddBookView.vue'), meta: { tab: 'library', title: 'add.title' } },
         {
           path: 'library/:id(\\d+)',
           name: 'book',
-          component: BookView,
+          component: () => import('@/views/BookView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'library', title: 'book.title' },
         },
-        { path: 'quotes', name: 'quotes', component: QuotesView, meta: { tab: 'quotes', title: 'quotes.title' } },
+        { path: 'quotes', name: 'quotes', component: () => import('@/views/QuotesView.vue'), meta: { tab: 'quotes', title: 'quotes.title' } },
         {
           path: 'quotes/new',
           name: 'quote-new',
-          component: QuoteFormView,
+          component: () => import('@/views/QuoteFormView.vue'),
           meta: { tab: 'quotes', title: 'quotes.form.createTitle' },
         },
         {
           path: 'quotes/:id(\\d+)/edit',
           name: 'quote-edit',
-          component: QuoteFormView,
+          component: () => import('@/views/QuoteFormView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'quotes', title: 'quotes.form.editTitle' },
         },
         {
           path: 'quotes/:id(\\d+)/share',
           name: 'quote-share',
-          component: QuoteShareView,
+          component: () => import('@/views/QuoteShareView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'quotes', title: 'quotes.shareCard.title' },
         },
-        { path: 'stats', name: 'stats', component: StatsView, meta: { tab: 'stats', title: 'stats.title' } },
-        { path: 'profile', name: 'profile', component: ProfileView, meta: { title: 'profile.title' } },
+        { path: 'stats', name: 'stats', component: () => import('@/views/StatsView.vue'), meta: { tab: 'stats', title: 'stats.title' } },
+        { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { title: 'profile.title' } },
         ...statsRoutes,
         ...libraryImportRoutes,
         ...socialRoutes,
         // Last: anything that matched nothing above. Inside the layout, so the reader keeps the tab bar.
-        { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundView, meta: { title: 'notFound.title' } },
+        { path: ':pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFoundView.vue'), meta: { title: 'notFound.title' } },
       ],
     },
     // Full-screen screens, outside of the layout with the tab bar.
     ...readerRoutes,
     { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true, title: 'auth.login.title' } },
-    { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true, title: 'auth.register.title' } },
+    { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { guestOnly: true, title: 'auth.register.title' } },
     ...accountRoutes,
   ],
 })

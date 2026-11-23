@@ -108,7 +108,7 @@ onMounted(() => load())
     <template #action>
       <RouterLink
         :to="{ name: 'library-add' }"
-        class="inline-flex min-h-10 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent"
+        class="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent"
       >
         {{ $t('library.add') }}
       </RouterLink>
@@ -116,14 +116,13 @@ onMounted(() => load())
   </PageHeader>
 
   <div class="-mx-4 mb-4 overflow-x-auto px-4">
-    <div role="tablist" :aria-label="$t('library.title')" class="flex gap-2">
+    <div role="group" :aria-label="$t('library.statusFilter')" class="flex gap-2">
       <button
         v-for="status in statuses"
         :key="status"
         type="button"
-        role="tab"
-        :aria-selected="current === status"
-        class="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-medium"
+        :aria-pressed="current === status"
+        class="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-medium"
         :class="current === status ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
         @click="select(status)"
       >

@@ -1,4 +1,5 @@
 import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
+import { safeRedirect } from './redirect'
 
 interface Visitor {
   isAuthenticated: boolean
@@ -17,11 +18,12 @@ export function redirectFor(to: RouteLocationNormalized, visitor: Visitor): Rout
   }
 
   if (to.meta.requiresAuth && !visitor.isAuthenticated) {
-    return { name: 'login' }
+    // Remember where the visitor was going, so signing in takes them there instead of to the home screen.
+    return { name: 'login', query: to.fullPath && to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
   }
 
   if (to.meta.guestOnly && visitor.isAuthenticated) {
-    return { name: 'home' }
+    return safeRedirect(to.query?.redirect) ?? { name: 'home' }
   }
 
   return null

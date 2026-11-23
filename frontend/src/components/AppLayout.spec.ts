@@ -55,4 +55,29 @@ describe('AppLayout', () => {
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('All is well')
   })
+
+  it('moves focus to the heading of the new screen, but not when only the query string changes', async () => {
+    const { wrapper, router } = await mountLayout()
+    const Heading = { template: '<h1 tabindex="-1">Screen</h1>' }
+    router.addRoute({ path: '/heading', name: 'heading', component: Heading })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const attached = mount(AppLayout, { attachTo: host, global: { plugins: [createPinia(), router, i18n] } })
+
+    await router.push('/heading')
+    await flushPromises()
+    expect(document.activeElement?.tagName).toBe('H1')
+
+    const input = document.createElement('input')
+    document.body.append(input)
+    input.focus()
+    await router.replace({ path: '/heading', query: { status: 'reading' } })
+    await flushPromises()
+    expect(document.activeElement).toBe(input)
+
+    input.remove()
+    attached.unmount()
+    wrapper.unmount()
+    host.remove()
+  })
 })

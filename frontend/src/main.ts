@@ -6,6 +6,7 @@ import { i18n } from './i18n'
 import { listenForInstallPrompt } from './pwa/install'
 import { registerServiceWorker } from './pwa/updates'
 import { router } from './router'
+import { installChunkReload } from './router/chunkReload'
 import { useAuthStore } from './stores/auth'
 import './style.css'
 
@@ -21,6 +22,7 @@ onUnauthorized(() => {
   }
 })
 
+installChunkReload(router)
 listenForInstallPrompt()
 registerServiceWorker()
 

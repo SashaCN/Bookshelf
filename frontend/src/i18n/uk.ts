@@ -102,6 +102,7 @@ export default {
   library: {
     title: 'Бібліотека',
     add: 'Додати книгу',
+    statusFilter: 'Статус книги',
     import: 'Імпорт з Goodreads',
     search: {
       label: 'Пошук у бібліотеці',

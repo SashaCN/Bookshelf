@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ApiError, NetworkError } from '@/api/http'
 import AuthLayout from '@/components/AuthLayout.vue'
 import FormField from '@/components/FormField.vue'
+import { safeRedirect } from '@/router/redirect'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
@@ -23,7 +24,7 @@ async function submit() {
 
   try {
     await auth.login({ email: email.value, password: password.value })
-    await router.push({ name: 'home' })
+    await router.push(safeRedirect(route.query.redirect) ?? { name: 'home' })
   } catch (e) {
     if (e instanceof ApiError && e.status === 422) {
       error.value = t('auth.errors.invalidCredentials')

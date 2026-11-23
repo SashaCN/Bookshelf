@@ -469,4 +469,36 @@ describe('BookView', () => {
 
     expect(wrapper.text()).toContain('Цієї книги немає у вашій бібліотеці.')
   })
+
+  it('does not let a second rating tap through while the first one is being saved', async () => {
+    const { wrapper } = await mountView(makeUserBook({ status: 'finished', allowed_statuses: ['reading'] }))
+    let finish: (book: UserBook) => void = () => undefined
+    vi.mocked(libraryApi.update).mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+
+    await wrapper.findAll('[aria-label="4 / 5"]')[0]!.trigger('click')
+
+    expect(wrapper.findAll('[aria-label="5 / 5"]')[0]!.attributes('disabled')).toBeDefined()
+
+    finish(makeUserBook({ status: 'finished', rating: 4 }))
+    await flushPromises()
+
+    expect(wrapper.findAll('[aria-label="5 / 5"]')[0]!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('stops showing the previous book while the next one loads, and ignores a late answer for it', async () => {
+    const { wrapper } = await mountView(makeUserBook({ id: 1, status: 'finished', allowed_statuses: [] }))
+    let late: (book: UserBook) => void = () => undefined
+    vi.mocked(libraryApi.get).mockImplementationOnce(() => new Promise((resolve) => (late = resolve)))
+
+    await wrapper.setProps({ id: 2 })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Atomic Habits')
+    expect(wrapper.text()).toContain('Завантаження…')
+
+    late(makeUserBook({ id: 2, book: makeBook({ title: 'Deep Work' }), status: 'finished', allowed_statuses: [] }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Deep Work')
+  })
 })

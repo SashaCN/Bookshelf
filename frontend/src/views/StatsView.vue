@@ -155,7 +155,7 @@ onMounted(load)
             :key="count"
             type="button"
             :aria-pressed="range === count"
-            class="min-h-10 min-w-10 rounded-full border px-3 text-sm font-medium"
+            class="min-h-11 min-w-11 rounded-full border px-3 text-sm font-medium"
             :class="range === count ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
             @click="selectRange(count)"
           >

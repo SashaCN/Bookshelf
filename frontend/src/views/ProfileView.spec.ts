@@ -207,6 +207,18 @@ describe('ProfileView', () => {
     expect(router.currentRoute.value.name).toBe('login')
   })
 
+  it('stays on the profile and says so when signing out fails', async () => {
+    const { wrapper, router } = await mountView()
+    vi.mocked(authApi.logout).mockRejectedValue(new ApiError(500, null))
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Вийти')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Не вдалося виконати запит')
+    expect(router.currentRoute.value.name).not.toBe('login')
+    expect(wrapper.findAll('button').find((button) => button.text() === 'Вийти')!.attributes('disabled')).toBeUndefined()
+  })
+
   describe('password change', () => {
     async function fill(wrapper: ReturnType<typeof mount>, confirmation = 'new-password') {
       await wrapper.get('#profile-current-password').setValue('old-password')

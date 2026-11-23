@@ -32,4 +32,19 @@ describe('RatingStars', () => {
 
     expect(wrapper.findAll('button')).toHaveLength(0)
   })
+
+  it('can be disabled while a rating is being saved', () => {
+    const wrapper = mount(RatingStars, { props: { modelValue: null, label: 'Rating', disabled: true } })
+
+    expect(wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined)).toBe(true)
+  })
+
+  it('draws empty stars as outlines and keeps a tap target of 44px', () => {
+    const wrapper = mount(RatingStars, { props: { modelValue: 1, label: 'Rating' } })
+    const buttons = wrapper.findAll('button')
+
+    expect(buttons[0]!.get('svg').attributes('fill')).toBe('currentColor')
+    expect(buttons[1]!.get('svg').attributes('fill')).toBe('none')
+    expect(buttons[1]!.classes()).toContain('size-11')
+  })
 })

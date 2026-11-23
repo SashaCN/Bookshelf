@@ -169,7 +169,7 @@ onMounted(() => {
     <template #action>
       <RouterLink
         :to="{ name: 'quote-new', query: bookFilter === undefined ? {} : { book: bookFilter } }"
-        class="inline-flex min-h-10 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent"
+        class="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent"
       >
         {{ $t('quotes.add') }}
       </RouterLink>
@@ -217,7 +217,7 @@ onMounted(() => {
       <button
         type="button"
         :aria-pressed="!favoritesOnly"
-        class="inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-medium"
+        class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium"
         :class="!favoritesOnly ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
         @click="select({ book: bookFilter, q: searchFilter, tag: tagFilter })"
       >
@@ -226,7 +226,7 @@ onMounted(() => {
       <button
         type="button"
         :aria-pressed="favoritesOnly"
-        class="inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-medium"
+        class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium"
         :class="favoritesOnly ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
         @click="select({ favorite: true, book: bookFilter, q: searchFilter, tag: tagFilter })"
       >

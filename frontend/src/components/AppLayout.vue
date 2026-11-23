@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onErrorCaptured, ref, watch } from 'vue'
+import { nextTick, onErrorCaptured, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppBanners from './AppBanners.vue'
 import CrashNotice from './CrashNotice.vue'
@@ -20,6 +20,16 @@ watch(
   () => route.path,
   () => {
     crashed.value = false
+  },
+)
+
+// A screen reader user gets no page load when the router swaps the screen: move focus to the new heading instead.
+// Only a different page counts; changing a filter in the query string must not steal focus.
+watch(
+  () => route.path,
+  async () => {
+    await nextTick()
+    document.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true })
   },
 )
 </script>
