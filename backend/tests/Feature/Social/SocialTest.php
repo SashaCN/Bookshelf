@@ -147,6 +147,7 @@ describe('profile', function () {
                 'username' => 'alice',
                 'name' => 'Alice',
                 'books_finished_this_year' => 1,
+                'reviews_count' => 0,
                 'followers_count' => 1,
                 'following_count' => 1,
                 'is_following' => true,

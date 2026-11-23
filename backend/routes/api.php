@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('throttle:public-profile')->group(function (): void {
     Route::get('/users/{username}', [ProfileController::class, 'show'])->name('users.show');
     Route::get('/users/{username}/quotes', [ProfileController::class, 'quotes'])->name('users.quotes');
+    Route::get('/users/{username}/reviews', [ProfileController::class, 'reviews'])->name('users.reviews');
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\BookStatus;
+use App\Enums\QuoteVisibility;
 use App\Models\User;
 use App\Rules\ReaderDate;
 use Illuminate\Auth\Access\Response;
@@ -29,6 +30,8 @@ class UpdateUserBookRequest extends FormRequest
             'status' => ['sometimes', 'required', Rule::enum(BookStatus::class)],
             'rating' => ['sometimes', 'nullable', 'integer', 'between:1,5'],
             'total_pages' => ['sometimes', 'required', 'integer', 'min:1', 'max:20000'],
+            'review' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'review_visibility' => ['sometimes', 'required', Rule::enum(QuoteVisibility::class)],
             // Used only when a book moves from "want" to "finished" (it was read earlier).
             'started_at' => ['nullable', 'date', new ReaderDate($this->readerTimezone())],
             'finished_at' => ['nullable', 'date', new ReaderDate($this->readerTimezone()), 'after_or_equal:started_at'],

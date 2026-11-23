@@ -7,6 +7,7 @@ use App\Actions\Social\ProfileQuery;
 use App\Actions\Social\ProfileSummary;
 use App\Http\Resources\ProfileMemberResource;
 use App\Http\Resources\PublicQuoteResource;
+use App\Http\Resources\PublicReviewResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -25,6 +26,11 @@ class ProfileController extends Controller
         $viewer = $request->user('sanctum');
 
         return PublicQuoteResource::collection($query->quotes($find->handle($viewer, $username), $viewer));
+    }
+
+    public function reviews(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
+    {
+        return PublicReviewResource::collection($query->reviews($find->handle($request->user('sanctum'), $username)));
     }
 
     public function followers(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection

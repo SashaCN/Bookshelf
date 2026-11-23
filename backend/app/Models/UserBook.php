@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BookStatus;
+use App\Enums\QuoteVisibility;
 use Database\Factories\UserBookFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,6 +19,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'current_page',
     'total_pages',
     'rating',
+    'review',
+    'review_visibility',
+    'reviewed_at',
     'started_at',
     'finished_at',
 ])]
@@ -34,6 +38,7 @@ class UserBook extends Model
     protected $attributes = [
         'status' => 'want',
         'current_page' => 0,
+        'review_visibility' => 'private',
     ];
 
     protected function casts(): array
@@ -43,6 +48,8 @@ class UserBook extends Model
             'current_page' => 'integer',
             'total_pages' => 'integer',
             'rating' => 'integer',
+            'review_visibility' => QuoteVisibility::class,
+            'reviewed_at' => 'datetime',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

@@ -3,6 +3,7 @@
 namespace App\Actions\Library;
 
 use App\Enums\BookStatus;
+use App\Enums\QuoteVisibility;
 use App\Models\User;
 use App\Models\UserBook;
 use App\Rules\ReaderDate;
@@ -19,7 +20,7 @@ class UpdateUserBook
     /**
      * Applies a partial update. Everything is saved together or not at all.
      *
-     * @param  array{status?: string, rating?: int|null, total_pages?: int, started_at?: string|null, finished_at?: string|null}  $data
+     * @param  array{status?: string, rating?: int|null, review?: string|null, review_visibility?: string, total_pages?: int, started_at?: string|null, finished_at?: string|null}  $data
      *
      * @throws ValidationException
      */
@@ -52,6 +53,14 @@ class UpdateUserBook
                 );
             }
 
+            if (array_key_exists('review_visibility', $data)) {
+                $userBook->review_visibility = QuoteVisibility::from($data['review_visibility']);
+            }
+
+            if (array_key_exists('review', $data)) {
+                $this->setReview($userBook, $data['review']);
+            }
+
             $userBook->save();
 
             // Finishing a book that is being read jumps the bookmark to the last page. Those pages were read
@@ -62,6 +71,26 @@ class UpdateUserBook
         });
 
         return $userBook->refresh()->load('book.authors');
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function setReview(UserBook $userBook, ?string $review): void
+    {
+        $review = $review === null || trim($review) === '' ? null : trim($review);
+
+        if ($review === $userBook->review) {
+            return;
+        }
+
+        // Clearing a review is always allowed; writing one needs a book that has been read (or given up on).
+        if ($review !== null && ! in_array($userBook->status, [BookStatus::Finished, BookStatus::Abandoned], true)) {
+            throw ValidationException::withMessages(['review' => ['library.review_not_finished']]);
+        }
+
+        $userBook->review = $review;
+        $userBook->reviewed_at = $review === null ? null : now();
     }
 
     private function timezoneOf(UserBook $userBook): string

@@ -5,6 +5,7 @@ namespace App\Actions\Social;
 use App\Enums\QuoteVisibility;
 use App\Models\Quote;
 use App\Models\User;
+use App\Models\UserBook;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
@@ -24,6 +25,22 @@ class ProfileQuery
             ->withLikes($viewer)
             ->with('userBook.book.authors')
             ->latest('id')
+            ->simplePaginate(self::PER_PAGE);
+    }
+
+    /**
+     * The public reviews of one reader, most recently written first.
+     *
+     * @return Paginator<int, UserBook>
+     */
+    public function reviews(User $profile): Paginator
+    {
+        return $profile->userBooks()
+            ->where('review_visibility', QuoteVisibility::Public)
+            ->whereNotNull('review')
+            ->with('book.authors')
+            ->orderByDesc('reviewed_at')
+            ->orderByDesc('id')
             ->simplePaginate(self::PER_PAGE);
     }
 
