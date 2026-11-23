@@ -77,6 +77,13 @@ export const router = createRouter({
           props: (route) => ({ id: Number(route.params.id) }),
         },
         { path: 'stats', name: 'stats', component: () => import('@/views/StatsView.vue'), meta: { tab: 'stats' } },
+        {
+          path: 'stats/year/:year(\\d{4})',
+          name: 'year-recap',
+          component: () => import('@/views/YearRecapView.vue'),
+          props: (route) => ({ year: Number(route.params.year) }),
+          meta: { tab: 'stats' },
+        },
         { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue') },
       ],
     },

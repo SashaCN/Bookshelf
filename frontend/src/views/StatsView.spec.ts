@@ -8,7 +8,7 @@ import type { GoalProgress, StatsSummary } from '@/types/api'
 import StatsView from './StatsView.vue'
 
 vi.mock('@/api/stats', () => ({
-  statsApi: { summary: vi.fn(), daily: vi.fn(), goal: vi.fn(), setGoal: vi.fn(), removeGoal: vi.fn() },
+  statsApi: { summary: vi.fn(), year: vi.fn(), daily: vi.fn(), goal: vi.fn(), setGoal: vi.fn(), removeGoal: vi.fn() },
 }))
 
 function makeSummary(overrides: Partial<StatsSummary> = {}): StatsSummary {
@@ -70,6 +70,15 @@ describe('StatsView', () => {
     expect(wrapper.text()).toContain('1 книга')
     expect(wrapper.text()).toContain(`${formatNumber(3100)} стор.`)
     expect(wrapper.text()).toContain('8 книг')
+  })
+
+  it('links to the recap of the current year and of the previous one', async () => {
+    const wrapper = await mountView()
+
+    const links = wrapper.findAll('a').filter((link) => link.attributes('href')?.startsWith('/stats/year/'))
+    expect(links.map((link) => link.attributes('href'))).toEqual(['/stats/year/2026', '/stats/year/2025'])
+    expect(links[0]!.text()).toBe('Рік у книгах →')
+    expect(links[1]!.text()).toContain('2025')
   })
 
   it('hides the reader tiles when the reader is not used', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDay, formatMoment, formatNumber, formatShortDay, signed } from './format'
+import { formatDay, formatMoment, formatNumber, formatShortDay, monthName, signed } from './format'
 
 describe('formatDay', () => {
   it('writes the day and the month in Ukrainian', () => {
@@ -45,5 +45,13 @@ describe('formatMoment', () => {
   it('uses the calendar of the given time zone, not UTC', () => {
     expect(formatMoment('2026-10-05T22:30:00+00:00', 'Europe/Kyiv')).toBe('6 жовтня')
     expect(formatMoment('2026-10-05T22:30:00+00:00', 'UTC')).toBe('5 жовтня')
+  })
+})
+
+describe('monthName', () => {
+  it('gives the month in the nominative, not the genitive used with a day', () => {
+    expect(monthName(1)).toBe('січень')
+    expect(monthName(5)).toBe('травень')
+    expect(monthName(12)).toBe('грудень')
   })
 })

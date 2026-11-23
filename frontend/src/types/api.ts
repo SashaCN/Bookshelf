@@ -254,6 +254,30 @@ export interface StatsSummary {
   reader: { chapters_this_month: number; chapters_this_year: number; documents_in_progress: number }
 }
 
+/** "A year in books": everything in the reader's own calendar; a book read again counts once per finished pass. */
+export interface YearRecap {
+  year: number
+  books_finished: number
+  pages_read: number
+  days_with_reading: number
+  longest_streak_in_year: number
+  chapters_read: number
+  quotes_added: number
+  reviews_written: number
+  average_rating: number | null
+  top_rated: { title: string; authors: string[]; rating: number; finished_at: string }[]
+  longest_book: { title: string; authors: string[]; total_pages: number } | null
+  /** Month number 1-12 with the most pages. */
+  busiest_month: { month: number; pages: number } | null
+  goal: { target: number; achieved: number } | null
+  finished_books: { title: string; authors: string[]; finished_at: string; rating: number | null }[]
+}
+
+export interface YearRecapResponse {
+  data: YearRecap
+  meta: { first_year: number; current_year: number }
+}
+
 export interface DailyPages {
   date: string
   pages: number

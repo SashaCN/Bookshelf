@@ -746,6 +746,79 @@ function goalProgress(year: number): GoalProgress {
   }
 }
 
+const localDay = (iso: string) => (iso.length === 10 ? iso : isoDay(new Date(iso)))
+
+/** Mirrors the server's year recap: finished passes (the current one plus the archived ones) of a calendar year. */
+function yearRecap(year: number) {
+  const prefix = String(year)
+  const passes = state.library
+    .flatMap((e) => [
+      ...(e.status === 'finished' && e.finished_at ? [{ e, at: e.finished_at }] : []),
+      ...(e.reads ?? []).map((r) => ({ e, at: r.finished_at })),
+    ])
+    .map((p) => ({ ...p, day: localDay(p.at) }))
+    .filter((p) => p.day.startsWith(prefix))
+    .sort((a, b) => a.at.localeCompare(b.at) || a.e.id - b.e.id)
+
+  const pages = new Map([...pagesByDay()].filter(([day]) => day.startsWith(prefix)).map(([day, n]) => [day, Math.max(n, 0)]))
+  const readingDays = [...pages].filter(([, n]) => n > 0).map(([day]) => day).sort()
+  let longest = 0
+  let run = 0
+  readingDays.forEach((day, i) => {
+    run = i > 0 && dayNumber(day) - dayNumber(readingDays[i - 1]) === 1 ? run + 1 : 1
+    longest = Math.max(longest, run)
+  })
+
+  const byMonth = new Map<number, number>()
+  for (const [day, n] of pages) byMonth.set(Number(day.slice(5, 7)), (byMonth.get(Number(day.slice(5, 7))) ?? 0) + n)
+  let busiest: { month: number; pages: number } | null = null
+  for (const month of [...byMonth.keys()].sort((a, b) => a - b)) {
+    const n = byMonth.get(month) as number
+    if (n > 0 && (busiest === null || n > busiest.pages)) busiest = { month, pages: n }
+  }
+
+  const rated = passes.filter((p) => p.e.rating !== null)
+  const seen = new Set<number>()
+  const topRated = [...rated]
+    .sort((a, b) => (b.e.rating as number) - (a.e.rating as number) || a.at.localeCompare(b.at))
+    .filter((p) => !seen.has(p.e.id) && !!seen.add(p.e.id))
+    .slice(0, 3)
+    .map((p) => ({ title: p.e.book.title, authors: p.e.book.authors, rating: p.e.rating as number, finished_at: p.day }))
+  const longestBook = [...passes]
+    .filter((p) => p.e.total_pages)
+    .sort((a, b) => (b.e.total_pages as number) - (a.e.total_pages as number) || a.at.localeCompare(b.at))[0]
+  const target = state.goals[year] ?? null
+
+  return {
+    year,
+    books_finished: passes.length,
+    pages_read: [...pages.values()].reduce((sum, n) => sum + n, 0),
+    days_with_reading: readingDays.length,
+    longest_streak_in_year: longest,
+    chapters_read: chapterDays().filter((d) => d.startsWith(prefix)).length,
+    quotes_added: state.quotes.filter((q) => localDay(q.created_at).startsWith(prefix)).length,
+    reviews_written: state.library.filter((e) => e.review && e.reviewed_at && localDay(e.reviewed_at).startsWith(prefix)).length,
+    average_rating: rated.length ? Math.round((rated.reduce((sum, p) => sum + (p.e.rating as number), 0) / rated.length) * 10) / 10 : null,
+    top_rated: topRated,
+    longest_book: longestBook ? { title: longestBook.e.book.title, authors: longestBook.e.book.authors, total_pages: longestBook.e.total_pages as number } : null,
+    busiest_month: busiest,
+    goal: target === null ? null : { target, achieved: passes.length },
+    finished_books: passes.map((p) => ({ title: p.e.book.title, authors: p.e.book.authors, finished_at: p.day, rating: p.e.rating })),
+  }
+}
+
+/** The first calendar year with any activity; the current year for a reader without any. */
+function firstActivityYear(): number {
+  const years = [
+    ...[...pagesByDay().keys()],
+    ...state.library.flatMap((e) => [e.finished_at, ...(e.reads ?? []).map((r) => r.finished_at)]).filter((d): d is string => !!d).map(localDay),
+    ...state.quotes.map((q) => localDay(q.created_at)),
+    ...chapterDays(),
+  ].map((day) => Number(day.slice(0, 4)))
+
+  return Math.min(new Date().getFullYear(), ...years)
+}
+
 // --- routing ------------------------------------------------------------------------------------------------------
 
 type Body = Record<string, unknown>
@@ -1305,6 +1378,12 @@ route('GET', '/api/stats/daily', (_p, query) => {
     return { date, pages: Math.max(days.get(date) ?? 0, 0), chapters: chapters.filter((d) => d === date).length }
   })
   return { data, meta: { from, to, total_pages: data.reduce((sum, d) => sum + d.pages, 0) } }
+})
+route('GET', '/api/stats/year/(\\d{4})', ([year]) => {
+  const first = firstActivityYear()
+  const current = new Date().getFullYear()
+  if (Number(year) < first || Number(year) > current) throw new HttpError(404, { message: 'Not found' })
+  return { data: yearRecap(Number(year)), meta: { first_year: first, current_year: current } }
 })
 route('GET', '/api/goals/(\\d+)', ([year]) => ok(goalProgress(Number(year))))
 route('PUT', '/api/goals/(\\d+)', ([year], _q, body) => {

@@ -21,6 +21,7 @@ export function createTestRouter() {
       { path: '/reader', name: 'reader', component: stub },
       { path: '/reader/:id(\\d+)', name: 'reader-view', component: stub },
       { path: '/stats', name: 'stats', component: stub, meta: { tab: 'stats' } },
+      { path: '/stats/year/:year(\\d{4})', name: 'year-recap', component: stub, meta: { tab: 'stats' } },
       { path: '/profile', name: 'profile', component: stub },
       { path: '/feed', name: 'feed', component: stub },
       { path: '/people', name: 'people-search', component: stub },

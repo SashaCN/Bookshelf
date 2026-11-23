@@ -183,6 +183,22 @@ describe('demo mock API', () => {
     expect((await statsApi.daily(3)).data.at(-1)?.chapters).toBe(2)
   })
 
+  it('recaps the current year from the history and refuses years outside the activity', async () => {
+    const year = new Date().getFullYear()
+    const { data, meta } = await statsApi.year(year)
+
+    expect(meta.current_year).toBe(year)
+    expect(meta.first_year).toBeLessThanOrEqual(year)
+    expect(data.year).toBe(year)
+    expect(data.pages_read).toBeGreaterThan(0)
+    expect(data.finished_books).toHaveLength(data.books_finished)
+    expect(data.top_rated.length).toBeLessThanOrEqual(3)
+    expect(data.goal).toEqual({ target: 12, achieved: data.books_finished })
+
+    await expect(statsApi.year(year + 1)).rejects.toMatchObject({ status: 404 })
+    await expect(statsApi.year(meta.first_year - 1)).rejects.toMatchObject({ status: 404 })
+  })
+
   it('sets and removes the yearly goal', async () => {
     const year = new Date().getFullYear()
     expect((await statsApi.goal(year)).target_books).toBe(12)

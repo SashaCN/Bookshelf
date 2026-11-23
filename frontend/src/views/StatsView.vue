@@ -27,6 +27,9 @@ const hasReaderActivity = computed(
   () => !!summary.value && (summary.value.reader.documents_in_progress > 0 || summary.value.reader.chapters_this_year > 0),
 )
 
+/** The year of the recap link: the reader's own current year. */
+const recapYear = computed(() => Number(summary.value?.today.date.slice(0, 4)))
+
 const failed = ref(false)
 const chartError = ref('')
 const goalError = ref('')
@@ -137,6 +140,15 @@ onMounted(load)
         :hint="t('stats.books', { n: summary.year.books_finished }, summary.year.books_finished)"
       />
     </div>
+
+    <nav class="flex flex-wrap gap-x-4 gap-y-1" :aria-label="$t('stats.recap.title', { year: recapYear })">
+      <RouterLink :to="{ name: 'year-recap', params: { year: recapYear } }" class="inline-flex min-h-11 items-center font-semibold text-accent">
+        {{ $t('stats.recap.link') }}
+      </RouterLink>
+      <RouterLink :to="{ name: 'year-recap', params: { year: recapYear - 1 } }" class="inline-flex min-h-11 items-center text-ink-muted underline">
+        {{ $t('stats.recap.linkYear', { year: recapYear - 1 }) }}
+      </RouterLink>
+    </nav>
 
     <section v-if="hasReaderActivity" class="flex flex-col gap-2" :aria-label="$t('stats.reader.title')">
       <h2 class="font-display text-xl font-semibold">{{ $t('stats.reader.title') }}</h2>
