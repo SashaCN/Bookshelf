@@ -22,10 +22,17 @@ class ImportEpub
      */
     public function handle(User $user, UploadedFile $file): ReaderDocument
     {
-        $parsed = $this->parser->parse(
-            $file->getRealPath(),
-            pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
-        );
+        try {
+            $parsed = $this->parser->parse(
+                $file->getRealPath(),
+                pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
+            );
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            // Last line of defence: whatever the parser chokes on, the file is not a usable EPUB.
+            throw ValidationException::withMessages(['file' => ['reader.invalid_epub']]);
+        }
 
         $path = Storage::disk('local')->putFileAs('reader/'.$user->id, $file, Str::uuid().'.epub');
 

@@ -106,6 +106,9 @@ class EpubParser
             $raw = $this->read($zip, $entry, self::MAX_CHAPTER_SIZE);
 
             return $raw === null ? null : $this->sanitize($raw, $zip, $entry);
+        } catch (\Throwable) {
+            // Last line of defence: a chapter that cannot be processed is a chapter that is not there.
+            return null;
         } finally {
             $zip->close();
         }
@@ -335,12 +338,13 @@ class EpubParser
      */
     private function read(ZipArchive $zip, string $name, int $limit): ?string
     {
-        $stream = $zip->getStream($name);
+        // A corrupt entry (bad CRC, broken deflate data) only warns; the caller sees it as unreadable or invalid XML.
+        $stream = @$zip->getStream($name);
         if ($stream === false) {
             return null;
         }
 
-        $content = stream_get_contents($stream, $limit);
+        $content = @stream_get_contents($stream, $limit);
         fclose($stream);
 
         return $content === false ? null : $content;
