@@ -39,7 +39,7 @@ class ReadingProgressController extends Controller
     {
         Gate::authorize('update', $userBook);
 
-        return (new UserBookResource($startRereading->handle($userBook)->loadCount('reads')))->withReaderDocument();
+        return (new UserBookResource($startRereading->handle($userBook)->loadCount('reads')))->withReads();
     }
 
     /**

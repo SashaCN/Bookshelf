@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeUserBook } from '@/test/fixtures'
 import { http } from './http'
-import { libraryApi } from './library'
+import { catalogApi, libraryApi } from './library'
 
 vi.mock('./http', () => ({
   http: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
@@ -10,6 +10,14 @@ vi.mock('./http', () => ({
 describe('libraryApi', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+  })
+
+  it('gives the catalog search 4 seconds, a second more than the server gives Open Library', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: [] })
+
+    await catalogApi.search('Тигролови')
+
+    expect(http.get).toHaveBeenCalledWith('/api/catalog/search?q=%D0%A2%D0%B8%D0%B3%D1%80%D0%BE%D0%BB%D0%BE%D0%B2%D0%B8', { timeoutMs: 4000 })
   })
 
   it('starts a reread with a body-less POST and unwraps the entry', async () => {

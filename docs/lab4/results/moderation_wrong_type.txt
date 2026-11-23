@@ -1,0 +1,2 @@
+$ php artisan moderation:hide video 1
+ERROR  Unknown type "video": use "post" or "comment".

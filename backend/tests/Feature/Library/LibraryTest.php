@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Book;
+use App\Models\Post;
 use App\Models\User;
 use App\Models\UserBook;
 
@@ -185,6 +186,27 @@ describe('deleting', function () {
         $this->actingAs($this->user)->deleteJson("/api/library/{$userBook->id}")->assertNoContent();
 
         expect(Book::count())->toBe(0);
+    });
+
+    it('keeps the posts about a hand-entered book when it leaves the library', function () {
+        $book = Book::factory()->manual($this->user)->withAuthors()->create(['title' => 'Моя книжка']);
+        $userBook = UserBook::factory()->for($this->user)->create(['book_id' => $book->id]);
+        $review = Post::factory()->review(4)->create(['user_id' => $this->user->id, 'book_id' => $book->id]);
+        $quote = Post::factory()->create(['user_id' => $this->user->id, 'book_id' => $book->id, 'content' => 'Цитата для спільноти']);
+
+        $this->actingAs($this->user)->deleteJson("/api/library/{$userBook->id}")->assertNoContent();
+
+        expect(UserBook::count())->toBe(0)
+            ->and(Book::find($book->id))->not->toBeNull()
+            ->and(Post::count())->toBe(2);
+
+        $this->actingAs($this->user)->getJson("/api/posts/{$review->id}")
+            ->assertOk()
+            ->assertJsonPath('data.book.title', 'Моя книжка');
+        $this->actingAs($this->user)->getJson("/api/posts/{$quote->id}")
+            ->assertOk()
+            ->assertJsonPath('data.book.title', 'Моя книжка')
+            ->assertJsonPath('data.content', 'Цитата для спільноти');
     });
 
     it('cannot delete somebody else\'s entry', function () {

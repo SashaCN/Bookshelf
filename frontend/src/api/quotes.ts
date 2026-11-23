@@ -1,4 +1,5 @@
-import type { Quote, QuoteFilters, QuotePayload, QuotesPage, TagCount } from '@/types/api'
+import type { Quote, QuoteFilters, QuotePayload, QuotesPage } from '@/types/api'
+import type { TagCount } from '@/types/quotes'
 import { http } from './http'
 
 function filterParams(filters: QuoteFilters): URLSearchParams {
@@ -22,7 +23,7 @@ export const quotesApi = {
   /** The reader's tags with their quote counts, ordered by name. */
   tags: () => http.get<{ data: TagCount[] }>('/api/tags').then((response) => response.data),
   /** The quote of the day, or null while the reader has no quotes. */
-  daily: () => http.get<{ data: Quote | null }>('/api/quotes/daily').then((response) => response.data),
+  daily: () => http.get<{ data: Quote | null }>('/api/quotes/daily?favorite=1').then((response) => response.data),
   get: (id: number) => http.get<{ data: Quote }>(`/api/quotes/${id}`).then((response) => response.data),
   /** The quotes matching the filters as a Markdown file. */
   exportMarkdown: (filters: QuoteFilters = {}) => {

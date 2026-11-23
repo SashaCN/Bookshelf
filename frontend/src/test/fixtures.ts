@@ -1,4 +1,4 @@
-import type { Book, CatalogEntry, FeedQuote, PublicProfile, PublicReview, Quote, UserBook } from '@/types/api'
+import type { Book, CatalogEntry, Quote, UserBook } from '@/types/api'
 
 export function makeBook(overrides: Partial<Book> = {}): Book {
   return {
@@ -24,10 +24,9 @@ export function makeUserBook(overrides: Partial<UserBook> = {}): UserBook {
     current_page: 0,
     total_pages: 320,
     progress_percent: 0,
+    has_text: false,
+    text_progress: null,
     rating: null,
-    review: null,
-    review_visibility: 'private',
-    reviewed_at: null,
     started_at: null,
     finished_at: null,
     created_at: '2026-10-05T10:00:00+00:00',
@@ -61,39 +60,10 @@ export function makeQuote(overrides: Partial<Quote> = {}): Quote {
     note: null,
     page: null,
     is_favorite: false,
-    visibility: 'private',
+    anchor: null,
     created_at: '2026-10-05T10:00:00+00:00',
     user_book_id: 1,
     book: { title: 'Atomic Habits', authors: ['James Clear'], cover_url: null },
-    ...overrides,
-  }
-}
-
-export function makeFeedQuote(overrides: Partial<FeedQuote> = {}): FeedQuote {
-  return { ...makeQuote(), visibility: 'public', author: { username: 'olena', name: 'Олена' }, ...overrides }
-}
-
-export function makeProfile(overrides: Partial<PublicProfile> = {}): PublicProfile {
-  return {
-    username: 'olena',
-    name: 'Олена',
-    books_finished_this_year: 5,
-    followers_count: 3,
-    following_count: 2,
-    reviews_count: 0,
-    is_following: false,
-    is_me: false,
-    ...overrides,
-  }
-}
-
-export function makePublicReview(overrides: Partial<PublicReview> = {}): PublicReview {
-  return {
-    id: 1,
-    book: { title: 'Маленький принц', authors: ['Антуан де Сент-Екзюпері'], cover_url: null },
-    rating: 5,
-    review: 'Проста книга про складні речі.',
-    reviewed_at: '2026-10-05T10:00:00+00:00',
     ...overrides,
   }
 }

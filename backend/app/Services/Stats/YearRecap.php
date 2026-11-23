@@ -2,6 +2,8 @@
 
 namespace App\Services\Stats;
 
+use App\Enums\PostType;
+use App\Models\Post;
 use App\Models\Quote;
 use App\Models\User;
 use App\Models\UserBook;
@@ -74,9 +76,9 @@ final class YearRecap
             'pages_read' => array_sum($days),
             'days_with_reading' => count($readingDays),
             'longest_streak_in_year' => ReadingStatistics::longestRun($readingDays),
-            'chapters_read' => array_sum($statistics->dailyChapters($first, $last)),
             'quotes_added' => Quote::query()->where('user_id', $user->id)->whereBetween('created_at', $utc)->count(),
-            'reviews_written' => $user->userBooks()->whereNotNull('review')->whereBetween('reviewed_at', $utc)->count(),
+            // A review is a post of the reader about a book; one per book, so this counts books reviewed in the year.
+            'reviews_written' => Post::query()->where('user_id', $user->id)->where('type', PostType::Review)->whereBetween('created_at', $utc)->count(),
             'average_rating' => $rated === [] ? null : round(array_sum(array_column($rated, 'rating')) / count($rated), 1),
             'top_rated' => $topRated,
             'longest_book' => $longest === null ? null : ['title' => $longest['title'], 'authors' => $longest['authors'], 'total_pages' => $longest['total_pages']],

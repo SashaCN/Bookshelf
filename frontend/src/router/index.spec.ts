@@ -1,24 +1,90 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError } from '@/api/http'
 import { authApi } from '@/api/auth'
+import { ApiError, NetworkError } from '@/api/http'
+import { useAuthStore } from '@/stores/auth'
 import { router } from './index'
 
-vi.mock('@/api/auth', () => ({ authApi: { me: vi.fn() } }))
+vi.mock('@/api/auth', () => ({ authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() } }))
 
-const user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
+const user = { id: 1, name: 'Olena', email: 'olena@example.com', handle: 'olena', bio: null, timezone: 'Europe/Kyiv' }
 
-describe('router guards', () => {
+describe('the app router', () => {
   beforeEach(async () => {
+    setActivePinia(createPinia())
     vi.resetAllMocks()
-    // Leave the previous test's page as a guest, then start the test with a store that has not asked the API yet.
+    // Every test starts outside of the app and with nobody signed in.
+    await router.replace('/login').catch(() => undefined)
+    // That visit made the store ask the API; start the test with one that has not asked yet.
     setActivePinia(createPinia())
-    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
-    await router.replace('/login')
-    setActivePinia(createPinia())
+    vi.resetAllMocks()
   })
 
-  it('sends a guest from a private page to the login form', async () => {
+  it('names the screen in the browser tab', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/stats')
+    expect(document.title).toBe('Статистика · Bookshelf')
+
+    await router.push('/quotes/new')
+    expect(document.title).toBe('Нова цитата · Bookshelf')
+
+    await router.push('/profile')
+    expect(document.title).toBe('Профіль · Bookshelf')
+  })
+
+  it('opens the recap of a year inside the stats tab, and not an address with a malformed year', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/stats/year/2025')
+    expect(router.currentRoute.value.name).toBe('year-recap')
+    expect(router.currentRoute.value.meta.tab).toBe('stats')
+    expect(document.title).toBe('Рік у книгах · Bookshelf')
+
+    await router.push('/stats/year/25')
+    expect(router.currentRoute.value.name).toBe('not-found')
+  })
+
+  it('shows a page of its own for an address that does not exist, inside the app', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/nothing/here')
+
+    expect(router.currentRoute.value.name).toBe('not-found')
+    expect(router.currentRoute.value.meta.tab).toBeUndefined()
+    expect(document.title).toBe('Не знайдено · Bookshelf')
+  })
+
+  it('sends a guest who asks for an unknown address to the sign-in form', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
+    useAuthStore().user = null
+
+    await router.push('/nothing/here')
+
+    expect(router.currentRoute.value.name).toBe('login')
+  })
+
+  it('lets a guest open the password reset screens, with the token from the link', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
+
+    await router.push('/forgot-password')
+    expect(router.currentRoute.value.name).toBe('forgot-password')
+    expect(document.title).toBe('Відновлення пароля · Bookshelf')
+
+    await router.push('/reset-password/tok123?email=a%40b.test')
+    expect(router.currentRoute.value.name).toBe('reset-password')
+    expect(router.currentRoute.value.params.token).toBe('tok123')
+  })
+
+  it('keeps a signed-in reader away from the password reset screens', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/forgot-password')
+
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('sends a guest from a private page to the sign-in form', async () => {
     vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
 
     await router.push('/library')
@@ -27,12 +93,12 @@ describe('router guards', () => {
   })
 
   it('remembers the page a guest wanted and returns there after signing in', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
     await router.push('/library/7')
 
     expect(router.currentRoute.value.name).toBe('login')
     expect(router.currentRoute.value.query.redirect).toBe('/library/7')
 
-    // The login form pushes the remembered page; for a signed-in reader the guest-only route honours it too.
     setActivePinia(createPinia())
     vi.mocked(authApi.me).mockResolvedValue(user)
     await router.push({ name: 'login', query: { redirect: '/stats' } })
@@ -41,6 +107,7 @@ describe('router guards', () => {
   })
 
   it('does not add a redirect for the home page and ignores a foreign one', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
     await router.push('/')
     expect(router.currentRoute.value.query.redirect).toBeUndefined()
 
@@ -67,66 +134,20 @@ describe('router guards', () => {
     expect(router.currentRoute.value.name).toBe('home')
   })
 
-  it('opens the password reset pages for a guest', async () => {
-    await router.push('/reset-password/abc?email=a%40b.test')
-    expect(router.currentRoute.value.name).toBe('reset-password')
+  it('does not send anybody away while the server cannot be reached', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new NetworkError())
 
-    await router.push('/forgot-password')
-    expect(router.currentRoute.value.name).toBe('forgot-password')
+    await router.push('/quotes')
+
+    expect(router.currentRoute.value.name).toBe('quotes')
+    expect(useAuthStore().unreachable).toBe(true)
   })
 
-  it('sends a signed-in reader away from the password reset pages', async () => {
-    vi.mocked(authApi.me).mockResolvedValue(user)
-
-    await router.push('/forgot-password')
-
-    expect(router.currentRoute.value.name).toBe('home')
-  })
-
-  it('opens the social pages for a signed-in reader and guards them from guests', async () => {
-    vi.mocked(authApi.me).mockResolvedValue(user)
-    await router.push('/u/olena/followers')
-    expect(router.currentRoute.value.name).toBe('followers')
-
-    await router.push('/feed')
-    expect(router.currentRoute.value.name).toBe('feed')
-
-    setActivePinia(createPinia())
-    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
-    await router.push('/u/olena/followers')
-    expect(router.currentRoute.value.name).toBe('login')
-  })
-
-  it('lets a guest open a shared public profile without signing in', async () => {
-    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
-
-    await router.push('/u/olena')
-
-    expect(router.currentRoute.value.name).toBe('public-profile')
-    expect(router.currentRoute.value.params.username).toBe('olena')
-  })
-
-  it('keeps a signed-in reader on a public profile', async () => {
-    vi.mocked(authApi.me).mockResolvedValue(user)
-
-    await router.push('/u/olena')
-
-    expect(router.currentRoute.value.name).toBe('public-profile')
-  })
-
-  it('treats the visitor as a guest when the API is unreachable', async () => {
-    vi.mocked(authApi.me).mockRejectedValue(new Error('Network down'))
+  it('treats an unexpected answer of the server as a guest', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new Error('Unexpected'))
 
     await router.push('/quotes')
 
     expect(router.currentRoute.value.name).toBe('login')
-  })
-
-  it('redirects an unknown address to the home page', async () => {
-    vi.mocked(authApi.me).mockResolvedValue(user)
-
-    await router.push('/no/such/page')
-
-    expect(router.currentRoute.value.name).toBe('home')
   })
 })

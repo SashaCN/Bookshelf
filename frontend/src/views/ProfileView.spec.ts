@@ -1,275 +1,239 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
 import { authApi } from '@/api/auth'
 import { ApiError } from '@/api/http'
-import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
+import { createTestEnvironment } from '@/test/utils'
 import type { User } from '@/types/api'
 import ProfileView from './ProfileView.vue'
 
-function mountView(timezone = 'Europe/Kyiv', extra: Partial<User> = {}) {
-  const pinia = createPinia()
-  setActivePinia(pinia)
-  const auth = useAuthStore()
-  auth.user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone, username: null, is_public: false, new_followers_count: 0, ...extra }
+vi.mock('@/api/auth', () => ({
+  authApi: { exportData: vi.fn(), me: vi.fn(), updateMe: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() },
+}))
 
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/login', name: 'login', component: { template: '<div />' } },
-      { path: '/u/:username/followers', name: 'followers', component: { template: '<div />' } },
-      { path: '/u/:username', name: 'public-profile', component: { template: '<div />' } },
-      { path: '/blocks', name: 'blocks', component: { template: '<div />' } },
-      { path: '/profile', name: 'profile', component: ProfileView },
-    ],
-  })
-  router.push('/profile')
+const user: User = {
+  id: 1,
+  name: 'Olena',
+  email: 'olena@example.com',
+  handle: 'olena',
+  bio: 'I read on trains.',
+  timezone: 'Europe/Kyiv',
+}
 
-  const wrapper = mount(ProfileView, { global: { plugins: [pinia, router, i18n] } })
-  return { wrapper, router, auth }
+async function mountView(current: User = user) {
+  const { plugins, router } = createTestEnvironment()
+  useAuthStore().user = current
+  await router.push({ name: 'profile' })
+
+  const wrapper = mount(ProfileView, { global: { plugins } })
+  await flushPromises()
+
+  return { wrapper, router }
+}
+
+async function save(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
 }
 
 describe('ProfileView', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    vi.resetAllMocks()
   })
 
-  it('links to the list of blocked readers', () => {
-    const { wrapper } = mountView()
+  describe('the fields', () => {
+    it('start from what the reader has now', async () => {
+      const { wrapper } = await mountView()
 
-    const link = wrapper.get('[data-test="blocked-link"]')
-    expect(link.text()).toBe('Заблоковані')
-    expect(link.attributes('href')).toBe('/blocks')
+      expect((wrapper.get('#profile-name').element as HTMLInputElement).value).toBe('Olena')
+      expect((wrapper.get('#profile-handle').element as HTMLInputElement).value).toBe('olena')
+      expect((wrapper.get('#profile-bio').element as HTMLTextAreaElement).value).toBe('I read on trains.')
+      expect(wrapper.text()).toContain('olena@example.com')
+    })
+
+    it('show the version of the app at the bottom, taken from package.json', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.get('[data-test="app-version"]').text()).toBe(`Версія ${__APP_VERSION__}`)
+      expect(__APP_VERSION__).toBe('2.0.0')
+    })
+
+    it('limit the name to 100 characters', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.get('#profile-name').attributes('maxlength')).toBe('100')
+    })
+
+    it('are labelled', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.get('label[for="profile-handle"]').text()).toBe('Нікнейм')
+      expect(wrapper.get('label[for="profile-bio"]').text()).toBe('Про себе')
+    })
+
+    it('explain what is public and what never is', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.text()).toContain('Нікнейм, ім’я та опис видно іншим читачам. Email і часовий пояс ніколи.')
+      expect(wrapper.get('#profile-handle-hint').text()).toContain('від 3 до 30 малих латинських літер')
+    })
+
+    it('count the characters of the bio, up to 280', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.get('#profile-bio-hint').text()).toContain('17 з 280')
+      expect(wrapper.get('#profile-bio').attributes('maxlength')).toBe('280')
+
+      await wrapper.get('#profile-bio').setValue('abc')
+      expect(wrapper.get('#profile-bio-hint').text()).toContain('3 з 280')
+    })
+
+    it('allow for a reader without a bio', async () => {
+      const { wrapper } = await mountView({ ...user, bio: null })
+
+      expect((wrapper.get('#profile-bio').element as HTMLTextAreaElement).value).toBe('')
+    })
   })
 
-  it('shows the reader with the saved name, e-mail and time zone', () => {
-    const { wrapper } = mountView('Europe/Warsaw')
+  describe('saving', () => {
+    it('sends the name, the time zone, the handle and the bio', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockResolvedValue({ ...user, handle: 'book_worm', bio: 'New bio' })
 
-    expect((wrapper.get('#profile-name').element as HTMLInputElement).value).toBe('Olena')
-    expect(wrapper.text()).toContain('olena@example.com')
-    expect((wrapper.get('#profile-timezone').element as HTMLSelectElement).value).toBe('Europe/Warsaw')
+      await wrapper.get('#profile-handle').setValue('  book_worm ')
+      await wrapper.get('#profile-bio').setValue('  New bio ')
+      await save(wrapper)
+
+      expect(authApi.updateMe).toHaveBeenCalledWith({ name: 'Olena', timezone: 'Europe/Kyiv', handle: 'book_worm', bio: 'New bio' })
+      expect(wrapper.get('[role="status"]').text()).toBe('Збережено.')
+      expect(useAuthStore().user?.handle).toBe('book_worm')
+    })
+
+    it('sends no bio for an empty one, which clears it', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockResolvedValue({ ...user, bio: null })
+
+      await wrapper.get('#profile-bio').setValue('   ')
+      await save(wrapper)
+
+      expect(authApi.updateMe).toHaveBeenCalledWith(expect.objectContaining({ bio: null }))
+    })
+
+    it('shows the handle the way the server keeps it, in lower case', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockResolvedValue({ ...user, handle: 'book_worm' })
+
+      await wrapper.get('#profile-handle').setValue('Book_Worm')
+      await save(wrapper)
+
+      expect((wrapper.get('#profile-handle').element as HTMLInputElement).value).toBe('book_worm')
+    })
+
+    it('says that the handle is taken, next to the field', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockRejectedValue(new ApiError(422, { errors: { handle: ['social.handle_taken'] } }))
+
+      await save(wrapper)
+
+      expect(wrapper.get('#profile-handle-error').text()).toBe('Цей нікнейм уже зайнятий.')
+      expect(wrapper.get('#profile-handle').attributes('aria-invalid')).toBe('true')
+      expect(wrapper.find('[role="status"]').exists()).toBe(false)
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    })
+
+    it('says what a handle looks like when the shape is wrong', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockRejectedValue(new ApiError(422, { errors: { handle: ['social.handle_invalid'] } }))
+
+      await save(wrapper)
+
+      expect(wrapper.get('#profile-handle-error').text()).toContain('3-30 малих латинських літер')
+    })
+
+    it('falls back to a general rule for a handle refused without a code', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockRejectedValue(new ApiError(422, { errors: { handle: ['The handle field is required.'] } }))
+
+      await save(wrapper)
+
+      expect(wrapper.get('#profile-handle-error').text()).toBe('Нікнейм: від 3 до 30 малих латинських літер, цифр або «_».')
+    })
+
+    it('says that the bio is too long, next to the field', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockRejectedValue(new ApiError(422, { errors: { bio: ['The bio field must not be greater than 280 characters.'] } }))
+
+      await save(wrapper)
+
+      expect(wrapper.get('#profile-bio-error').text()).toBe('Опис має бути не довшим за 280 символів.')
+      expect(wrapper.get('#profile-bio').attributes('aria-invalid')).toBe('true')
+    })
+
+    it('forgets an error once the reader tries again', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockRejectedValueOnce(new ApiError(422, { errors: { handle: ['social.handle_taken'] } })).mockResolvedValueOnce(user)
+
+      await save(wrapper)
+      await save(wrapper)
+
+      expect(wrapper.find('#profile-handle-error').exists()).toBe(false)
+      expect(wrapper.get('[role="status"]').text()).toBe('Збережено.')
+    })
+
+    it('says why when the server turns the change down for another reason', async () => {
+      const { wrapper } = await mountView()
+      vi.mocked(authApi.updateMe).mockRejectedValue(new ApiError(500, null))
+
+      await save(wrapper)
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+      expect(wrapper.find('#profile-handle-error').exists()).toBe(false)
+    })
   })
 
-  it('offers a time zone the browser list does not know, so it is not lost', () => {
-    const { wrapper } = mountView('Europe/Nowhere')
+  describe('the community', () => {
+    it('links to the list of blocked readers', async () => {
+      const { wrapper } = await mountView()
 
-    const options = wrapper.findAll('#profile-timezone option').map((option) => option.text())
+      const link = wrapper.findAll('a').find((candidate) => candidate.text() === 'Заблоковані читачі')
 
-    expect(options[0]).toBe('Europe/Nowhere')
+      expect(link?.attributes('href')).toBe('/community/blocked')
+    })
+
+    it('links to the public profile of the reader', async () => {
+      const { wrapper } = await mountView()
+
+      const link = wrapper.findAll('a').find((candidate) => candidate.text() === 'Мій публічний профіль')
+
+      expect(link?.attributes('href')).toBe('/u/olena')
+    })
   })
 
-  it('saves the trimmed name and the chosen time zone', async () => {
-    const { wrapper, auth } = mountView()
-    const update = vi.spyOn(auth, 'updateProfile').mockResolvedValue()
+  it('signs out and goes to the sign-in screen', async () => {
+    const { wrapper, router } = await mountView()
+    vi.mocked(authApi.logout).mockResolvedValue({})
 
-    await wrapper.get('#profile-name').setValue('  Olena K.  ')
-    await wrapper.get('#profile-timezone').setValue('Europe/Warsaw')
-    await wrapper.get('form').trigger('submit')
+    await wrapper.findAll('button').find((button) => button.text() === 'Вийти')!.trigger('click')
     await flushPromises()
 
-    expect(update).toHaveBeenCalledWith({ name: 'Olena K.', timezone: 'Europe/Warsaw', username: null, is_public: false })
-    expect(wrapper.get('[role="status"]').text()).toBe('Збережено.')
-  })
-
-  it('shows an error and no confirmation when saving fails', async () => {
-    const { wrapper, auth } = mountView()
-    vi.spyOn(auth, 'updateProfile').mockRejectedValue(new ApiError(500, null))
-
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(wrapper.find('[role="status"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Не вдалося')
-  })
-
-  it('logs out and goes to the login page', async () => {
-    const { wrapper, router, auth } = mountView()
-    const logout = vi.spyOn(auth, 'logout').mockResolvedValue()
-
-    await wrapper.get('[data-test="logout"]').trigger('click')
-    await flushPromises()
-
-    expect(logout).toHaveBeenCalled()
+    expect(authApi.logout).toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('login')
   })
 
-  it('reports a failed logout instead of failing silently, and stays on the page', async () => {
-    const { wrapper, router, auth } = mountView()
-    vi.spyOn(auth, 'logout').mockRejectedValue(new ApiError(500, null))
-    await router.isReady()
+  it('stays on the profile and says so when signing out fails', async () => {
+    const { wrapper, router } = await mountView()
+    vi.mocked(authApi.logout).mockRejectedValue(new ApiError(500, null))
 
-    await wrapper.get('[data-test="logout"]').trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === 'Вийти')!.trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося')
+    expect(wrapper.text()).toContain('Не вдалося виконати запит')
     expect(router.currentRoute.value.name).not.toBe('login')
-    expect(wrapper.get('[data-test="logout"]').attributes('disabled')).toBeUndefined()
-  })
-
-  it('logs out only once when tapped twice', async () => {
-    const { wrapper, auth } = mountView()
-    const logout = vi.spyOn(auth, 'logout').mockReturnValue(new Promise(() => undefined))
-
-    await wrapper.get('[data-test="logout"]').trigger('click')
-    await wrapper.get('[data-test="logout"]').trigger('click')
-
-    expect(logout).toHaveBeenCalledTimes(1)
-  })
-
-  it('takes the "saved" note away as soon as the reader edits again', async () => {
-    const { wrapper, auth } = mountView()
-    vi.spyOn(auth, 'updateProfile').mockResolvedValue()
-
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
-    expect(wrapper.find('[role="status"]').exists()).toBe(true)
-
-    await wrapper.get('#profile-name').setValue('Olena K')
-
-    expect(wrapper.find('[role="status"]').exists()).toBe(false)
-  })
-
-  describe('public profile', () => {
-    it('shows the saved username and the toggle', () => {
-      const { wrapper } = mountView('Europe/Kyiv', { username: 'olena', is_public: true })
-
-      expect((wrapper.get('#profile-username').element as HTMLInputElement).value).toBe('olena')
-      expect((wrapper.get('#profile-public').element as HTMLInputElement).checked).toBe(true)
-    })
-
-    it('saves the username and the toggle with the rest of the profile', async () => {
-      const { wrapper, auth } = mountView()
-      const update = vi.spyOn(auth, 'updateProfile').mockResolvedValue()
-
-      await wrapper.get('#profile-username').setValue(' Olena_K ')
-      await wrapper.get('#profile-public').setValue(true)
-      await wrapper.get('form').trigger('submit')
-      await flushPromises()
-
-      expect(update).toHaveBeenCalledWith({ name: 'Olena', timezone: 'Europe/Kyiv', username: 'olena_k', is_public: true })
-    })
-
-    it('links to the own public page only when it is set and public', () => {
-      const hidden = mountView('Europe/Kyiv', { username: 'olena', is_public: false })
-      expect(hidden.wrapper.find('a[href="/u/olena"]').exists()).toBe(false)
-
-      const noName = mountView('Europe/Kyiv', { username: null, is_public: true })
-      expect(noName.wrapper.find('a[href^="/u/"]').exists()).toBe(false)
-
-      const shown = mountView('Europe/Kyiv', { username: 'olena', is_public: true })
-      expect(shown.wrapper.get('a[href="/u/olena"]').text()).toBe('Моя публічна сторінка')
-    })
-
-    it('explains that a username is needed to go public', async () => {
-      const { wrapper, auth } = mountView()
-      vi.spyOn(auth, 'updateProfile').mockRejectedValue(
-        new ApiError(422, { message: 'Invalid', errors: { username: ['profile.username_required'] } }),
-      )
-
-      await wrapper.get('form').trigger('submit')
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('вкажіть ім’я користувача')
-    })
-
-    it('hints at the username format before anything is sent', async () => {
-      const { wrapper, auth } = mountView()
-      const update = vi.spyOn(auth, 'updateProfile').mockResolvedValue()
-
-      expect(wrapper.find('#profile-username-error').exists()).toBe(false)
-      await wrapper.get('#profile-username').setValue('ab')
-
-      expect(wrapper.get('#profile-username-error').text()).toContain('від 3 до 30 символів')
-      expect(wrapper.get('#profile-username').attributes('aria-invalid')).toBe('true')
-      expect(wrapper.get('#profile-username').attributes('aria-describedby')).toBe('profile-username-error')
-
-      await wrapper.get('form').trigger('submit')
-      expect(update).not.toHaveBeenCalled()
-
-      await wrapper.get('#profile-username').setValue('Olena_1')
-      expect(wrapper.find('#profile-username-error').exists()).toBe(false)
-    })
-
-    it('says what a public profile shows', () => {
-      const { wrapper } = mountView()
-
-      expect(wrapper.get('#profile-public-hint').text()).toContain('публічні цитати')
-      expect(wrapper.get('#profile-public-hint').text()).toContain('Пошта, бібліотека й нотатки лишаються приватними')
-    })
-
-    it('shows next to the field that the username is taken', async () => {
-      const { wrapper, auth } = mountView()
-      vi.spyOn(auth, 'updateProfile').mockRejectedValue(
-        new ApiError(422, { message: 'Invalid', errors: { username: ['The username has already been taken.'] } }),
-      )
-
-      await wrapper.get('#profile-username').setValue('olena')
-      await wrapper.get('form').trigger('submit')
-      await flushPromises()
-
-      expect(wrapper.get('#profile-username-error').text()).toBe('Це ім’я вже зайняте. Оберіть інше.')
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-
-      await wrapper.get('#profile-username').setValue('olena2')
-      expect(wrapper.find('#profile-username-error').exists()).toBe(false)
-    })
-
-    it('shows the missing username next to the field', async () => {
-      const { wrapper, auth } = mountView()
-      vi.spyOn(auth, 'updateProfile').mockRejectedValue(
-        new ApiError(422, { message: 'Invalid', errors: { username: ['profile.username_required'] } }),
-      )
-
-      await wrapper.get('form').trigger('submit')
-      await flushPromises()
-
-      expect(wrapper.get('#profile-username-error').text()).toContain('вкажіть ім’я користувача')
-    })
-
-    it('blames the name being taken when the server rejects a well-formed username', async () => {
-      const { wrapper, auth } = mountView()
-      vi.spyOn(auth, 'updateProfile').mockRejectedValue(
-        new ApiError(422, { message: 'Invalid', errors: { username: ['The username format is invalid.'] } }),
-      )
-      await wrapper.get('#profile-username').setValue('valid_name')
-      await wrapper.get('form').trigger('submit')
-      await flushPromises()
-
-      expect(wrapper.get('#profile-username-error').text()).toContain('вже зайняте')
-    })
-
-    it('disables saving while the request is on its way', async () => {
-      const { wrapper, auth } = mountView()
-      vi.spyOn(auth, 'updateProfile').mockReturnValue(new Promise(() => undefined))
-
-      await wrapper.get('form').trigger('submit')
-
-      expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
-    })
-  })
-
-  describe('new followers', () => {
-    it('links to the own followers list with a plural line', () => {
-      const { wrapper } = mountView('Europe/Kyiv', { username: 'olena', is_public: true, new_followers_count: 2 })
-
-      const line = wrapper.get('[data-test="new-followers-line"]')
-      expect(line.text()).toBe('У вас 2 нові підписники')
-      expect(line.attributes('href')).toBe('/u/olena/followers')
-    })
-
-    it('has no line without new followers', () => {
-      const { wrapper } = mountView('Europe/Kyiv', { username: 'olena', is_public: true, new_followers_count: 0 })
-
-      expect(wrapper.find('[data-test="new-followers-line"]').exists()).toBe(false)
-    })
+    expect(wrapper.findAll('button').find((button) => button.text() === 'Вийти')!.attributes('disabled')).toBeUndefined()
   })
 
   describe('password change', () => {
-    async function fill(wrapper: ReturnType<typeof mountView>['wrapper'], confirmation = 'new-password') {
-      await wrapper.get('[data-test="password-toggle"]').trigger('click')
+    async function fill(wrapper: ReturnType<typeof mount>, confirmation = 'new-password') {
       await wrapper.get('#profile-current-password').setValue('old-password')
       await wrapper.get('#profile-new-password').setValue('new-password')
       await wrapper.get('#profile-confirm-password').setValue(confirmation)
@@ -278,39 +242,20 @@ describe('ProfileView', () => {
     }
 
     it('sends the three passwords, clears the fields and says it is done', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       const change = vi.spyOn(auth, 'changePassword').mockResolvedValue()
 
       await fill(wrapper)
 
       expect(change).toHaveBeenCalledWith({ current_password: 'old-password', password: 'new-password', password_confirmation: 'new-password' })
-      expect(wrapper.get('[data-test="password-done"]').text()).toContain('Пароль змінено')
-    })
-
-    it('keeps the form collapsed until opened, toggles aria-expanded and collapses after success', async () => {
-      const { wrapper, auth } = mountView()
-      vi.spyOn(auth, 'changePassword').mockResolvedValue()
-      const toggle = wrapper.get('[data-test="password-toggle"]')
-
-      expect(toggle.attributes('aria-expanded')).toBe('false')
-      expect(wrapper.find('#profile-current-password').exists()).toBe(false)
-
-      await toggle.trigger('click')
-      expect(toggle.attributes('aria-expanded')).toBe('true')
-      expect(wrapper.find('#profile-current-password').exists()).toBe(true)
-
-      await toggle.trigger('click')
-      expect(toggle.attributes('aria-expanded')).toBe('false')
-      expect(wrapper.find('#profile-current-password').exists()).toBe(false)
-
-      await fill(wrapper)
-      expect(toggle.attributes('aria-expanded')).toBe('false')
-      expect(wrapper.find('[data-test="password-form"]').exists()).toBe(false)
-      expect(wrapper.get('[data-test="password-done"]').text()).toContain('Пароль змінено')
+      expect((wrapper.get('#profile-current-password').element as HTMLInputElement).value).toBe('')
+      expect(wrapper.get('[data-test="password-form"] [role="status"]').text()).toContain('Пароль змінено')
     })
 
     it('does not send mismatching passwords', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       const change = vi.spyOn(auth, 'changePassword').mockResolvedValue()
 
       await fill(wrapper, 'different')
@@ -320,17 +265,19 @@ describe('ProfileView', () => {
     })
 
     it('shows a wrong current password next to its field', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       vi.spyOn(auth, 'changePassword').mockRejectedValue(new ApiError(422, { errors: { current_password: ['wrong'] } }))
 
       await fill(wrapper)
 
       expect(wrapper.get('#profile-current-password-error').text()).toBe('Поточний пароль невірний.')
-      expect(wrapper.find('[data-test="password-done"]').exists()).toBe(false)
+      expect(wrapper.find('[data-test="password-form"] [role="status"]').exists()).toBe(false)
     })
 
     it('shows a refused new password next to its field', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       vi.spyOn(auth, 'changePassword').mockRejectedValue(new ApiError(422, { errors: { password: ['weak'] } }))
 
       await fill(wrapper)
@@ -339,7 +286,8 @@ describe('ProfileView', () => {
     })
 
     it('shows other failures as a notice', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       vi.spyOn(auth, 'changePassword').mockRejectedValue(new ApiError(500, null))
 
       await fill(wrapper)
@@ -348,7 +296,8 @@ describe('ProfileView', () => {
     })
 
     it('disables the button while the request is on its way', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       vi.spyOn(auth, 'changePassword').mockReturnValue(new Promise(() => undefined))
 
       await fill(wrapper)
@@ -358,32 +307,33 @@ describe('ProfileView', () => {
   })
 
   describe('account deletion', () => {
-    async function openDialog(wrapper: ReturnType<typeof mountView>['wrapper']) {
+    async function openDialog(wrapper: ReturnType<typeof mount>) {
       await wrapper.get('[data-test="delete-account"]').trigger('click')
       await flushPromises()
     }
 
-    async function confirm(wrapper: ReturnType<typeof mountView>['wrapper'], password = 'secret-password') {
+    async function confirm(wrapper: ReturnType<typeof mount>, password = 'secret-password') {
       await wrapper.get('#delete-account-password').setValue(password)
       await wrapper.get('[role="dialog"] form').trigger('submit')
       await flushPromises()
     }
 
     it('explains what is deleted and asks for the password before anything happens', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       const remove = vi.spyOn(auth, 'deleteAccount').mockResolvedValue()
 
       await openDialog(wrapper)
 
       const text = wrapper.get('[role="dialog"]').text()
-      for (const part of ['бібліотека', 'цитати', 'відгуки', 'EPUB', 'підписники', 'неможливо скасувати']) {
+      for (const part of ['бібліотека', 'цитати', 'публікації', 'книги', 'підписники', 'неможливо скасувати']) {
         expect(text).toContain(part)
       }
       expect(remove).not.toHaveBeenCalled()
     })
 
     it('moves the focus into the dialog, closes on Escape and gives the focus back', async () => {
-      const { wrapper } = mountView()
+      const { wrapper } = await mountView()
       wrapper.element.ownerDocument.body.append(wrapper.element)
       const opener = wrapper.get('[data-test="delete-account"]')
       ;(opener.element as HTMLElement).focus()
@@ -402,7 +352,8 @@ describe('ProfileView', () => {
     })
 
     it('can be cancelled with the button without deleting anything', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       const remove = vi.spyOn(auth, 'deleteAccount').mockResolvedValue()
       await openDialog(wrapper)
 
@@ -413,7 +364,8 @@ describe('ProfileView', () => {
     })
 
     it('deletes the account and goes to the login screen with a note', async () => {
-      const { wrapper, router, auth } = mountView()
+      const { wrapper, router } = await mountView()
+      const auth = useAuthStore()
       const remove = vi.spyOn(auth, 'deleteAccount').mockResolvedValue()
       await openDialog(wrapper)
 
@@ -425,7 +377,8 @@ describe('ProfileView', () => {
     })
 
     it('does not send an empty password', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       const remove = vi.spyOn(auth, 'deleteAccount').mockResolvedValue()
       await openDialog(wrapper)
 
@@ -435,7 +388,8 @@ describe('ProfileView', () => {
     })
 
     it('keeps the dialog open and names the password when it is wrong', async () => {
-      const { wrapper, router, auth } = mountView()
+      const { wrapper, router } = await mountView()
+      const auth = useAuthStore()
       vi.spyOn(auth, 'deleteAccount').mockRejectedValue(new ApiError(422, { errors: { password: ['wrong'] } }))
       await openDialog(wrapper)
 
@@ -446,7 +400,8 @@ describe('ProfileView', () => {
     })
 
     it('shows other failures inside the dialog', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       vi.spyOn(auth, 'deleteAccount').mockRejectedValue(new ApiError(500, null))
       await openDialog(wrapper)
 
@@ -456,7 +411,8 @@ describe('ProfileView', () => {
     })
 
     it('disables the confirm button and ignores Escape while deleting', async () => {
-      const { wrapper, auth } = mountView()
+      const { wrapper } = await mountView()
+      const auth = useAuthStore()
       vi.spyOn(auth, 'deleteAccount').mockReturnValue(new Promise(() => undefined))
       await openDialog(wrapper)
 
@@ -481,15 +437,15 @@ describe('ProfileView', () => {
       return { createObjectURL, revokeObjectURL, downloads }
     }
 
-    it('explains what is in the file and that EPUB files are not', () => {
-      const { wrapper } = mountView()
+    it('explains what is in the file and that book texts are not', async () => {
+      const { wrapper } = await mountView()
 
-      expect(wrapper.get('#profile-data-hint').text()).toContain('Самих EPUB-файлів у ньому немає.')
+      expect(wrapper.get('#profile-data-hint').text()).toContain('Самого тексту книжок у файлі немає.')
       expect(wrapper.get('[data-test="export-data"]').text()).toBe('Завантажити мої дані')
     })
 
-    it('sits above the danger zone', () => {
-      const { wrapper } = mountView()
+    it('sits above the danger zone', async () => {
+      const { wrapper } = await mountView()
 
       const html = wrapper.html()
       expect(html.indexOf('profile-data-title')).toBeLessThan(html.indexOf('profile-danger-title'))
@@ -499,8 +455,8 @@ describe('ProfileView', () => {
       vi.useFakeTimers({ toFake: ['setTimeout'] })
       const { createObjectURL, revokeObjectURL, downloads } = stubDownload()
       const file = new Blob(['{}'])
-      vi.spyOn(authApi, 'exportData').mockResolvedValue(file)
-      const { wrapper } = mountView()
+      vi.mocked(authApi.exportData).mockResolvedValue(file)
+      const { wrapper } = await mountView()
 
       await wrapper.get('[data-test="export-data"]').trigger('click')
       await flushPromises()
@@ -519,8 +475,8 @@ describe('ProfileView', () => {
     it('disables the button while the file is being prepared', async () => {
       stubDownload()
       let finish: (file: Blob) => void = () => undefined
-      vi.spyOn(authApi, 'exportData').mockReturnValue(new Promise((resolve) => (finish = resolve)))
-      const { wrapper } = mountView()
+      vi.mocked(authApi.exportData).mockReturnValue(new Promise((resolve) => (finish = resolve)))
+      const { wrapper } = await mountView()
 
       await wrapper.get('[data-test="export-data"]').trigger('click')
 
@@ -535,8 +491,8 @@ describe('ProfileView', () => {
 
     it('shows an error notice when the download fails', async () => {
       const { downloads } = stubDownload()
-      vi.spyOn(authApi, 'exportData').mockRejectedValue(new ApiError(500, null))
-      const { wrapper } = mountView()
+      vi.mocked(authApi.exportData).mockRejectedValue(new ApiError(500, null))
+      const { wrapper } = await mountView()
 
       await wrapper.get('[data-test="export-data"]').trigger('click')
       await flushPromises()
@@ -548,8 +504,8 @@ describe('ProfileView', () => {
 
     it('says the limit is per hour when it is reached', async () => {
       stubDownload()
-      vi.spyOn(authApi, 'exportData').mockRejectedValue(new ApiError(429, null))
-      const { wrapper } = mountView()
+      vi.mocked(authApi.exportData).mockRejectedValue(new ApiError(429, null))
+      const { wrapper } = await mountView()
 
       await wrapper.get('[data-test="export-data"]').trigger('click')
       await flushPromises()

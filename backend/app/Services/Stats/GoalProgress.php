@@ -36,7 +36,7 @@ final class GoalProgress
 
         // This year the goal is spread evenly over the days; a past year is simply done or not; a future one has not begun.
         [$expected, $due] = match (true) {
-            $year === $today->year => [$target * $today->dayOfYear / $today->daysInYear, intdiv($target * $today->dayOfYear, $today->daysInYear)],
+            $year === $today->year => [$target * $today->dayOfYear / $today->daysInYear, intdiv($target * $today->dayOfYear + $today->daysInYear - 1, $today->daysInYear)],
             $year < $today->year => [(float) $target, $target],
             default => [0.0, 0],
         };
@@ -46,11 +46,12 @@ final class GoalProgress
             'target_books' => $target,
             'finished_books' => $finished,
             'expected_books' => round($expected, 1),
-            // Whole books that should be finished by today.
+            // Whole books it takes to be on track today: the real-valued expectation rounded up.
             'due_books' => $due,
             'remaining_books' => max(0, $target - $finished),
-            // Books are whole: being 0.02 of a book short on the second day of the year is not being behind.
-            'on_track' => $year > $today->year ? null : $finished >= $due,
+            // On track means finished >= goal * dayOfYear / daysInYear as a real number (F-6.5), so a book finished
+            // is needed as soon as any part of it is due: 4 books for a goal of 12 on day 100 (3.29 expected).
+            'on_track' => $year > $today->year ? null : $finished >= $expected,
         ];
     }
 }

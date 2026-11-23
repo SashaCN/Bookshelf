@@ -12,7 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class QuoteResource extends JsonResource
 {
     /**
-     * @return array<int|string, mixed>
+     * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
@@ -20,18 +20,13 @@ class QuoteResource extends JsonResource
             'id' => $this->id,
             'type' => $this->type,
             'content' => $this->content,
+            'note' => $this->note,
             'page' => $this->page,
-            // Private to the owner: a public quote shows its words, not the reader's notes or favorites.
-            $this->mergeWhen($request->user('sanctum')?->id === $this->user_id, fn () => [
-                'note' => $this->note,
-                'is_favorite' => $this->is_favorite,
-            ]),
-            // Tags are private labels: only the owner gets them, and only where the relation was loaded.
-            'tags' => $this->when($this->exposesTags($request) && $this->resource->relationLoaded('tags'), fn () => $this->tags->pluck('name')->all()),
-            'visibility' => $this->visibility,
-            // Only where the likes were counted (the lists), never a misleading 0 elsewhere.
-            'likes_count' => $this->when(array_key_exists('likes_count', $this->resource->getAttributes()), fn () => (int) $this->likes_count),
-            'comments_count' => $this->when(array_key_exists('comments_count', $this->resource->getAttributes()), fn () => (int) $this->comments_count),
+            'is_favorite' => $this->is_favorite,
+            // Where in the uploaded text of the book the quote was selected, or null for one that was typed in.
+            'anchor' => $this->anchor(),
+            // Tags are private labels of the reader, only where the relation was loaded (the reader's own screens).
+            'tags' => $this->whenLoaded('tags', fn () => $this->tags->pluck('name')->all()),
             'created_at' => $this->created_at?->toIso8601String(),
             // The library entry the quote belongs to, and enough of its book to show where the quote comes from.
             'user_book_id' => $this->user_book_id,
@@ -41,13 +36,5 @@ class QuoteResource extends JsonResource
                 'cover_url' => $this->userBook->book->cover_url,
             ]),
         ];
-    }
-
-    /**
-     * Whether this resource may show the quote's tags. Shared quotes (profiles, feed) never do.
-     */
-    protected function exposesTags(Request $request): bool
-    {
-        return $request->user('sanctum')?->id === $this->user_id;
     }
 }

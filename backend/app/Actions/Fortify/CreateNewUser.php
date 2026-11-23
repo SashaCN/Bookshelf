@@ -2,16 +2,22 @@
 
 namespace App\Actions\Fortify;
 
+use App\Actions\Social\GenerateHandle;
 use App\Models\User;
+use App\Support\TimeZones;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
+use Throwable;
 
 class CreateNewUser implements CreatesNewUsers
 {
     use PasswordValidationRules;
+
+    public function __construct(private readonly GenerateHandle $handles) {}
 
     /**
      * Validate and create a newly registered user.
@@ -22,8 +28,12 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
+        if (array_key_exists('timezone', $input)) {
+            $input['timezone'] = TimeZones::normalize($input['timezone']);
+        }
+
         Validator::make($input, [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:100'],
             'email' => [
                 'required',
                 'string',
@@ -35,11 +45,19 @@ class CreateNewUser implements CreatesNewUsers
             'timezone' => ['nullable', 'timezone:all_with_bc'],
         ])->validate();
 
-        return User::create([
-            'name' => $input['name'],
-            'email' => $input['email'],
-            'password' => Hash::make($input['password']),
-            'timezone' => $input['timezone'] ?? User::DEFAULT_TIMEZONE,
-        ]);
+        // The handle comes from the name. Two readers with the same name registering at the very same moment
+        // may be given the same one; the unique index stops the second, who simply gets the next free handle.
+        return retry(
+            3,
+            fn () => User::create([
+                'name' => $input['name'],
+                'email' => $input['email'],
+                'handle' => $this->handles->handle($input['name']),
+                'password' => Hash::make($input['password']),
+                'timezone' => $input['timezone'] ?? User::DEFAULT_TIMEZONE,
+            ]),
+            0,
+            fn (Throwable $e) => $e instanceof UniqueConstraintViolationException && str_contains($e->getMessage(), 'handle'),
+        );
     }
 }

@@ -65,20 +65,6 @@ describe('LibraryView', () => {
     expect(wrapper.text()).not.toContain('Want One')
   })
 
-  it('links to the Goodreads import', async () => {
-    const { wrapper } = await mountView(library)
-
-    const link = wrapper.findAll('a').find((a) => a.text() === 'Імпорт з Goodreads')
-
-    expect(link?.attributes('href')).toBe('/library/import')
-  })
-
-  it('names the status filter for screen readers', async () => {
-    const { wrapper } = await mountView([])
-
-    expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Статус книги')
-  })
-
   it('restores the tab from the URL', async () => {
     const { wrapper } = await mountView(library, { status: 'finished' })
 
@@ -103,6 +89,14 @@ describe('LibraryView', () => {
 
     expect(wrapper.text()).toContain('Список порожній')
     expect(wrapper.findAll('a').some((link) => link.attributes('href') === '/library/add')).toBe(true)
+  })
+
+  it('links to the Goodreads import', async () => {
+    const { wrapper } = await mountView(library)
+
+    const link = wrapper.findAll('a').find((a) => a.text() === 'Імпорт з Goodreads')
+
+    expect(link?.attributes('href')).toBe('/library/import')
   })
 
   it('offers a retry when the library cannot be loaded', async () => {

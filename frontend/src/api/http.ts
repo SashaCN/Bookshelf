@@ -14,11 +14,38 @@ export class ApiError extends Error {
   }
 }
 
+/** The request never got an answer: no network, a dropped connection, a server that is down. */
+export class NetworkError extends Error {
+  constructor() {
+    super('The server could not be reached')
+    this.name = 'NetworkError'
+  }
+}
+
 let unauthorizedHandler: (() => void) | null = null
 
-/** Called whenever the API answers 401, i.e. the session is gone (expired, or ended in another tab). */
+/**
+ * Called when the server says the reader is no longer signed in (an expired session) in answer to a request
+ * made while using the app. Asking who is signed in, or signing in, are expected to answer 401 and do not count.
+ */
 export function onUnauthorized(handler: (() => void) | null): void {
   unauthorizedHandler = handler
+}
+
+/** How long to wait for an answer. A phone with one bar of signal may never get one, and waiting for ever helps nobody. */
+const TIMEOUT_MS = 20_000
+
+/** A book of several megabytes that is read and cleaned up on the server needs far longer than a JSON request does. */
+export const UPLOAD_TIMEOUT_MS = 120_000
+
+/** `fetch` that tells a missing network (or no answer in time) apart from an answer of the server. */
+async function send(input: string, init: RequestInit, timeoutMs = TIMEOUT_MS): Promise<Response> {
+  try {
+    const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined
+    return await fetch(input, { ...init, signal })
+  } catch {
+    throw new NetworkError()
+  }
 }
 
 function readCookie(name: string): string | null {
@@ -32,14 +59,26 @@ async function ensureCsrfCookie(force = false): Promise<void> {
     return
   }
 
-  await fetch('/api/sanctum/csrf-cookie', {
+  await send('/api/sanctum/csrf-cookie', {
     credentials: 'same-origin',
     headers: { Accept: 'application/json' },
   })
 }
 
-async function request<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
+export interface RequestOptions {
+  /** How long to wait for an answer instead of the usual. */
+  timeoutMs?: number
+  /**
+   * Let the request finish although the page is being left (the phone is locked, the tab is closed). The browser allows
+   * only a small body for such a request (64 KB), which is for a few numbers and not for a form with a file.
+   */
+  keepalive?: boolean
+}
+
+async function request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}, retried = false): Promise<T> {
   const isWrite = method !== 'GET'
+  // A file goes as it is: the browser sets the content type of a form, with the boundary that tells its parts apart.
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData
 
   if (isWrite) {
     await ensureCsrfCookie()
@@ -50,9 +89,6 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
     'X-Requested-With': 'XMLHttpRequest',
   }
 
-  // FormData gets its multipart Content-Type (with the boundary) from the browser.
-  const isForm = body instanceof FormData
-
   if (body !== undefined && !isForm) {
     headers['Content-Type'] = 'application/json'
   }
@@ -62,24 +98,29 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
     headers['X-XSRF-TOKEN'] = csrfToken
   }
 
-  const response = await fetch(path, {
-    method,
-    headers,
-    credentials: 'same-origin',
-    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
-  })
+  const response = await send(
+    path,
+    {
+      method,
+      headers,
+      credentials: 'same-origin',
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
+      ...(options.keepalive ? { keepalive: true } : {}),
+    },
+    options.timeoutMs,
+  )
 
   // The CSRF token expired (e.g. the session was regenerated): fetch a fresh one and retry once.
   if (response.status === 419 && !retried) {
     await ensureCsrfCookie(true)
-    return request<T>(method, path, body, true)
+    return request<T>(method, path, body, options, true)
   }
 
   // Only parse real JSON: a redirected HTML page (e.g. "already signed in") must not crash the client.
   const isJson = response.headers.get('content-type')?.includes('json') ?? false
   const data = isJson ? ((await response.json()) as unknown) : null
 
-  if (response.status === 401) {
+  if (response.status === 401 && path !== '/api/me' && !path.startsWith('/api/auth/')) {
     unauthorizedHandler?.()
   }
 
@@ -90,13 +131,16 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
   return data as T
 }
 
-/** GET a file (not JSON): the raw body as a Blob, with the same session and error handling as the JSON calls. */
+/**
+ * GET a file (not JSON): the raw body as a Blob, with the same session and error handling as the JSON calls. A large
+ * export is streamed by the server, so it gets as long as an upload does.
+ */
 async function download(path: string): Promise<Blob> {
-  const response = await fetch(path, {
-    method: 'GET',
-    headers: { Accept: '*/*', 'X-Requested-With': 'XMLHttpRequest' },
-    credentials: 'same-origin',
-  })
+  const response = await send(
+    path,
+    { method: 'GET', headers: { Accept: '*/*', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' },
+    UPLOAD_TIMEOUT_MS,
+  )
 
   if (response.status === 401) {
     unauthorizedHandler?.()
@@ -107,14 +151,21 @@ async function download(path: string): Promise<Blob> {
     throw new ApiError(response.status, isJson ? ((await response.json()) as unknown) : null)
   }
 
-  return response.blob()
+  try {
+    return await response.blob()
+  } catch {
+    throw new NetworkError()
+  }
 }
 
 export const http = {
   download,
-  get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
-  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
-  put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
-  delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
+  get: <T>(path: string, options?: RequestOptions) => request<T>('GET', path, undefined, options),
+  post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, options),
+  patch: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, options),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, options),
+  /** `body` is for the few deletions that ask for a confirmation, such as the password for deleting an account. */
+  delete: <T>(path: string, options?: RequestOptions & { body?: unknown }) => request<T>('DELETE', path, options?.body, options),
+  /** Send a file (a `FormData`) with a POST; waits longer for the answer than the other methods. */
+  upload: <T>(path: string, form: FormData, timeoutMs = UPLOAD_TIMEOUT_MS) => request<T>('POST', path, form, { timeoutMs }),
 }

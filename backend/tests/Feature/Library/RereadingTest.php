@@ -30,7 +30,6 @@ describe('starting a reread', function () {
             'started_at' => '2026-09-01 10:00:00',
             'finished_at' => '2026-09-20 10:00:00',
             'rating' => 5,
-            'review' => 'Great.',
         ]);
 
         reread($userBook)
@@ -46,8 +45,7 @@ describe('starting a reread', function () {
             ->and($userBook->current_page)->toBe(0)
             ->and($userBook->started_at->toDateTimeString())->toBe('2026-10-05 12:00:00')
             ->and($userBook->finished_at)->toBeNull()
-            ->and($userBook->rating)->toBe(5)
-            ->and($userBook->review)->toBe('Great.');
+            ->and($userBook->rating)->toBe(5);
 
         $read = UserBookRead::query()->sole();
         expect($read->user_book_id)->toBe($userBook->id)
@@ -82,7 +80,15 @@ describe('starting a reread', function () {
             ->assertJsonPath('errors.status.0', 'library.reread_not_finished');
 
         expect(UserBookRead::query()->count())->toBe(0);
-    })->with(['reading', 'unstarted', 'abandoned']);
+    })->with(['reading', 'abandoned']);
+
+    it('refuses a book that is only wanted', function () {
+        $userBook = UserBook::factory()->for($this->user)->create();
+
+        reread($userBook)->assertUnprocessable()->assertJsonPath('errors.status.0', 'library.reread_not_finished');
+
+        expect(UserBookRead::query()->count())->toBe(0);
+    });
 
     it('answers 404 for a foreign entry before looking at its status', function () {
         $userBook = UserBook::factory()->for($this->stranger)->reading()->create();
@@ -158,15 +164,6 @@ describe('statistics', function () {
         $this->actingAs($this->user)->getJson('/api/goals/2026')
             ->assertOk()
             ->assertJsonPath('data.finished_books', 2);
-    });
-
-    it('counts archived passes in the profile of a public reader', function () {
-        $alice = User::factory()->public()->create(['username' => 'alice']);
-        $userBook = UserBook::factory()->for($alice)->reading()->create();
-        $userBook->reads()->create(['finished_at' => '2026-02-01 10:00:00']);
-        $userBook->reads()->create(['finished_at' => '2026-04-01 10:00:00']);
-
-        $this->actingAs($this->user)->getJson('/api/users/alice')->assertJsonPath('data.books_finished_this_year', 2);
     });
 
     it('counts archived passes in the summary totals', function () {

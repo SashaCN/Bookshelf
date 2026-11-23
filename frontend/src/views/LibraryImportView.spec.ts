@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { createTestEnvironment } from '@/test/utils'
-import type { GoodreadsImportResult } from '@/types/api'
+import type { GoodreadsImportResult } from '@/types/libraryImport'
 import LibraryImportView from './LibraryImportView.vue'
 
 vi.mock('@/api/library', () => ({

@@ -2,62 +2,75 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\Social\FindPublicProfile;
-use App\Actions\Social\ProfileQuery;
-use App\Actions\Social\ProfileSummary;
-use App\Http\Resources\ProfileMemberResource;
-use App\Http\Resources\PublicQuoteResource;
-use App\Http\Resources\PublicReviewResource;
-use Illuminate\Http\JsonResponse;
+use App\Http\Requests\SearchReadersRequest;
+use App\Http\Resources\PostResource;
+use App\Http\Resources\ProfileResource;
+use App\Http\Resources\ReaderResource;
+use App\Models\Post;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Gate;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request, string $username, FindPublicProfile $find, ProfileSummary $summary): JsonResponse
+    /**
+     * Find readers by the beginning of their handle or of a word in their name (at least two characters). Readers who
+     * have a block with the current reader, in either direction, are not found.
+     */
+    public function index(SearchReadersRequest $request): AnonymousResourceCollection
     {
-        $profile = $find->handle($request->user('sanctum'), $username);
+        $viewer = $request->user();
+        $term = $request->term();
 
-        return response()->json(['data' => $summary->handle($request->user('sanctum'), $profile)]);
+        $readers = User::query()
+            ->notBlockedWith($viewer)
+            ->where(fn ($query) => $query
+                ->where('handle', 'like', "{$term}%")
+                ->orWhere('name', 'like', "{$term}%")
+                ->orWhere('name', 'like', "% {$term}%"))
+            ->withExists(['followers as is_following' => fn ($follows) => $follows->where('follows.follower_id', $viewer->id)])
+            ->orderBy('handle')
+            ->simplePaginate(20);
+
+        return ReaderResource::collection($readers);
     }
 
-    public function quotes(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
+    /**
+     * The public profile. A reader who has blocked the current reader is "not found".
+     */
+    public function show(Request $request, User $user): ProfileResource
     {
-        $viewer = $request->user('sanctum');
+        Gate::authorize('viewProfile', $user);
 
-        return PublicQuoteResource::collection($query->quotes($find->handle($viewer, $username), $viewer));
+        return new ProfileResource(self::profileOf($user, $request->user()));
     }
 
-    public function reviews(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
+    /**
+     * The posts of one reader, newest first. Hidden posts are not in the list, and nothing of a reader the current
+     * reader has blocked.
+     */
+    public function posts(Request $request, User $user): AnonymousResourceCollection
     {
-        return PublicReviewResource::collection($query->reviews($find->handle($request->user('sanctum'), $username)));
+        Gate::authorize('viewProfile', $user);
+
+        $viewer = $request->user();
+
+        $posts = Post::query()
+            ->where('posts.user_id', $user->id)
+            ->visibleTo($viewer)
+            ->withViewerState($viewer)
+            ->latest('posts.id')
+            ->simplePaginate(20);
+
+        return PostResource::collection($posts);
     }
 
-    public function followers(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
+    /**
+     * The reader with the numbers and relations of a profile page, as the viewer sees them.
+     */
+    public static function profileOf(User $user, User $viewer): User
     {
-        $viewer = $request->user('sanctum');
-        $profile = $find->handle($viewer, $username);
-        $followers = $query->followers($profile, $viewer);
-
-        // Only the owner learns which followers are new; the seen mark is theirs alone.
-        if ($viewer?->is($profile)) {
-            $seenAt = $profile->followers_seen_at;
-            foreach ($followers->items() as $follower) {
-                $follower->setAttribute(
-                    'is_new',
-                    $seenAt === null || Carbon::parse($follower->pivot->getAttribute('created_at'))->greaterThan($seenAt),
-                );
-            }
-        }
-
-        return ProfileMemberResource::collection($followers);
-    }
-
-    public function following(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
-    {
-        $viewer = $request->user('sanctum');
-
-        return ProfileMemberResource::collection($query->following($find->handle($viewer, $username), $viewer));
+        return User::query()->withProfileState($viewer)->findOrFail($user->id);
     }
 }

@@ -41,13 +41,13 @@ async function submit() {
 </script>
 
 <template>
-  <AuthLayout :title="$t('auth.forgot.title')">
+  <AuthLayout :title="$t('account.forgot.title')">
     <p v-if="sent" role="status" data-test="reset-link-sent" class="rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted">
-      {{ $t('auth.forgot.sent') }}
+      {{ $t('account.forgot.sent') }}
     </p>
 
     <form v-else class="flex flex-col gap-4" @submit.prevent="submit">
-      <p class="text-sm text-ink-muted">{{ $t('auth.forgot.intro') }}</p>
+      <p class="text-sm text-ink-muted">{{ $t('account.forgot.intro') }}</p>
       <FormField
         id="email"
         v-model="email"
@@ -64,13 +64,13 @@ async function submit() {
         :disabled="submitting"
         class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
       >
-        {{ $t('auth.forgot.submit') }}
+        {{ $t('account.forgot.submit') }}
       </button>
     </form>
 
     <template #footer>
       <RouterLink :to="{ name: 'login' }" class="font-medium text-accent underline underline-offset-2">
-        {{ $t('auth.forgot.toLogin') }}
+        {{ $t('account.forgot.toLogin') }}
       </RouterLink>
     </template>
   </AuthLayout>

@@ -1,26 +1,59 @@
-import type { FeedPage, QuoteComment, QuoteCommentsPage, PeoplePage, PersonSearchResult, PublicProfile, QuotesPage, ReviewsPage } from '@/types/api'
+import type {
+  BookReviewsPage,
+  Comment,
+  CommentsPage,
+  FeedScope,
+  NewPostPayload,
+  Post,
+  PostsPage,
+  Profile,
+  ReadersPage,
+  ReportPayload,
+  ReportTarget,
+  UpdatePostPayload,
+} from '@/types/social'
 import { http } from './http'
 
-const user = (username: string) => `/api/users/${encodeURIComponent(username)}`
+function pageQuery(page: number, params: Record<string, string> = {}): string {
+  return new URLSearchParams({ ...params, page: String(page) }).toString()
+}
+
+const profilePath = (handle: string) => `/api/profiles/${encodeURIComponent(handle)}`
 
 export const socialApi = {
-  profile: (username: string) => http.get<{ data: PublicProfile }>(user(username)).then((response) => response.data),
-  quotes: (username: string, page = 1) => http.get<QuotesPage>(`${user(username)}/quotes?page=${page}`),
-  reviews: (username: string, page = 1) => http.get<ReviewsPage>(`${user(username)}/reviews?page=${page}`),
-  follow: (username: string) => http.post<null>(`${user(username)}/follow`),
-  unfollow: (username: string) => http.delete<null>(`${user(username)}/follow`),
-  followers: (username: string, page = 1) => http.get<PeoplePage>(`${user(username)}/followers?page=${page}`),
-  following: (username: string, page = 1) => http.get<PeoplePage>(`${user(username)}/following?page=${page}`),
-  search: (q: string) =>
-    http.get<{ data: PersonSearchResult[] }>(`/api/users?q=${encodeURIComponent(q)}`).then((response) => response.data),
-  block: (username: string) => http.post<null>(`${user(username)}/block`),
-  unblock: (username: string) => http.delete<null>(`${user(username)}/block`),
-  blocked: (page = 1) => http.get<PeoplePage>(`/api/me/blocks?page=${page}`),
-  like: (quoteId: number) => http.post<null>(`/api/quotes/${quoteId}/like`),
-  unlike: (quoteId: number) => http.delete<null>(`/api/quotes/${quoteId}/like`),
-  comments: (quoteId: number, page = 1) => http.get<QuoteCommentsPage>(`/api/quotes/${quoteId}/comments?page=${page}`),
-  addComment: (quoteId: number, body: string) =>
-    http.post<{ data: QuoteComment }>(`/api/quotes/${quoteId}/comments`, { body }).then((response) => response.data),
-  deleteComment: (quoteId: number, commentId: number) => http.delete<null>(`/api/quotes/${quoteId}/comments/${commentId}`),
-  feed: (page = 1) => http.get<FeedPage>(`/api/feed?page=${page}`),
+  feed: (scope: FeedScope, page = 1) => http.get<PostsPage>(`/api/feed?${pageQuery(page, { scope })}`),
+
+  searchReaders: (query: string, page = 1) => http.get<ReadersPage>(`/api/profiles?${pageQuery(page, { q: query })}`),
+  profile: (handle: string) => http.get<{ data: Profile }>(profilePath(handle)).then((response) => response.data),
+  profilePosts: (handle: string, page = 1) => http.get<PostsPage>(`${profilePath(handle)}/posts?${pageQuery(page)}`),
+  follow: (handle: string) =>
+    http.put<{ data: Profile }>(`${profilePath(handle)}/follow`).then((response) => response.data),
+  unfollow: (handle: string) =>
+    http.delete<{ data: Profile }>(`${profilePath(handle)}/follow`).then((response) => response.data),
+
+  blocks: (page = 1) => http.get<ReadersPage>(`/api/blocks?${pageQuery(page)}`),
+  block: (handle: string) =>
+    http.put<{ data: Profile }>(`/api/blocks/${encodeURIComponent(handle)}`).then((response) => response.data),
+  unblock: (handle: string) => http.delete<null>(`/api/blocks/${encodeURIComponent(handle)}`),
+
+  getPost: (id: number) => http.get<{ data: Post }>(`/api/posts/${id}`).then((response) => response.data),
+  createPost: (payload: NewPostPayload) =>
+    http.post<{ data: Post }>('/api/posts', payload).then((response) => response.data),
+  updatePost: (id: number, payload: UpdatePostPayload) =>
+    http.patch<{ data: Post }>(`/api/posts/${id}`, payload).then((response) => response.data),
+  deletePost: (id: number) => http.delete<null>(`/api/posts/${id}`),
+  /** Both answer with the post, so the counter on screen is the exact one. */
+  like: (id: number) => http.put<{ data: Post }>(`/api/posts/${id}/like`).then((response) => response.data),
+  /** Null when the reader may no longer see the post (its author blocked them): the like is gone all the same. */
+  unlike: (id: number) => http.delete<{ data: Post | null }>(`/api/posts/${id}/like`).then((response) => response.data),
+
+  comments: (postId: number, page = 1) => http.get<CommentsPage>(`/api/posts/${postId}/comments?${pageQuery(page)}`),
+  addComment: (postId: number, content: string) =>
+    http.post<{ data: Comment }>(`/api/posts/${postId}/comments`, { content }).then((response) => response.data),
+  deleteComment: (id: number) => http.delete<null>(`/api/comments/${id}`),
+
+  report: (target: ReportTarget, payload: ReportPayload) =>
+    http.post<unknown>(`/api/${target.kind === 'post' ? 'posts' : 'comments'}/${target.id}/report`, payload),
+
+  bookReviews: (bookId: number, page = 1) => http.get<BookReviewsPage>(`/api/books/${bookId}/reviews?${pageQuery(page)}`),
 }

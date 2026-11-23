@@ -6,7 +6,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { libraryApi } from '@/api/library'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLibraryStore } from '@/stores/library'
-import type { GoodreadsImportResult } from '@/types/api'
+import type { GoodreadsImportResult } from '@/types/libraryImport'
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 

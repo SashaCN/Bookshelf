@@ -1,0 +1,33 @@
+{
+  "data": {
+    "today": {
+      "date": "2026-11-03",
+      "pages": 80
+    },
+    "streak": {
+      "current": 1,
+      "longest": 1,
+      "read_today": true
+    },
+    "pace": 5.7,
+    "month": {
+      "pages": 80,
+      "books_finished": 0
+    },
+    "year": {
+      "pages": 80,
+      "books_finished": 0
+    },
+    "forecasts": [
+      {
+        "user_book_id": 27,
+        "title": "Kobzar",
+        "current_page": 80,
+        "total_pages": 640,
+        "pages_per_day": 5.7,
+        "days_left": 98,
+        "finish_on": "2027-02-09"
+      }
+    ]
+  }
+}

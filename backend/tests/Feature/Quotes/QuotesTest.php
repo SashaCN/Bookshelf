@@ -92,12 +92,25 @@ describe('saving a quote', function () {
     })->with([
         'no text' => [[], 'content'],
         'empty text' => [['content' => ''], 'content'],
-        'too long' => [['content' => str_repeat('a', 2001)], 'content'],
+        'too long' => [['content' => str_repeat('a', 5001)], 'content'],
         'unknown type' => [['content' => 'x', 'type' => 'poem'], 'type'],
         'page zero' => [['content' => 'x', 'page' => 0], 'page'],
         'page as text' => [['content' => 'x', 'page' => 'ten'], 'page'],
         'note too long' => [['content' => 'x', 'note' => str_repeat('a', 2001)], 'note'],
     ]);
+
+    it('accepts a quote of exactly 5000 characters and keeps all of it', function () {
+        $text = str_repeat('я', 5000);
+
+        $id = $this->actingAs($this->user)->postJson("/api/library/{$this->userBook->id}/quotes", ['content' => $text])
+            ->assertCreated()->json('data.id');
+
+        expect(Quote::query()->findOrFail($id)->content)->toBe($text);
+
+        $this->actingAs($this->user)->patchJson("/api/quotes/{$id}", ['content' => str_repeat('b', 5001)])
+            ->assertUnprocessable()->assertJsonValidationErrors('content');
+        $this->actingAs($this->user)->patchJson("/api/quotes/{$id}", ['content' => str_repeat('b', 5000)])->assertOk();
+    });
 
     it('treats an empty note as no note', function () {
         $this->actingAs($this->user)->postJson("/api/library/{$this->userBook->id}/quotes", ['content' => 'x', 'note' => ''])

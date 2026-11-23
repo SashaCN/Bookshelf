@@ -134,6 +134,20 @@ describe('manually', function () {
             ->and($book->openlibrary_work_key)->toBeNull();
     });
 
+    it('keeps an optional https cover link and shows it as the cover', function () {
+        $url = 'https://covers.example.org/tigrolovy.jpg';
+
+        $this->actingAs($this->user)->postJson('/api/library', ['title' => 'Тигролови', 'cover_url' => $url])
+            ->assertCreated()
+            ->assertJsonPath('data.book.cover_url', $url);
+
+        expect(Book::first()->cover_url)->toBe($url);
+
+        $this->actingAs($this->user)->postJson('/api/library', ['title' => 'Without cover'])
+            ->assertCreated()
+            ->assertJsonPath('data.book.cover_url', null);
+    });
+
     it('works without authors and without a page count', function () {
         $this->actingAs($this->user)->postJson('/api/library', ['title' => 'Untitled notes'])
             ->assertCreated()
@@ -172,7 +186,19 @@ describe('manually', function () {
         'absurd page count' => [['total_pages' => 20001], 'total_pages'],
         'year in the far future' => [['published_year' => 3000], 'published_year'],
         'unknown status' => [['status' => 'archived'], 'status'],
+        'cover over plain http' => [['cover_url' => 'http://example.org/c.jpg'], 'cover_url'],
+        'cover that is not a link' => [['cover_url' => 'javascript:alert(1)'], 'cover_url'],
+        'cover link too long' => [['cover_url' => 'https://example.org/'.str_repeat('a', 2030)], 'cover_url'],
     ]);
+
+    it('stores a cover link of 2048 characters', function () {
+        $url = 'https://example.org/'.str_repeat('a', 2048 - 20);
+
+        $this->actingAs($this->user)->postJson('/api/library', ['title' => 'Long link', 'cover_url' => $url])
+            ->assertCreated();
+
+        expect(Book::first()->cover_url)->toBe($url);
+    });
 
     it('needs a title or a key', function () {
         $this->actingAs($this->user)->postJson('/api/library', ['authors' => ['Someone']])

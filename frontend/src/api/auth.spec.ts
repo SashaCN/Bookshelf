@@ -11,14 +11,6 @@ describe('authApi', () => {
     vi.resetAllMocks()
   })
 
-  it('marks the followers list as seen', async () => {
-    vi.mocked(http.post).mockResolvedValue(null)
-
-    await authApi.followersSeen()
-
-    expect(http.post).toHaveBeenCalledWith('/api/me/followers-seen')
-  })
-
   it('downloads all the reader data as a file', async () => {
     const file = new Blob(['{}'])
     vi.mocked(http.download).mockResolvedValue(file)
@@ -52,6 +44,6 @@ describe('authApi', () => {
 
     await authApi.deleteMe('secret-password')
 
-    expect(http.delete).toHaveBeenCalledWith('/api/me', { password: 'secret-password' })
+    expect(http.delete).toHaveBeenCalledWith('/api/me', { body: { password: 'secret-password' } })
   })
 })

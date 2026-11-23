@@ -1,0 +1,1422 @@
+{
+ "transactions": [
+  {
+   "id": "EI-01",
+   "type": "EI",
+   "name": "Register an account",
+   "route": "POST /api/auth/register",
+   "screen": "views/RegisterView.vue",
+   "dets": [
+    "name",
+    "email",
+    "password",
+    "button Create account",
+    "error message"
+   ],
+   "ftrs": [
+    "Users"
+   ],
+   "note": "Fortify; handle is generated server-side from the name (GenerateHandle), timezone defaults to Europe/Kyiv."
+  },
+  {
+   "id": "EI-02",
+   "type": "EI",
+   "name": "Sign in",
+   "route": "POST /api/auth/login",
+   "screen": "views/LoginView.vue",
+   "dets": [
+    "email",
+    "password",
+    "button Sign in",
+    "error message"
+   ],
+   "ftrs": [
+    "Users"
+   ],
+   "note": "Creates a Sanctum cookie session; session table is technical and not counted."
+  },
+  {
+   "id": "EI-03",
+   "type": "EI",
+   "name": "Sign out",
+   "route": "POST /api/auth/logout",
+   "screen": "views/ProfileView.vue",
+   "dets": [
+    "button Log out",
+    "error message"
+   ],
+   "ftrs": [
+    "Users"
+   ]
+  },
+  {
+   "id": "EI-04",
+   "type": "EI",
+   "name": "Edit own profile (name, handle, bio, timezone)",
+   "route": "PATCH /api/me",
+   "screen": "views/ProfileView.vue",
+   "dets": [
+    "name",
+    "handle",
+    "bio",
+    "timezone",
+    "button Save",
+    "confirmation/error message"
+   ],
+   "ftrs": [
+    "Users"
+   ]
+  },
+  {
+   "id": "EI-05",
+   "type": "EI",
+   "name": "Add a catalog book to the library",
+   "route": "POST /api/library (openlibrary_work_key)",
+   "screen": "views/AddBookView.vue",
+   "dets": [
+    "selected catalog entry (work key)",
+    "button Add",
+    "error message"
+   ],
+   "ftrs": [
+    "Library",
+    "Catalog",
+    "OpenLibrary"
+   ],
+   "note": "Server looks the work up in Open Library when the book is not stored yet, stores Book+Authors and creates the library entry (EIF read + ILF writes). The user fills no field; the selected entry counts as one DET."
+  },
+  {
+   "id": "EI-06",
+   "type": "EI",
+   "name": "Add a book manually",
+   "route": "POST /api/library (title, authors, ...)",
+   "screen": "views/AddBookView.vue",
+   "dets": [
+    "title",
+    "authors",
+    "pages",
+    "year",
+    "button Add book",
+    "error message"
+   ],
+   "ftrs": [
+    "Library",
+    "Catalog"
+   ]
+  },
+  {
+   "id": "EI-07",
+   "type": "EI",
+   "name": "Change reading status (start, finish, abandon, return to want)",
+   "route": "PATCH /api/library/{id} (status)",
+   "screen": "views/BookView.vue",
+   "dets": [
+    "status action button (start / finish / abandon / back to wishlist)",
+    "error message"
+   ],
+   "ftrs": [
+    "Library",
+    "ReadingLog"
+   ],
+   "note": "Finishing sets current page to total pages and writes a reading-log row; counted once although the button label varies."
+  },
+  {
+   "id": "EI-08",
+   "type": "EI",
+   "name": "Update reading progress (current page or +N quick step)",
+   "route": "POST /api/library/{id}/progress",
+   "screen": "components/ReadingCard.vue, components/PageJumpForm.vue (views/BookView.vue)",
+   "dets": [
+    "page",
+    "button Save",
+    "quick-step button +N",
+    "error message"
+   ],
+   "ftrs": [
+    "Library",
+    "ReadingLog"
+   ],
+   "note": "Same process from the Reading screen and the book card. Writes a reading-log row (pages delta) and updates current page."
+  },
+  {
+   "id": "EI-09",
+   "type": "EI",
+   "name": "Set total pages of a book",
+   "route": "PATCH /api/library/{id} (total_pages)",
+   "screen": "views/BookView.vue",
+   "dets": [
+    "total pages",
+    "button Save",
+    "error message"
+   ],
+   "ftrs": [
+    "Library"
+   ]
+  },
+  {
+   "id": "EI-10",
+   "type": "EI",
+   "name": "Rate a book (1-5 stars)",
+   "route": "PATCH /api/library/{id} (rating)",
+   "screen": "views/BookView.vue",
+   "dets": [
+    "rating (star group)",
+    "error message"
+   ],
+   "ftrs": [
+    "Library"
+   ]
+  },
+  {
+   "id": "EI-11",
+   "type": "EI",
+   "name": "Remove a book from the library",
+   "route": "DELETE /api/library/{id}",
+   "screen": "views/BookView.vue",
+   "dets": [
+    "button Remove",
+    "button Yes, remove",
+    "error message"
+   ],
+   "ftrs": [
+    "Library",
+    "Catalog",
+    "ReadingLog",
+    "Quotes",
+    "BookTexts"
+   ],
+   "note": "Cascade deletes log, quotes and text of the entry; a manual book left without readers is deleted from the catalog."
+  },
+  {
+   "id": "EI-12",
+   "type": "EI",
+   "name": "Add a quote or insight",
+   "route": "POST /api/library/{id}/quotes",
+   "screen": "views/QuoteFormView.vue",
+   "dets": [
+    "book",
+    "type (quote/insight)",
+    "content",
+    "note",
+    "page",
+    "button Save",
+    "error message"
+   ],
+   "ftrs": [
+    "Quotes",
+    "Library"
+   ]
+  },
+  {
+   "id": "EI-13",
+   "type": "EI",
+   "name": "Edit a quote",
+   "route": "PATCH /api/quotes/{id}",
+   "screen": "views/QuoteFormView.vue",
+   "dets": [
+    "type (quote/insight)",
+    "content",
+    "note",
+    "page",
+    "button Save",
+    "error message"
+   ],
+   "ftrs": [
+    "Quotes"
+   ]
+  },
+  {
+   "id": "EI-14",
+   "type": "EI",
+   "name": "Delete a quote",
+   "route": "DELETE /api/quotes/{id}",
+   "screen": "components/QuoteCard.vue",
+   "dets": [
+    "button Delete",
+    "button Yes, delete",
+    "error message"
+   ],
+   "ftrs": [
+    "Quotes"
+   ],
+   "note": "The same process is used for removing a highlight in the reader (components/reader/HighlightSheet.vue); not counted twice."
+  },
+  {
+   "id": "EI-15",
+   "type": "EI",
+   "name": "Mark or unmark a quote as favorite",
+   "route": "PATCH /api/quotes/{id} (is_favorite)",
+   "screen": "components/QuoteCard.vue",
+   "dets": [
+    "favorite button (star)",
+    "error message"
+   ],
+   "ftrs": [
+    "Quotes"
+   ]
+  },
+  {
+   "id": "EI-16",
+   "type": "EI",
+   "name": "Set or change the yearly reading goal",
+   "route": "PUT /api/goals/{year}",
+   "screen": "components/GoalCard.vue (views/StatsView.vue)",
+   "dets": [
+    "target books",
+    "button Save",
+    "error message"
+   ],
+   "ftrs": [
+    "Goals"
+   ]
+  },
+  {
+   "id": "EI-17",
+   "type": "EI",
+   "name": "Remove the yearly reading goal",
+   "route": "DELETE /api/goals/{year}",
+   "screen": "components/GoalCard.vue (views/StatsView.vue)",
+   "dets": [
+    "button Remove goal",
+    "error message"
+   ],
+   "ftrs": [
+    "Goals"
+   ]
+  },
+  {
+   "id": "EI-18",
+   "type": "EI",
+   "name": "Publish a quote to the community",
+   "route": "POST /api/posts (type=quote)",
+   "screen": "views/ComposePostView.vue",
+   "dets": [
+    "post type (radio group)",
+    "quote choice (radio group)",
+    "comment",
+    "button Publish",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts",
+    "Quotes",
+    "Catalog"
+   ],
+   "note": "Snapshot of the quote text and book is stored in the post."
+  },
+  {
+   "id": "EI-19",
+   "type": "EI",
+   "name": "Publish a book review",
+   "route": "POST /api/posts (type=review)",
+   "screen": "views/ComposePostView.vue",
+   "dets": [
+    "post type (radio group)",
+    "book",
+    "rating",
+    "review text",
+    "button Publish",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts",
+    "Library",
+    "Catalog"
+   ],
+   "note": "One review per reader per book (unique index)."
+  },
+  {
+   "id": "EI-20",
+   "type": "EI",
+   "name": "Edit own post (comment, rating, review text)",
+   "route": "PATCH /api/posts/{id}",
+   "screen": "components/PostEditForm.vue (views/PostView.vue)",
+   "dets": [
+    "comment (quote post)",
+    "rating (review)",
+    "review text (review)",
+    "button Save",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts"
+   ],
+   "note": "Fields shown depend on the post type; the maximum set is listed."
+  },
+  {
+   "id": "EI-21",
+   "type": "EI",
+   "name": "Delete own post",
+   "route": "DELETE /api/posts/{id}",
+   "screen": "components/PostCard.vue",
+   "dets": [
+    "button Delete",
+    "button Yes, delete",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts"
+   ]
+  },
+  {
+   "id": "EI-22",
+   "type": "EI",
+   "name": "Like or unlike a post",
+   "route": "PUT|DELETE /api/posts/{id}/like",
+   "screen": "components/PostCard.vue",
+   "dets": [
+    "like button (toggle)",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts"
+   ],
+   "note": "PUT and DELETE are two halves of one toggle; counted once. Updates likes_count."
+  },
+  {
+   "id": "EI-23",
+   "type": "EI",
+   "name": "Follow or unfollow a reader",
+   "route": "PUT|DELETE /api/profiles/{handle}/follow",
+   "screen": "views/ReaderProfileView.vue",
+   "dets": [
+    "follow button (toggle)",
+    "error message"
+   ],
+   "ftrs": [
+    "Relations",
+    "Users"
+   ],
+   "note": "Toggle counted once."
+  },
+  {
+   "id": "EI-24",
+   "type": "EI",
+   "name": "Comment on a post",
+   "route": "POST /api/posts/{id}/comments",
+   "screen": "components/CommentForm.vue (views/PostView.vue)",
+   "dets": [
+    "comment text",
+    "button Send",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts",
+    "Users"
+   ],
+   "note": "Updates comments_count of the post."
+  },
+  {
+   "id": "EI-25",
+   "type": "EI",
+   "name": "Delete a comment",
+   "route": "DELETE /api/comments/{id}",
+   "screen": "components/CommentList.vue",
+   "dets": [
+    "button Delete",
+    "button Yes, delete",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts"
+   ],
+   "note": "Allowed to the comment author and to the post author."
+  },
+  {
+   "id": "EI-26",
+   "type": "EI",
+   "name": "Report a post or a comment",
+   "route": "POST /api/posts/{id}/report | POST /api/comments/{id}/report",
+   "screen": "components/ReportDialog.vue",
+   "dets": [
+    "reason (radio group spam/abuse/other)",
+    "note",
+    "button Send report",
+    "error message"
+   ],
+   "ftrs": [
+    "Reports",
+    "Posts"
+   ],
+   "note": "One dialog and one process for both targets. 3 open reports auto-hide the content (see algorithms)."
+  },
+  {
+   "id": "EI-27",
+   "type": "EI",
+   "name": "Block a reader",
+   "route": "PUT /api/blocks/{handle}",
+   "screen": "views/ReaderProfileView.vue",
+   "dets": [
+    "button Block",
+    "button Yes, block",
+    "error message"
+   ],
+   "ftrs": [
+    "Relations",
+    "Users"
+   ],
+   "note": "Also removes follows in both directions."
+  },
+  {
+   "id": "EI-28",
+   "type": "EI",
+   "name": "Unblock a reader",
+   "route": "DELETE /api/blocks/{handle}",
+   "screen": "views/ReaderProfileView.vue, views/BlockedReadersView.vue",
+   "dets": [
+    "button Unblock",
+    "error message"
+   ],
+   "ftrs": [
+    "Relations",
+    "Users"
+   ],
+   "note": "Available on the profile and on the blocked list; counted once."
+  },
+  {
+   "id": "EI-29",
+   "type": "EI",
+   "name": "Upload an EPUB text for a book",
+   "route": "POST /api/library/{id}/text",
+   "screen": "components/reader/BookTextBlock.vue (views/BookView.vue)",
+   "dets": [
+    "EPUB file",
+    "button Upload / Replace",
+    "error message"
+   ],
+   "ftrs": [
+    "BookTexts",
+    "Library"
+   ],
+   "note": "Parses, sanitizes and stores chapters (EPUB sanitizer, see algorithms). Replacing an existing text uses the same process."
+  },
+  {
+   "id": "EI-30",
+   "type": "EI",
+   "name": "Remove the EPUB text of a book",
+   "route": "DELETE /api/library/{id}/text",
+   "screen": "components/reader/BookTextBlock.vue",
+   "dets": [
+    "button Remove text",
+    "button Yes, remove",
+    "error message"
+   ],
+   "ftrs": [
+    "BookTexts",
+    "Quotes"
+   ],
+   "note": "Quotes keep their text; their anchors are cleared (nullOnDelete)."
+  },
+  {
+   "id": "EI-31",
+   "type": "EI",
+   "name": "Save the reading position in the reader",
+   "route": "PUT /api/book-texts/{id}/position",
+   "screen": "views/ReaderView.vue (composables/usePositionSaver.ts)",
+   "dets": [
+    "chapter",
+    "chapter progress",
+    "error message"
+   ],
+   "ftrs": [
+    "BookTexts",
+    "Library",
+    "ReadingLog"
+   ],
+   "note": "Triggered automatically while reading (debounced), no button. Updates the current page of the library entry and the reading log through UpdateProgress."
+  },
+  {
+   "id": "EI-32",
+   "type": "EI",
+   "name": "Save a quote from the reader (highlight with optional note)",
+   "route": "POST /api/library/{id}/quotes (with anchor)",
+   "screen": "components/reader/ReaderSelectionBar.vue (views/ReaderView.vue)",
+   "dets": [
+    "selected text (content)",
+    "note",
+    "anchor chapter",
+    "anchor start offset",
+    "anchor end offset",
+    "button Save",
+    "error message"
+   ],
+   "ftrs": [
+    "Quotes",
+    "BookTexts",
+    "Library"
+   ],
+   "note": "Anchor is verified on the server (ResolveQuoteAnchor)."
+  },
+  {
+   "id": "EO-01",
+   "type": "EO",
+   "name": "Reading statistics summary",
+   "route": "GET /api/stats/summary",
+   "screen": "views/StatsView.vue",
+   "dets": [
+    "pages today",
+    "current streak (days)",
+    "longest streak (days)",
+    "read-today flag (streak hint)",
+    "reading pace (pages/day, 14 days)",
+    "pages this month",
+    "books finished this month",
+    "pages this year",
+    "books finished this year",
+    "error message"
+   ],
+   "ftrs": [
+    "ReadingLog",
+    "Library"
+   ],
+   "note": "Computed by ReadingStatistics (streak, pace, period sums)."
+  },
+  {
+   "id": "EO-02",
+   "type": "EO",
+   "name": "Pages-per-day chart",
+   "route": "GET /api/stats/daily",
+   "screen": "components/PagesChart.vue (views/StatsView.vue)",
+   "dets": [
+    "range selector (7/30/90 days)",
+    "date of each day",
+    "pages of each day",
+    "total pages",
+    "average pages per day",
+    "best day date",
+    "best day pages",
+    "error message"
+   ],
+   "ftrs": [
+    "ReadingLog"
+   ],
+   "note": "Total, average and best day are computed on the client from the daily series."
+  },
+  {
+   "id": "EO-03",
+   "type": "EO",
+   "name": "Finish-date forecast for books being read",
+   "route": "GET /api/stats/summary (forecasts)",
+   "screen": "views/StatsView.vue",
+   "dets": [
+    "book title",
+    "current page",
+    "total pages",
+    "pages left",
+    "pace for the book (pages/day)",
+    "days left",
+    "forecast finish date",
+    "empty-state message"
+   ],
+   "ftrs": [
+    "Library",
+    "ReadingLog",
+    "Catalog"
+   ],
+   "note": "Delivered by the same route as EO-01 but a separate user-recognizable output block with its own algorithm."
+  },
+  {
+   "id": "EO-04",
+   "type": "EO",
+   "name": "Yearly goal progress",
+   "route": "GET /api/goals/{year}",
+   "screen": "components/GoalCard.vue (views/StatsView.vue)",
+   "dets": [
+    "year",
+    "target books",
+    "books finished",
+    "books expected by today",
+    "books due by today",
+    "books remaining",
+    "on-track flag / status text",
+    "progress percent",
+    "error message"
+   ],
+   "ftrs": [
+    "Goals",
+    "Library"
+   ],
+   "note": "Computed by GoalProgress."
+  },
+  {
+   "id": "EO-05",
+   "type": "EO",
+   "name": "Quote of the day",
+   "route": "GET /api/quotes/daily",
+   "screen": "components/DailyQuoteCard.vue (views/HomeView.vue)",
+   "dets": [
+    "quote text",
+    "quote type",
+    "book title",
+    "book authors",
+    "page",
+    "link Share"
+   ],
+   "ftrs": [
+    "Quotes",
+    "Library",
+    "Catalog"
+   ],
+   "note": "Deterministic daily pick (PickQuoteOfTheDay)."
+  },
+  {
+   "id": "EO-06",
+   "type": "EO",
+   "name": "Quote card image for sharing",
+   "route": "GET /api/quotes/{id} + canvas rendering",
+   "screen": "views/QuoteShareView.vue",
+   "dets": [
+    "template choice (light/dark/accent)",
+    "quote text on the card",
+    "book title",
+    "author",
+    "page label",
+    "brand mark",
+    "button Share/Download",
+    "error message"
+   ],
+   "ftrs": [
+    "Quotes",
+    "Catalog"
+   ],
+   "note": "PNG is drawn on a canvas on the client (utils/quoteCard.ts) and passed to the share sheet or downloaded."
+  },
+  {
+   "id": "EO-07",
+   "type": "EO",
+   "name": "Community feed",
+   "route": "GET /api/feed",
+   "screen": "views/CommunityView.vue",
+   "dets": [
+    "scope switch (following/all)",
+    "author name",
+    "author handle",
+    "post date",
+    "post type",
+    "book title",
+    "book authors",
+    "quote text / review text",
+    "comment",
+    "rating",
+    "page",
+    "likes count",
+    "comments count (visible only)",
+    "liked-by-me flag",
+    "hidden-content notice",
+    "button Load more",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts",
+    "Users",
+    "Relations",
+    "Catalog"
+   ],
+   "note": "Computed per viewer: follow filter, block filter, hidden content, visible comment counts, liked-by-me."
+  },
+  {
+   "id": "EO-08",
+   "type": "EO",
+   "name": "Book reviews with average rating",
+   "route": "GET /api/books/{id}/reviews",
+   "screen": "components/BookReviews.vue (views/BookView.vue)",
+   "dets": [
+    "average rating",
+    "reviews count",
+    "my review link",
+    "review author",
+    "review rating",
+    "review text",
+    "review date",
+    "likes count",
+    "comments count",
+    "button Load more",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts",
+    "Users",
+    "Relations",
+    "Catalog"
+   ],
+   "note": "Average and count are aggregated by the server."
+  },
+  {
+   "id": "EQ-01",
+   "type": "EQ",
+   "name": "List books currently being read",
+   "route": "GET /api/library?status=reading",
+   "screen": "views/HomeView.vue",
+   "dets": [
+    "cover",
+    "title",
+    "authors",
+    "current page",
+    "total pages",
+    "progress percent",
+    "read-in-reader link",
+    "error message"
+   ],
+   "ftrs": [
+    "Library",
+    "Catalog",
+    "BookTexts"
+   ],
+   "note": "The Reading tab; shares the library store with EQ-02."
+  },
+  {
+   "id": "EQ-02",
+   "type": "EQ",
+   "name": "List library by status",
+   "route": "GET /api/library",
+   "screen": "views/LibraryView.vue",
+   "dets": [
+    "status tab (wishlist/reading/finished/abandoned)",
+    "count in tab",
+    "cover",
+    "title",
+    "authors",
+    "status",
+    "progress percent",
+    "error message"
+   ],
+   "ftrs": [
+    "Library",
+    "Catalog"
+   ]
+  },
+  {
+   "id": "EQ-03",
+   "type": "EQ",
+   "name": "Search the Open Library catalog",
+   "route": "GET /api/catalog/search",
+   "screen": "views/AddBookView.vue",
+   "dets": [
+    "search field",
+    "cover",
+    "title",
+    "authors",
+    "publication year",
+    "pages",
+    "already-in-library flag",
+    "no-results message",
+    "catalog-unavailable message"
+   ],
+   "ftrs": [
+    "OpenLibrary",
+    "Catalog",
+    "Library"
+   ]
+  },
+  {
+   "id": "EQ-04",
+   "type": "EQ",
+   "name": "Show a book card",
+   "route": "GET /api/library/{id}",
+   "screen": "views/BookView.vue",
+   "dets": [
+    "cover",
+    "title",
+    "subtitle",
+    "authors",
+    "publication year",
+    "source label (manual)",
+    "status",
+    "current page",
+    "total pages",
+    "progress percent",
+    "rating",
+    "has-text flag / text progress",
+    "not-found message",
+    "error message"
+   ],
+   "ftrs": [
+    "Library",
+    "Catalog",
+    "BookTexts"
+   ]
+  },
+  {
+   "id": "EQ-05",
+   "type": "EQ",
+   "name": "Reading journal of a book",
+   "route": "GET /api/library/{id}/logs",
+   "screen": "components/ReadingJournal.vue (views/BookView.vue)",
+   "dets": [
+    "button Load more",
+    "log date",
+    "from page",
+    "to page",
+    "pages delta",
+    "empty message",
+    "error message"
+   ],
+   "ftrs": [
+    "ReadingLog"
+   ]
+  },
+  {
+   "id": "EQ-06",
+   "type": "EQ",
+   "name": "List quotes with filters",
+   "route": "GET /api/quotes",
+   "screen": "views/QuotesView.vue",
+   "dets": [
+    "filter button All",
+    "filter button Favorites",
+    "book filter",
+    "button Reset",
+    "button Load more",
+    "quote text",
+    "quote type",
+    "note",
+    "page",
+    "favorite flag",
+    "book title",
+    "book authors",
+    "error message"
+   ],
+   "ftrs": [
+    "Quotes",
+    "Library",
+    "Catalog"
+   ]
+  },
+  {
+   "id": "EQ-07",
+   "type": "EQ",
+   "name": "Show quotes of one book (book card block)",
+   "route": "GET /api/quotes?book={id}",
+   "screen": "components/BookQuotes.vue (views/BookView.vue)",
+   "dets": [
+    "quote text",
+    "page",
+    "link All quotes",
+    "empty message",
+    "button Retry"
+   ],
+   "ftrs": [
+    "Quotes"
+   ]
+  },
+  {
+   "id": "EQ-08",
+   "type": "EQ",
+   "name": "Search readers",
+   "route": "GET /api/profiles?q=",
+   "screen": "views/CommunityView.vue",
+   "dets": [
+    "search field",
+    "button Search",
+    "reader handle",
+    "reader name",
+    "reader bio",
+    "following flag",
+    "button Load more",
+    "too-short message"
+   ],
+   "ftrs": [
+    "Users",
+    "Relations"
+   ]
+  },
+  {
+   "id": "EQ-09",
+   "type": "EQ",
+   "name": "Show a reader profile",
+   "route": "GET /api/profiles/{handle}",
+   "screen": "views/ReaderProfileView.vue",
+   "dets": [
+    "name",
+    "handle",
+    "bio",
+    "posts count",
+    "followers count",
+    "following count",
+    "is-me flag",
+    "following flag",
+    "blocked flag/note",
+    "not-found message",
+    "error message"
+   ],
+   "ftrs": [
+    "Users",
+    "Posts",
+    "Relations"
+   ],
+   "note": "Counters are plain counts of related rows, not derived values, so the screen is an EQ (by analogy with 'show profile')."
+  },
+  {
+   "id": "EQ-10",
+   "type": "EQ",
+   "name": "List posts of a reader",
+   "route": "GET /api/profiles/{handle}/posts",
+   "screen": "views/ReaderProfileView.vue",
+   "dets": [
+    "post type",
+    "book title",
+    "book authors",
+    "quote text / review text",
+    "comment",
+    "rating",
+    "page",
+    "date",
+    "likes count",
+    "comments count",
+    "liked-by-me flag",
+    "button Load more",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts",
+    "Users",
+    "Relations",
+    "Catalog"
+   ]
+  },
+  {
+   "id": "EQ-11",
+   "type": "EQ",
+   "name": "Show a post with details",
+   "route": "GET /api/posts/{id}",
+   "screen": "views/PostView.vue",
+   "dets": [
+    "author name",
+    "author handle",
+    "date",
+    "post type",
+    "book title",
+    "book authors",
+    "quote text / review text",
+    "comment",
+    "rating",
+    "page",
+    "likes count",
+    "comments count",
+    "hidden notice",
+    "not-found message",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts",
+    "Users",
+    "Catalog"
+   ]
+  },
+  {
+   "id": "EQ-12",
+   "type": "EQ",
+   "name": "List comments of a post",
+   "route": "GET /api/posts/{id}/comments",
+   "screen": "views/PostView.vue (components/CommentList.vue)",
+   "dets": [
+    "author name",
+    "author handle",
+    "date",
+    "comment text",
+    "hidden mark",
+    "button Load more",
+    "empty message",
+    "error message"
+   ],
+   "ftrs": [
+    "Posts",
+    "Users"
+   ]
+  },
+  {
+   "id": "EQ-13",
+   "type": "EQ",
+   "name": "List blocked readers",
+   "route": "GET /api/blocks",
+   "screen": "views/BlockedReadersView.vue",
+   "dets": [
+    "reader name",
+    "reader handle",
+    "reader bio",
+    "button Load more",
+    "empty message",
+    "error message"
+   ],
+   "ftrs": [
+    "Relations",
+    "Users"
+   ]
+  },
+  {
+   "id": "EQ-14",
+   "type": "EQ",
+   "name": "Show own account and profile settings",
+   "route": "GET /api/me",
+   "screen": "views/ProfileView.vue (also restores the session on start)",
+   "dets": [
+    "name",
+    "email",
+    "handle",
+    "bio",
+    "timezone",
+    "error message"
+   ],
+   "ftrs": [
+    "Users"
+   ]
+  },
+  {
+   "id": "EQ-15",
+   "type": "EQ",
+   "name": "Reader: show a chapter with highlights",
+   "route": "GET /api/book-texts/{id}/chapters/{position}",
+   "screen": "views/ReaderView.vue",
+   "dets": [
+    "chapter number",
+    "chapter title",
+    "chapter text",
+    "highlights (id, range, text, note)",
+    "button Previous chapter",
+    "button Next chapter",
+    "end-of-book message",
+    "error message"
+   ],
+   "ftrs": [
+    "BookTexts",
+    "Quotes"
+   ],
+   "note": "Highlights are quotes anchored in this chapter; the highlight list sheet uses the same data."
+  },
+  {
+   "id": "EQ-16",
+   "type": "EQ",
+   "name": "Reader: open the text with contents and saved position",
+   "route": "GET /api/library/{id}/text",
+   "screen": "views/ReaderView.vue, components/reader/ReaderContents.vue",
+   "dets": [
+    "source file name",
+    "chapters count",
+    "characters count",
+    "saved chapter",
+    "saved chapter progress",
+    "overall progress",
+    "chapter list: position",
+    "chapter list: title",
+    "no-text / not-found message",
+    "error message"
+   ],
+   "ftrs": [
+    "BookTexts",
+    "Library"
+   ]
+  }
+ ],
+ "ilf": [
+  {
+   "id": "ILF-01",
+   "name": "Readers (accounts and public profiles)",
+   "tables": [
+    "users"
+   ],
+   "ret": 1,
+   "ret_list": [
+    "reader"
+   ],
+   "dets": [
+    "name",
+    "email",
+    "timezone",
+    "handle",
+    "bio",
+    "is_admin"
+   ],
+   "note": "Excluded: id, created_at, updated_at, password hash, remember_token, email_verified_at (not used). sessions, password_reset_tokens, cache, jobs tables are technical."
+  },
+  {
+   "id": "ILF-02",
+   "name": "Book catalog (books and authors)",
+   "tables": [
+    "books",
+    "authors",
+    "author_book"
+   ],
+   "ret": 2,
+   "ret_list": [
+    "book",
+    "author (with author_book link and position)"
+   ],
+   "dets": [
+    "title",
+    "subtitle",
+    "isbn_13",
+    "openlibrary_work_key",
+    "cover_url",
+    "page_count",
+    "published_year",
+    "subjects",
+    "source",
+    "created_by",
+    "author name",
+    "author openlibrary_key",
+    "author position in book"
+   ]
+  },
+  {
+   "id": "ILF-03",
+   "name": "Library entries (reader's shelf)",
+   "tables": [
+    "user_books"
+   ],
+   "ret": 1,
+   "ret_list": [
+    "library entry"
+   ],
+   "dets": [
+    "user_id",
+    "book_id",
+    "status",
+    "current_page",
+    "total_pages",
+    "rating",
+    "started_at",
+    "finished_at"
+   ],
+   "note": "Foreign keys user_id and book_id are counted (instruction: do not exclude FKs)."
+  },
+  {
+   "id": "ILF-04",
+   "name": "Reading log (progress records)",
+   "tables": [
+    "reading_logs"
+   ],
+   "ret": 1,
+   "ret_list": [
+    "reading log row"
+   ],
+   "dets": [
+    "user_book_id",
+    "user_id",
+    "from_page",
+    "to_page",
+    "logged_on"
+   ]
+  },
+  {
+   "id": "ILF-05",
+   "name": "Quotes and insights (with text anchors)",
+   "tables": [
+    "quotes"
+   ],
+   "ret": 1,
+   "ret_list": [
+    "quote"
+   ],
+   "dets": [
+    "user_book_id",
+    "user_id",
+    "type",
+    "content",
+    "note",
+    "page",
+    "is_favorite",
+    "book_text_id",
+    "chapter_position",
+    "start_offset",
+    "end_offset"
+   ]
+  },
+  {
+   "id": "ILF-06",
+   "name": "Yearly reading goals",
+   "tables": [
+    "reading_goals"
+   ],
+   "ret": 1,
+   "ret_list": [
+    "goal"
+   ],
+   "dets": [
+    "user_id",
+    "year",
+    "target_books"
+   ]
+  },
+  {
+   "id": "ILF-07",
+   "name": "Community posts with likes and comments",
+   "tables": [
+    "posts",
+    "likes",
+    "comments"
+   ],
+   "ret": 3,
+   "ret_list": [
+    "post",
+    "like",
+    "comment"
+   ],
+   "dets": [
+    "posts.user_id",
+    "posts.book_id",
+    "posts.type",
+    "posts.content",
+    "posts.comment",
+    "posts.rating",
+    "posts.page",
+    "posts.likes_count",
+    "posts.comments_count",
+    "posts.hidden_at",
+    "likes.user_id",
+    "likes.post_id",
+    "comments.post_id",
+    "comments.user_id",
+    "comments.content",
+    "comments.hidden_at"
+   ],
+   "note": "Excluded: review_book_id (virtual technical column for the unique index), likes.created_at (the only timestamp of a pivot row)."
+  },
+  {
+   "id": "ILF-08",
+   "name": "Reader relations (follows and blocks)",
+   "tables": [
+    "follows",
+    "blocks"
+   ],
+   "ret": 2,
+   "ret_list": [
+    "follow",
+    "block"
+   ],
+   "dets": [
+    "follows.follower_id",
+    "follows.followed_id",
+    "blocks.user_id",
+    "blocks.blocked_id"
+   ]
+  },
+  {
+   "id": "ILF-09",
+   "name": "Reports (complaints about posts and comments)",
+   "tables": [
+    "reports"
+   ],
+   "ret": 1,
+   "ret_list": [
+    "report"
+   ],
+   "dets": [
+    "reporter_id",
+    "reportable_type",
+    "reportable_id",
+    "reason",
+    "note",
+    "status"
+   ]
+  },
+  {
+   "id": "ILF-10",
+   "name": "Book texts (uploaded EPUB with chapters and reading position)",
+   "tables": [
+    "book_texts",
+    "book_chapters"
+   ],
+   "ret": 2,
+   "ret_list": [
+    "book text",
+    "chapter"
+   ],
+   "dets": [
+    "book_texts.user_book_id",
+    "book_texts.user_id",
+    "source_name",
+    "chapters_count",
+    "characters_count",
+    "chapter_position",
+    "chapter_progress",
+    "progress",
+    "position_updated_at",
+    "book_chapters.book_text_id",
+    "chapter.position",
+    "chapter.title",
+    "chapter.content",
+    "chapter.characters"
+   ]
+  }
+ ],
+ "eif": [
+  {
+   "id": "EIF-01",
+   "name": "Open Library catalog (search.json and work lookup)",
+   "ret": 1,
+   "dets": [
+    "key (work key)",
+    "title",
+    "subtitle",
+    "author_name",
+    "author_key",
+    "first_publish_year",
+    "cover_i (cover id)",
+    "number_of_pages_median",
+    "subject",
+    "isbn"
+   ],
+   "note": "Read-only HTTP GET to the Open Library API by OpenLibraryClient (search and findByWorkKey). Maintained by another application; the app stores only copies of the books the reader adds."
+  }
+ ],
+ "operator_commands": [
+  "php artisan moderation:reports - list the open reports about posts and comments, oldest first",
+  "php artisan moderation:hide {type} {id} - hide a post or a comment from everybody but its author and close its reports",
+  "php artisan moderation:restore {type} {id} - show a hidden post or comment again and close its reports",
+  "php artisan moderation:resolve {report} - mark one report as looked at without changing visibility"
+ ],
+ "algorithms": [
+  {
+   "name": "Reading streak calculation (current and longest run of days with net positive pages, in the reader's time zone)",
+   "where": "backend/app/Services/Stats/ReadingStatistics.php (streak)"
+  },
+  {
+   "name": "Reading pace (average pages per day over a 14-day window)",
+   "where": "backend/app/Services/Stats/ReadingStatistics.php (pace, dailyPages)"
+  },
+  {
+   "name": "Per-book pace and forecast of the finishing date (pages left / pace, bounded to 730 days)",
+   "where": "backend/app/Services/Stats/ReadingStatistics.php (forecasts)"
+  },
+  {
+   "name": "Yearly goal progress (expected and due books by day of year, on-track flag)",
+   "where": "backend/app/Services/Stats/GoalProgress.php"
+  },
+  {
+   "name": "Quote of the day (deterministic pick by crc32 of user id and local date)",
+   "where": "backend/app/Actions/Quotes/PickQuoteOfTheDay.php"
+  },
+  {
+   "name": "Reading log from progress change (net pages delta, status transitions, finish sets last page)",
+   "where": "backend/app/Actions/Library/UpdateProgress.php, RecordReadingLog.php, ChangeUserBookStatus.php"
+  },
+  {
+   "name": "EPUB import: safe archive and XML reading, limits, DRM check, chapter extraction",
+   "where": "backend/app/Services/Epub/EpubImporter.php, EpubArchive.php, PackageReader.php, SafeXml.php"
+  },
+  {
+   "name": "EPUB HTML sanitizer (whitelist of elements and attributes)",
+   "where": "backend/app/Services/Epub/HtmlSanitizer.php"
+  },
+  {
+   "name": "Server-side verification of a quote anchor against chapter text (offset slice and text skeleton comparison)",
+   "where": "backend/app/Actions/Reader/ResolveQuoteAnchor.php"
+  },
+  {
+   "name": "UTF-16 offset resolution between DOM selection and chapter text (anchor offsets, highlight ranges, code-point alignment)",
+   "where": "frontend/src/utils/readerDom.ts"
+  },
+  {
+   "name": "Reading position to overall progress, debounced position saver",
+   "where": "backend/app/Actions/Reader/SaveReadingPosition.php, frontend/src/composables/usePositionSaver.ts"
+  },
+  {
+   "name": "Quote card canvas rendering (text wrapping, font fitting, word breaking, three templates)",
+   "where": "frontend/src/utils/quoteCard.ts"
+  },
+  {
+   "name": "Auto-hide of content after 3 open reports (moderation threshold)",
+   "where": "backend/app/Actions/Social/ReportContent.php, ModerateContent.php"
+  }
+ ]
+}

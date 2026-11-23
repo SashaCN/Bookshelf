@@ -38,6 +38,12 @@ describe('RegisterView', () => {
     vi.restoreAllMocks()
   })
 
+  it('limits the name to 100 characters', () => {
+    const { wrapper } = mountView()
+
+    expect(wrapper.get('#register-name').attributes('maxlength')).toBe('100')
+  })
+
   it('registers with the browser time zone and goes to the home page', async () => {
     const { wrapper, router, auth } = mountView()
     const register = vi.spyOn(auth, 'register').mockResolvedValue()

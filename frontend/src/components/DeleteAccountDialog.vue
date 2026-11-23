@@ -23,16 +23,16 @@ function submit() {
 </script>
 
 <template>
-  <BaseDialog :title="$t('profile.danger.dialogTitle')" initial-focus="input" @cancel="emit('cancel')">
+  <BaseDialog :title="$t('account.danger.dialogTitle')" initial-focus="input" @cancel="emit('cancel')">
     <template #default="{ descriptionId }">
       <div :id="descriptionId" class="flex flex-col gap-2 text-sm">
-        <p>{{ $t('profile.danger.dialogIntro') }}</p>
+        <p>{{ $t('account.danger.dialogIntro') }}</p>
         <ul class="list-disc pl-5">
-          <li v-for="item in ['library', 'quotes', 'reviews', 'files', 'followers']" :key="item">
-            {{ $t(`profile.danger.items.${item}`) }}
+          <li v-for="item in ['library', 'quotes', 'community', 'books', 'follows']" :key="item">
+            {{ $t(`account.danger.items.${item}`) }}
           </li>
         </ul>
-        <p class="font-medium">{{ $t('profile.danger.irreversible') }}</p>
+        <p class="font-medium">{{ $t('account.danger.irreversible') }}</p>
       </div>
 
       <form class="flex flex-col gap-4" @submit.prevent="submit">
@@ -43,7 +43,7 @@ function submit() {
           v-model="password"
           type="password"
           autocomplete="current-password"
-          :label="$t('profile.danger.password')"
+          :label="$t('account.danger.password')"
           :error="passwordError"
         />
 
@@ -60,7 +60,7 @@ function submit() {
             :disabled="pending"
             class="min-h-11 rounded-lg bg-danger px-4 font-semibold text-on-accent disabled:opacity-60"
           >
-            {{ $t('profile.danger.confirm') }}
+            {{ $t('account.danger.confirm') }}
           </button>
         </div>
       </form>

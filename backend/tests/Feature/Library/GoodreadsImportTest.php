@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 
-const GR_HEADER = 'Book Id,Title,Author,Author l-f,Additional Authors,ISBN,ISBN13,My Rating,Average Rating,Publisher,Binding,Number of Pages,Year Published,Original Publication Year,Date Read,Date Added,Bookshelves,Exclusive Shelf,My Review';
+const GR_HEADER = 'Book Id,Title,Author,Author l-f,Additional Authors,ISBN,ISBN13,My Rating,Average Rating,Publisher,Binding,Number of Pages,Year Published,Original Publication Year,Date Read,Date Added,Bookshelves,Exclusive Shelf,Read Count,My Review';
 
 /**
  * One export line with the given overrides, columns in the Goodreads order.
@@ -24,7 +24,7 @@ function grRow(array $over = []): string
         'Additional Authors' => '', 'ISBN' => '="0441013597"', 'ISBN13' => '="9780441013593"', 'My Rating' => '5',
         'Average Rating' => '4.27', 'Publisher' => 'Ace', 'Binding' => 'Paperback', 'Number of Pages' => '528',
         'Year Published' => '2005', 'Original Publication Year' => '1965', 'Date Read' => '2026/03/14',
-        'Date Added' => '2026/01/02', 'Bookshelves' => '', 'Exclusive Shelf' => 'read', 'My Review' => '',
+        'Date Added' => '2026/01/02', 'Bookshelves' => '', 'Exclusive Shelf' => 'read', 'Read Count' => '1', 'My Review' => '',
     ], $over);
 
     $out = fopen('php://temp', 'r+');
@@ -62,7 +62,7 @@ it('requires authentication', function () {
 });
 
 describe('mapping', function () {
-    it('maps a read book with rating, date, review, isbn and both authors', function () {
+    it('maps a read book with rating, date, isbn and both authors; the review text is not kept', function () {
         grImport($this->user, grCsv(grRow([
             'Additional Authors' => 'Brian Herbert, Kevin Anderson', 'My Review' => "Line one\nLine \"two\", with comma",
         ])))->assertOk()->assertExactJson(['data' => ['imported' => 1, 'skipped_existing' => 0, 'skipped_invalid' => 0, 'errors' => []]]);
@@ -72,14 +72,38 @@ describe('mapping', function () {
             ->and($userBook->rating)->toBe(5)
             ->and($userBook->total_pages)->toBe(528)
             ->and($userBook->current_page)->toBe(528)
-            ->and($userBook->review)->toBe("Line one\nLine \"two\", with comma")
-            ->and($userBook->review_visibility->value)->toBe('private')
+            ->and($userBook->reads()->count())->toBe(0)
             ->and($userBook->finished_at->toDateString())->toBe('2026-03-14')
             ->and($userBook->book->source)->toBe(BookSource::Manual)
             ->and($userBook->book->created_by)->toBe($this->user->id)
             ->and($userBook->book->isbn_13)->toBe('9780441013593')
             ->and($userBook->book->published_year)->toBe(1965)
             ->and($userBook->book->authors->pluck('name')->all())->toBe(['Frank Herbert', 'Brian Herbert', 'Kevin Anderson']);
+    });
+
+    it('archives earlier passes for a book read several times', function () {
+        grImport($this->user, grCsv(
+            grRow(['Title' => 'A', 'ISBN13' => '', 'ISBN' => '', 'Read Count' => '3']),
+            grRow(['Title' => 'B', 'ISBN13' => '', 'ISBN' => '', 'Read Count' => '1']),
+            grRow(['Title' => 'C', 'ISBN13' => '', 'ISBN' => '', 'Read Count' => '0']),
+            grRow(['Title' => 'D', 'ISBN13' => '', 'ISBN' => '', 'Read Count' => '', 'Exclusive Shelf' => 'to-read', 'Date Read' => '']),
+            grRow(['Title' => 'E', 'ISBN13' => '', 'ISBN' => '', 'Read Count' => '5', 'Exclusive Shelf' => 'to-read', 'Date Read' => '']),
+        ))->assertOk()->assertJsonPath('data.imported', 5);
+
+        $a = UserBook::whereRelation('book', 'title', 'A')->sole();
+        expect($a->status)->toBe(BookStatus::Finished)
+            ->and($a->reads()->count())->toBe(2)
+            ->and($a->reads()->first()->finished_at->toDateString())->toBe('2026-03-14');
+
+        foreach (['B', 'C', 'D', 'E'] as $title) {
+            expect(UserBook::whereRelation('book', 'title', $title)->sole()->reads()->count())->toBe(0);
+        }
+    });
+
+    it('caps the archived passes of an absurd read count', function () {
+        grImport($this->user, grCsv(grRow(['Read Count' => '99999'])))->assertOk();
+
+        expect(UserBook::sole()->reads()->count())->toBe(20);
     });
 
     it('maps the other shelves', function () {
@@ -92,7 +116,7 @@ describe('mapping', function () {
         expect($reading->status)->toBe(BookStatus::Reading)->and($reading->current_page)->toBe(0)->and($reading->started_at)->not->toBeNull();
 
         $want = UserBook::whereRelation('book', 'title', 'B')->sole();
-        expect($want->status)->toBe(BookStatus::Want)->and($want->rating)->toBeNull()->and($want->review)->toBeNull();
+        expect($want->status)->toBe(BookStatus::Want)->and($want->rating)->toBeNull();
     });
 
     it('turns a rating of 0 into no rating and falls back to the date added', function () {

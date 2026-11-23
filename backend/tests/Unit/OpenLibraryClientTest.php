@@ -2,6 +2,7 @@
 
 use App\Exceptions\CatalogUnavailableException;
 use App\Services\OpenLibrary\OpenLibraryClient;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -95,7 +96,7 @@ it('finds a single work by its key', function () {
 
 it('reports an unavailable catalog and does not cache the failure', function () {
     Http::fakeSequence('openlibrary.org/search.json*')
-        ->push('', 500)->push('', 500)->push('', 500)
+        ->push('', 500)
         ->push(['docs' => [openLibraryDoc()]]);
     $client = app(OpenLibraryClient::class);
 
@@ -141,6 +142,32 @@ it('skips works whose key is not a plain work id', function () {
 
 it('does not retry a request the catalog rejected as wrong', function () {
     Http::fake(['openlibrary.org/search.json*' => Http::response('', 422)]);
+
+    expect(fn () => app(OpenLibraryClient::class)->search('atomic habits'))
+        ->toThrow(CatalogUnavailableException::class);
+
+    Http::assertSentCount(1);
+});
+
+it('gives the catalog 3 seconds at most', function () {
+    expect(config('services.openlibrary.timeout'))->toBe(3);
+});
+
+it('reports a timeout as an unavailable catalog after a single attempt', function () {
+    $attempts = 0;
+    Http::fake(['openlibrary.org/search.json*' => function () use (&$attempts) {
+        $attempts++;
+
+        throw new ConnectionException('cURL error 28: Operation timed out');
+    }]);
+
+    expect(fn () => app(OpenLibraryClient::class)->search('atomic habits'))
+        ->toThrow(CatalogUnavailableException::class)
+        ->and($attempts)->toBe(1);
+});
+
+it('does not retry a server error either, so the worst case stays at the timeout', function () {
+    Http::fake(['openlibrary.org/search.json*' => Http::response('', 503)]);
 
     expect(fn () => app(OpenLibraryClient::class)->search('atomic habits'))
         ->toThrow(CatalogUnavailableException::class);

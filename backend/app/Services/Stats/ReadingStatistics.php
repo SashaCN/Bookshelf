@@ -3,15 +3,14 @@
 namespace App\Services\Stats;
 
 use App\Enums\BookStatus;
-use App\Models\ReaderDocument;
 use App\Models\ReadingLog;
 use App\Models\User;
 use App\Models\UserBook;
 use App\Models\UserBookRead;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -65,69 +64,6 @@ final class ReadingStatistics
         }
 
         return $days;
-    }
-
-    /**
-     * EPUB chapters read on each day of the range, every day present. A chapter counts on the day it was first left
-     * forward (see RecordChapterReads); `read_on` is already the reader's local date.
-     *
-     * @return array<string, int> day (YYYY-MM-DD) => chapters
-     */
-    public function dailyChapters(CarbonInterface $from, CarbonInterface $to): array
-    {
-        $counts = $this->chapterReads()
-            ->whereBetween('read_on', [$from->toDateString(), $to->toDateString()])
-            ->groupBy('read_on')
-            ->selectRaw('read_on, COUNT(*) AS chapters')
-            ->pluck('chapters', 'read_on');
-
-        $days = [];
-        $last = $to->toDateString();
-
-        for ($day = CarbonImmutable::parse($from->toDateString(), 'UTC'); $day->toDateString() <= $last; $day = $day->addDay()) {
-            $key = $day->toDateString();
-            $days[$key] = (int) ($counts[$key] ?? 0);
-        }
-
-        return $days;
-    }
-
-    /**
-     * Chapters read in the current month and the current year, in one query.
-     *
-     * @return array{month: int, year: int}
-     */
-    public function chaptersThisMonthAndYear(): array
-    {
-        $today = $this->today();
-        $month = $today->startOfMonth()->toDateString();
-
-        $row = $this->chapterReads()
-            ->whereBetween('read_on', [$today->startOfYear()->toDateString(), $today->toDateString()])
-            ->selectRaw('COUNT(*) AS year_count, COALESCE(SUM(read_on >= ?), 0) AS month_count', [$month])
-            ->first();
-
-        return ['month' => (int) ($row->month_count ?? 0), 'year' => (int) ($row->year_count ?? 0)];
-    }
-
-    /**
-     * Books opened in the reader during the last 30 days. An EPUB has no "finished" state (the last chapter may be
-     * long or the reader may stop early), so recent activity is the honest meaning of "being read".
-     */
-    public function documentsInProgress(): int
-    {
-        return ReaderDocument::query()
-            ->where('user_id', $this->user->id)
-            ->where('last_read_at', '>=', now()->subDays(30))
-            ->count();
-    }
-
-    /** @return Builder */
-    private function chapterReads()
-    {
-        return DB::table('reader_chapter_reads')
-            ->join('reader_documents', 'reader_documents.id', '=', 'reader_chapter_reads.reader_document_id')
-            ->where('reader_documents.user_id', $this->user->id);
     }
 
     public function pagesBetween(CarbonInterface $from, CarbonInterface $to): int
@@ -246,7 +182,7 @@ final class ReadingStatistics
     /**
      * The two sources of finished passes in the range: current finishes and archived passes.
      *
-     * @return array{0: \Illuminate\Database\Eloquent\Builder<UserBook>|HasMany<UserBook, User>, 1: \Illuminate\Database\Eloquent\Builder<UserBookRead>}
+     * @return array{0: HasMany<UserBook, User>, 1: Builder<UserBookRead>}
      */
     private function passQueries(CarbonInterface $from, CarbonInterface $to): array
     {
@@ -270,8 +206,8 @@ final class ReadingStatistics
     }
 
     /**
-     * The first calendar year with any activity of the reader (reading, a finish, a quote, a chapter), or null for a
-     * reader with none. One query: the earliest moment of each source.
+     * The first calendar year with any activity of the reader (reading, a finish, a quote), or null for a reader with
+     * none. One query: the earliest moment of each source.
      */
     public function firstActivityYear(): ?int
     {
@@ -281,9 +217,8 @@ final class ReadingStatistics
             'SELECT MIN(logged_on) AS v, 0 AS utc FROM reading_logs WHERE user_id = ?
              UNION ALL SELECT MIN(finished_at), 1 FROM user_books WHERE user_id = ? AND finished_at IS NOT NULL
              UNION ALL SELECT MIN(finished_at), 1 FROM user_book_reads WHERE user_book_id IN (SELECT id FROM user_books WHERE user_id = ?)
-             UNION ALL SELECT MIN(created_at), 1 FROM quotes WHERE user_id = ?
-             UNION ALL SELECT MIN(read_on), 0 FROM reader_chapter_reads WHERE reader_document_id IN (SELECT id FROM reader_documents WHERE user_id = ?)',
-            [$id, $id, $id, $id, $id],
+             UNION ALL SELECT MIN(created_at), 1 FROM quotes WHERE user_id = ?',
+            [$id, $id, $id, $id],
         );
 
         $years = [];

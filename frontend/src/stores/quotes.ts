@@ -143,6 +143,20 @@ export const useQuotesStore = defineStore('quotes', () => {
     }
   }
 
+  /**
+   * The server clears where in the text of a book its quotes were selected when that text is replaced or removed; the
+   * quotes that are shown must stop saying they can be opened in the text.
+   */
+  function clearAnchors(userBookId: number): void {
+    const cleared = (quote: Quote): Quote => (quote.user_book_id === userBookId && quote.anchor ? { ...quote, anchor: null } : quote)
+
+    items.value = items.value.map(cleared)
+
+    if (daily.value) {
+      daily.value = cleared(daily.value)
+    }
+  }
+
   /** Forget everything, e.g. when somebody else signs in on the same device. */
   function reset(): void {
     generation++
@@ -155,5 +169,5 @@ export const useQuotesStore = defineStore('quotes', () => {
     page = 1
   }
 
-  return { items, filters, hasMore, loaded, loadingMore, daily, find, load, loadMore, loadDaily, get, create, update, remove, toggleFavorite, reset }
+  return { items, filters, hasMore, loaded, loadingMore, daily, find, load, loadMore, loadDaily, get, create, update, remove, toggleFavorite, clearAnchors, reset }
 })

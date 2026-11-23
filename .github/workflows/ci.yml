@@ -110,16 +110,7 @@ jobs:
         run: npm run typecheck
 
       - name: Tests
-        run: npm run test:coverage
-
-      # lcov paths are relative to frontend/, SonarQube resolves them from the repository root.
-      - name: Prepare the coverage report for SonarQube
-        run: sed -i 's|^SF:|SF:frontend/|' coverage/lcov.info
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-frontend
-          path: frontend/coverage/lcov.info
+        run: npm run test
 
       - name: Build
         run: npm run build
@@ -181,11 +172,6 @@ jobs:
         with:
           name: coverage-backend
           path: backend/coverage
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: coverage-frontend
-          path: frontend/coverage
 
       - uses: SonarSource/sonarqube-scan-action@v5
         env:

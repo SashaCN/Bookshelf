@@ -2,24 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\Social\FindPublicProfile;
-use App\Actions\Social\FollowUser;
+use App\Actions\Social\FollowReader;
+use App\Http\Resources\ProfileResource;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Gate;
 
 class FollowController extends Controller
 {
-    public function store(Request $request, string $username, FindPublicProfile $find, FollowUser $followUser): Response
+    /**
+     * Follow a reader. Following again changes nothing.
+     */
+    public function store(Request $request, User $user, FollowReader $follows): ProfileResource
     {
-        $followUser->follow($request->user(), $find->handle($request->user(), $username));
+        Gate::authorize('viewProfile', $user);
 
-        return response()->noContent();
+        $follows->follow($request->user(), $user);
+
+        return new ProfileResource(ProfileController::profileOf($user, $request->user()));
     }
 
-    public function destroy(Request $request, string $username, FindPublicProfile $find, FollowUser $followUser): Response
+    /**
+     * Unfollow. Unfollowing somebody who is not followed changes nothing.
+     */
+    public function destroy(Request $request, User $user, FollowReader $follows): ProfileResource
     {
-        $followUser->unfollow($request->user(), $followUser->findToUnfollow($request->user(), $username, $find));
+        Gate::authorize('viewProfile', $user);
 
-        return response()->noContent();
+        $follows->unfollow($request->user(), $user);
+
+        return new ProfileResource(ProfileController::profileOf($user, $request->user()));
     }
 }

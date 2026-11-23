@@ -41,9 +41,9 @@ async function submit() {
     if (e instanceof ApiError && e.status === 422) {
       const errors = e.fieldErrors
       // Laravel reports a bad or expired token under the email field.
-      if (errors.email) fieldErrors.email = t('auth.errors.invalidResetLink')
+      if (errors.email) fieldErrors.email = t('account.errors.invalidResetLink')
       if (errors.password) {
-        fieldErrors.password = password.value === passwordConfirmation.value ? t('auth.errors.passwordTooShort') : t('auth.errors.passwordMismatch')
+        fieldErrors.password = password.value === passwordConfirmation.value ? t('auth.errors.passwordTooShort') : t('account.errors.passwordMismatch')
       }
       if (!errors.email && !errors.password) error.value = t('auth.errors.generic')
     } else if (e instanceof ApiError && e.status === 429) {
@@ -58,7 +58,7 @@ async function submit() {
 </script>
 
 <template>
-  <AuthLayout :title="$t('auth.reset.title')">
+  <AuthLayout :title="$t('account.reset.title')">
     <form class="flex flex-col gap-4" @submit.prevent="submit">
       <FormField
         id="email"
@@ -74,7 +74,7 @@ async function submit() {
         type="password"
         autocomplete="new-password"
         :minlength="8"
-        :label="$t('auth.reset.newPassword')"
+        :label="$t('account.reset.newPassword')"
         :hint="$t('auth.hints.password')"
         :error="fieldErrors.password"
       />
@@ -84,7 +84,7 @@ async function submit() {
         type="password"
         autocomplete="new-password"
         :minlength="8"
-        :label="$t('auth.reset.confirmPassword')"
+        :label="$t('account.reset.confirmPassword')"
       />
 
       <p v-if="error" role="alert" class="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{{ error }}</p>
@@ -94,7 +94,7 @@ async function submit() {
         :disabled="submitting"
         class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
       >
-        {{ $t('auth.reset.submit') }}
+        {{ $t('account.reset.submit') }}
       </button>
     </form>
   </AuthLayout>

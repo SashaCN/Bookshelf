@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError } from '@/api/http'
+import { ApiError, NetworkError } from '@/api/http'
 import { catalogApi, libraryApi } from '@/api/library'
 import { makeEntry, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
@@ -131,6 +131,17 @@ describe('AddBookView', () => {
       // The search text becomes the title of the manual form.
       expect((wrapper.get('#manual-title').element as HTMLInputElement).value).toBe('Тигролови')
     })
+
+    it('treats a search that gets no answer in time as an unavailable catalog', async () => {
+      vi.mocked(catalogApi.search).mockRejectedValue(new NetworkError())
+      const { wrapper } = await mountView()
+
+      await type(wrapper, 'Тигролови')
+      await settleSearch()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('Каталог Open Library зараз недоступний')
+      expect(wrapper.text()).toContain(wrapper.get('button.text-accent').text())
+    })
   })
 
   describe('failed searches', () => {
@@ -244,6 +255,22 @@ describe('AddBookView', () => {
         published_year: null,
       })
       expect(router.currentRoute.value.params.id).toBe('5')
+    })
+
+    it('sends the optional cover link only when it is filled in', async () => {
+      vi.mocked(libraryApi.create).mockResolvedValue(makeUserBook({ id: 6 }))
+      const { wrapper } = await mountView()
+      await wrapper.get('button.text-accent').trigger('click')
+
+      await wrapper.get('#manual-title').setValue('Тигролови')
+      await wrapper.get('#manual-cover').setValue(' https://covers.example.org/t.jpg ')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(libraryApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Тигролови', cover_url: 'https://covers.example.org/t.jpg' }),
+      )
+      expect(wrapper.get('#manual-cover').attributes('maxlength')).toBe('2048')
     })
   })
 })

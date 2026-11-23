@@ -30,17 +30,6 @@ it('falls back to the default time zone', function () {
     expect(User::first()->timezone)->toBe(User::DEFAULT_TIMEZONE);
 });
 
-it('accepts a legacy time zone name that some browsers still report', function () {
-    $this->postJson('/api/auth/register', [
-        'name' => 'Olena',
-        'email' => 'olena@example.com',
-        'password' => 'secret-password',
-        'timezone' => 'Europe/Kiev',
-    ])->assertCreated();
-
-    expect(User::first()->timezone)->toBe('Europe/Kiev');
-});
-
 it('rejects invalid registration data', function (array $payload, string $field) {
     $this->postJson('/api/auth/register', $payload + [
         'name' => 'Olena',
@@ -54,6 +43,14 @@ it('rejects invalid registration data', function (array $payload, string $field)
     'unknown time zone' => [['timezone' => 'Mars/Olympus'], 'timezone'],
 ]);
 
+it('limits the name to 100 characters', function () {
+    $payload = ['email' => 'long@example.com', 'password' => 'secret-password'];
+
+    $this->postJson('/api/auth/register', $payload + ['name' => str_repeat('я', 101)])
+        ->assertUnprocessable()->assertJsonValidationErrors('name');
+    $this->postJson('/api/auth/register', $payload + ['name' => str_repeat('я', 100)])->assertCreated();
+});
+
 it('rejects a duplicate email', function () {
     User::factory()->create(['email' => 'olena@example.com']);
 
@@ -62,6 +59,17 @@ it('rejects a duplicate email', function () {
         'email' => 'olena@example.com',
         'password' => 'secret-password',
     ])->assertUnprocessable()->assertJsonValidationErrors('email');
+});
+
+it('accepts a legacy time zone name that some browsers still report and stores the canonical one', function () {
+    $this->postJson('/api/auth/register', [
+        'name' => 'Olena',
+        'email' => 'olena@example.com',
+        'password' => 'secret-password',
+        'timezone' => 'Europe/Kiev',
+    ])->assertCreated();
+
+    expect(User::first()->timezone)->toBe('Europe/Kyiv');
 });
 
 it('throttles registrations from one address', function () {

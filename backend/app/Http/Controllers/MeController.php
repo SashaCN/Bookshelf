@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Actions\Account\DeleteAccount;
 use App\Actions\Account\ExportUserData;
-use App\Actions\Social\UpdateProfile;
 use App\Http\Requests\DeleteAccountRequest;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MeController extends Controller
@@ -24,25 +25,28 @@ class MeController extends Controller
     }
 
     /**
-     * Update the authenticated user's profile (name and time zone).
+     * Update the authenticated user's profile (name, time zone, handle and bio).
      */
-    public function update(UpdateProfileRequest $request, UpdateProfile $updateProfile): UserResource
+    public function update(UpdateProfileRequest $request): UserResource
     {
-        return new UserResource($updateProfile->handle($request->user(), $request->validated()));
+        $user = $request->user();
+
+        try {
+            $user->update($request->validated());
+        } catch (UniqueConstraintViolationException $e) {
+            // Another reader took the handle between the check of the request and this update.
+            if (! str_contains($e->getMessage(), 'handle')) {
+                throw $e;
+            }
+
+            throw ValidationException::withMessages(['handle' => ['social.handle_taken']]);
+        }
+
+        return new UserResource($user);
     }
 
     /**
-     * Mark the followers list as seen, so the new-follower badge resets.
-     */
-    public function followersSeen(Request $request): Response
-    {
-        $request->user()->forceFill(['followers_seen_at' => now()])->save();
-
-        return response()->noContent();
-    }
-
-    /**
-     * Everything the reader owns as a JSON file for download (without the EPUB files).
+     * Everything the reader owns as a JSON file for download (without the text of uploaded books).
      */
     public function export(Request $request, ExportUserData $export): StreamedResponse
     {
@@ -57,7 +61,7 @@ class MeController extends Controller
     }
 
     /**
-     * Delete the account with all its data and files, after confirming the password.
+     * Delete the account with all its data, after confirming the password.
      */
     public function destroy(DeleteAccountRequest $request, DeleteAccount $deleteAccount): Response
     {

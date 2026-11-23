@@ -1,0 +1,563 @@
+{
+ "size": 22.101,
+ "fp_size": 16.965300000000003,
+ "w_sum": 13,
+ "b": 1.1400000000000001,
+ "post": {
+  "ACAP": 3,
+  "PCAP": 3,
+  "PCON": 3,
+  "RELY": 3,
+  "DATA": 3,
+  "CPLX": 3,
+  "DOCU": 4,
+  "TIME": 3,
+  "STOR": 4,
+  "PVOL": 3,
+  "AEXP": 3,
+  "PEXP": 3,
+  "LTEX": 3,
+  "TOOL": 4,
+  "SITE": 4
+ },
+ "ratings": {
+  "ACAP": [
+   3,
+   "Nominal",
+   "Analysts of the usual skill; the requirements were written and reviewed by the team."
+  ],
+  "PCAP": [
+   3,
+   "Nominal",
+   "Students of the third year with a working knowledge of the languages."
+  ],
+  "PCON": [
+   3,
+   "Nominal",
+   "The team of three is stable; no one leaves during the semester."
+  ],
+  "RELY": [
+   3,
+   "Nominal",
+   "A failure is a nuisance for one reader, not a loss of money or life."
+  ],
+  "DATA": [
+   3,
+   "Nominal",
+   "A small database of one reader’s library, quotes and posts."
+  ],
+  "CPLX": [
+   3,
+   "Nominal",
+   "Mostly standard operations; the EPUB parser and the anchors of quotes are harder."
+  ],
+  "DOCU": [
+   4,
+   "High",
+   "More documentation than the life cycle needs: the specification, the two designs, four guides."
+  ],
+  "TIME": [
+   3,
+   "Nominal",
+   "The use of the processor stays under 50%."
+  ],
+  "STOR": [
+   4,
+   "High",
+   "The program must live in 1 GB of memory together with the database, so the stack is trimmed."
+  ],
+  "PVOL": [
+   3,
+   "Nominal",
+   "The platform (Docker images, PHP, Node) changes about once in six to twelve months."
+  ],
+  "AEXP": [
+   3,
+   "Nominal",
+   "About a year of experience with applications of this kind."
+  ],
+  "PEXP": [
+   3,
+   "Nominal",
+   "About a year of experience with the platform (Laravel, Vue, Docker)."
+  ],
+  "LTEX": [
+   3,
+   "Nominal",
+   "About a year with PHP and TypeScript and their tools."
+  ],
+  "TOOL": [
+   4,
+   "High",
+   "A container stack, a pipeline, a linter, static analysis, test runners, an editor with checks."
+  ],
+  "SITE": [
+   4,
+   "High",
+   "One city and one repository, with an exchange of messages and short meetings."
+  ]
+ },
+ "scale": [
+  [
+   "PREC",
+   "Precedentedness",
+   3,
+   "Nominal",
+   "The kind of product is known, but it is the first such product of the team."
+  ],
+  [
+   "FLEX",
+   "Development flexibility",
+   2,
+   "High",
+   "The artefacts are fixed by the course, the process is chosen by the team."
+  ],
+  [
+   "RESL",
+   "Architecture and risk resolution",
+   3,
+   "Nominal",
+   "The risks and the architecture were analysed in the specification and the designs."
+  ],
+  [
+   "TEAM",
+   "Team cohesion",
+   2,
+   "High",
+   "The team knows each other and works in one repository."
+  ],
+  [
+   "PMAT",
+   "Process maturity",
+   3,
+   "Nominal",
+   "Some management of the process (level 2 of CMM), as in the example of the methodology."
+  ]
+ ],
+ "base_levels": {
+  "PERS": "N",
+  "RCPX": "H",
+  "PDIF": "H",
+  "PREX": "N",
+  "FCIL": "H",
+  "RUSE": "N",
+  "SCED": "N"
+ },
+ "base_em": {
+  "PERS": 1.0,
+  "RCPX": 1.33,
+  "RUSE": 1.0,
+  "PDIF": 1.29,
+  "PREX": 1.0,
+  "FCIL": 0.87,
+  "SCED": 1.0
+ },
+ "base_product": 1.4926590000000002,
+ "base": {
+  "pm": 127.21262274616107,
+  "cost": 127212.62274616107,
+  "tdev": 16.83968673909193,
+  "staff": 7.554334276946349
+ },
+ "scenarios": [
+  {
+   "key": "S0",
+   "name": "Base: the usual processor",
+   "changes": {},
+   "sums": {
+    "PERS": 9,
+    "RCPX": 13,
+    "PDIF": 10,
+    "PREX": 9,
+    "FCIL": 8
+   },
+   "levels": {
+    "PERS": "N",
+    "RCPX": "H",
+    "PDIF": "H",
+    "PREX": "N",
+    "FCIL": "H",
+    "RUSE": "N",
+    "SCED": "N"
+   },
+   "em": {
+    "PERS": 1.0,
+    "RCPX": 1.33,
+    "RUSE": 1.0,
+    "PDIF": 1.29,
+    "PREX": 1.0,
+    "FCIL": 0.87,
+    "SCED": 1.0
+   },
+   "product": 1.4926590000000002,
+   "pm": 127.21262274616107,
+   "cost": 127212.62274616107,
+   "tdev": 16.83968673909193,
+   "staff": 7.554334276946349,
+   "d_pm": 0.0,
+   "d_pct": 0.0,
+   "d_cost": 0.0,
+   "d_tdev": 0.0
+  },
+  {
+   "key": "S1",
+   "name": "New processor: only the experience (LTEX: nominal to very low)",
+   "changes": {
+    "LTEX": 1
+   },
+   "sums": {
+    "PERS": 9,
+    "RCPX": 13,
+    "PDIF": 10,
+    "PREX": 7,
+    "FCIL": 8
+   },
+   "levels": {
+    "PERS": "N",
+    "RCPX": "H",
+    "PDIF": "H",
+    "PREX": "L",
+    "FCIL": "H",
+    "RUSE": "N",
+    "SCED": "N"
+   },
+   "em": {
+    "PERS": 1.0,
+    "RCPX": 1.33,
+    "RUSE": 1.0,
+    "PDIF": 1.29,
+    "PREX": 1.12,
+    "FCIL": 0.87,
+    "SCED": 1.0
+   },
+   "product": 1.6717780800000004,
+   "pm": 142.4781374757004,
+   "cost": 142478.1374757004,
+   "tdev": 17.532975435070384,
+   "staff": 8.126295391409043,
+   "d_pm": 15.265514729539333,
+   "d_pct": 12.00000000000001,
+   "d_cost": 15265.51472953934,
+   "d_tdev": 0.6932886959784526
+  },
+  {
+   "key": "S2",
+   "name": "New processor: only the tools (TOOL: high to very low)",
+   "changes": {
+    "TOOL": 1
+   },
+   "sums": {
+    "PERS": 9,
+    "RCPX": 13,
+    "PDIF": 10,
+    "PREX": 9,
+    "FCIL": 5
+   },
+   "levels": {
+    "PERS": "N",
+    "RCPX": "H",
+    "PDIF": "H",
+    "PREX": "N",
+    "FCIL": "L",
+    "RUSE": "N",
+    "SCED": "N"
+   },
+   "em": {
+    "PERS": 1.0,
+    "RCPX": 1.33,
+    "RUSE": 1.0,
+    "PDIF": 1.29,
+    "PREX": 1.0,
+    "FCIL": 1.1,
+    "SCED": 1.0
+   },
+   "product": 1.8872700000000004,
+   "pm": 160.84354600089333,
+   "cost": 160843.54600089332,
+   "tdev": 18.306315808096326,
+   "staff": 8.786232450428782,
+   "d_pm": 33.63092325473225,
+   "d_pct": 26.436781609195403,
+   "d_cost": 33630.923254732246,
+   "d_tdev": 1.4666290690043944
+  },
+  {
+   "key": "S3",
+   "name": "New processor: both (the scenario of the variant)",
+   "changes": {
+    "LTEX": 1,
+    "TOOL": 1
+   },
+   "sums": {
+    "PERS": 9,
+    "RCPX": 13,
+    "PDIF": 10,
+    "PREX": 7,
+    "FCIL": 5
+   },
+   "levels": {
+    "PERS": "N",
+    "RCPX": "H",
+    "PDIF": "H",
+    "PREX": "L",
+    "FCIL": "L",
+    "RUSE": "N",
+    "SCED": "N"
+   },
+   "em": {
+    "PERS": 1.0,
+    "RCPX": 1.33,
+    "RUSE": 1.0,
+    "PDIF": 1.29,
+    "PREX": 1.12,
+    "FCIL": 1.1,
+    "SCED": 1.0
+   },
+   "product": 2.1137424000000005,
+   "pm": 180.14477152100054,
+   "cost": 180144.77152100054,
+   "tdev": 19.05998551771761,
+   "staff": 9.451464239232667,
+   "d_pm": 52.93214877483946,
+   "d_pct": 41.60919540229888,
+   "d_cost": 52932.14877483947,
+   "d_tdev": 2.220298778625679
+  }
+ ],
+ "pa_before": 0.86,
+ "pa_after": 1.5128,
+ "pa_ratio": 1.7590697674418605,
+ "sens": [
+  {
+   "driver": "PERS",
+   "level": "N",
+   "em": 1.0,
+   "worse": {
+    "level": "L",
+    "em": 1.26,
+    "pct": 26.0
+   },
+   "better": {
+    "level": "H",
+    "em": 0.83,
+    "pct": -17.000000000000004
+   }
+  },
+  {
+   "driver": "RCPX",
+   "level": "H",
+   "em": 1.33,
+   "worse": {
+    "level": "VH",
+    "em": 1.91,
+    "pct": 43.60902255639096
+   },
+   "better": {
+    "level": "N",
+    "em": 1.0,
+    "pct": -24.812030075187973
+   }
+  },
+  {
+   "driver": "RUSE",
+   "level": "N",
+   "em": 1.0,
+   "worse": {
+    "level": "H",
+    "em": 1.07,
+    "pct": 7.000000000000006
+   },
+   "better": {
+    "level": "L",
+    "em": 0.95,
+    "pct": -5.000000000000004
+   }
+  },
+  {
+   "driver": "PDIF",
+   "level": "H",
+   "em": 1.29,
+   "worse": {
+    "level": "VH",
+    "em": 1.81,
+    "pct": 40.31007751937985
+   },
+   "better": {
+    "level": "N",
+    "em": 1.0,
+    "pct": -22.480620155038768
+   }
+  },
+  {
+   "driver": "PREX",
+   "level": "N",
+   "em": 1.0,
+   "worse": {
+    "level": "L",
+    "em": 1.12,
+    "pct": 12.00000000000001
+   },
+   "better": {
+    "level": "H",
+    "em": 0.87,
+    "pct": -13.0
+   }
+  },
+  {
+   "driver": "FCIL",
+   "level": "H",
+   "em": 0.87,
+   "worse": {
+    "level": "N",
+    "em": 1.0,
+    "pct": 14.942528735632177
+   },
+   "better": {
+    "level": "VH",
+    "em": 0.73,
+    "pct": -16.09195402298851
+   }
+  },
+  {
+   "driver": "SCED",
+   "level": "N",
+   "em": 1.0,
+   "worse": {
+    "level": "L",
+    "em": 1.14,
+    "pct": 13.99999999999999
+   },
+   "better": {
+    "level": "H",
+    "em": 1.0,
+    "pct": 0.0
+   }
+  }
+ ],
+ "sens_scale": [
+  {
+   "key": "PREC",
+   "w": 3,
+   "worse": {
+    "w": 4,
+    "b": 1.1500000000000001,
+    "pct": 3.1440355272599696
+   },
+   "better": {
+    "w": 2,
+    "b": 1.1300000000000001,
+    "pct": -3.048199065692958
+   }
+  },
+  {
+   "key": "FLEX",
+   "w": 2,
+   "worse": {
+    "w": 3,
+    "b": 1.1500000000000001,
+    "pct": 3.1440355272599696
+   },
+   "better": {
+    "w": 1,
+    "b": 1.1300000000000001,
+    "pct": -3.048199065692958
+   }
+  },
+  {
+   "key": "RESL",
+   "w": 3,
+   "worse": {
+    "w": 4,
+    "b": 1.1500000000000001,
+    "pct": 3.1440355272599696
+   },
+   "better": {
+    "w": 2,
+    "b": 1.1300000000000001,
+    "pct": -3.048199065692958
+   }
+  },
+  {
+   "key": "TEAM",
+   "w": 2,
+   "worse": {
+    "w": 3,
+    "b": 1.1500000000000001,
+    "pct": 3.1440355272599696
+   },
+   "better": {
+    "w": 1,
+    "b": 1.1300000000000001,
+    "pct": -3.048199065692958
+   }
+  },
+  {
+   "key": "PMAT",
+   "w": 3,
+   "worse": {
+    "w": 4,
+    "b": 1.1500000000000001,
+    "pct": 3.1440355272599696
+   },
+   "better": {
+    "w": 2,
+    "b": 1.1300000000000001,
+    "pct": -3.048199065692958
+   }
+  }
+ ],
+ "sens_size": [
+  {
+   "pct": -20,
+   "size": 17.6808,
+   "pm": 98.63993825670781,
+   "cost": 98639.93825670781,
+   "tdev": 15.381689793553292,
+   "staff": 6.4128154696013535
+  },
+  {
+   "pct": -10,
+   "size": 19.8909,
+   "pm": 112.81495313800227,
+   "cost": 112814.95313800227,
+   "tdev": 16.134807498835443,
+   "staff": 6.992023496167827
+  },
+  {
+   "pct": 0,
+   "size": 22.101,
+   "pm": 127.21262274616107,
+   "cost": 127212.62274616107,
+   "tdev": 16.83968673909193,
+   "staff": 7.554334276946349
+  },
+  {
+   "pct": 10,
+   "size": 24.3111,
+   "pm": 141.8135953420243,
+   "cost": 141813.59534202432,
+   "tdev": 17.50381907226887,
+   "staff": 8.101865927459123
+  },
+  {
+   "pct": 20,
+   "size": 26.521199999999997,
+   "pm": 156.60182793931358,
+   "cost": 156601.82793931357,
+   "tdev": 18.132969253472584,
+   "staff": 8.63630361637123
+  }
+ ],
+ "fp_est": {
+  "pm": 94.1024157209239,
+  "cost": 94102.4157209239,
+  "tdev": 15.125966342894555,
+  "staff": 6.221249842006203
+ },
+ "actual_effort": 4.904761904761905,
+ "actual_days": 103,
+ "rate": 1000,
+ "savings_credit": 100,
+ "savings_chip": 1000,
+ "saving_needed_pct_of_credit": 529.3214877483947
+}

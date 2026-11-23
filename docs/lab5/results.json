@@ -1,0 +1,569 @@
+{
+ "schedule": {
+  "works": [
+   {
+    "code": "A",
+    "name": "Technical specification",
+    "days": 5,
+    "pred": [],
+    "stage": "design",
+    "es": 0,
+    "ef": 5,
+    "lf": 5,
+    "ls": 0,
+    "slack": 0
+   },
+   {
+    "code": "B",
+    "name": "Preliminary design",
+    "days": 5,
+    "pred": [
+     "A"
+    ],
+    "stage": "design",
+    "es": 5,
+    "ef": 10,
+    "lf": 10,
+    "ls": 5,
+    "slack": 0
+   },
+   {
+    "code": "C",
+    "name": "Skeleton, Docker, CI",
+    "days": 5,
+    "pred": [
+     "B"
+    ],
+    "stage": "code",
+    "es": 10,
+    "ef": 15,
+    "lf": 15,
+    "ls": 10,
+    "slack": 0
+   },
+   {
+    "code": "D",
+    "name": "Authentication",
+    "days": 4,
+    "pred": [
+     "C"
+    ],
+    "stage": "code",
+    "es": 15,
+    "ef": 19,
+    "lf": 19,
+    "ls": 15,
+    "slack": 0
+   },
+   {
+    "code": "E",
+    "name": "Library server and Open Library",
+    "days": 6,
+    "pred": [
+     "D"
+    ],
+    "stage": "code",
+    "es": 19,
+    "ef": 25,
+    "lf": 25,
+    "ls": 19,
+    "slack": 0
+   },
+   {
+    "code": "F",
+    "name": "Library screens",
+    "days": 6,
+    "pred": [
+     "D"
+    ],
+    "stage": "code",
+    "es": 19,
+    "ef": 25,
+    "lf": 25,
+    "ls": 19,
+    "slack": 0
+   },
+   {
+    "code": "G",
+    "name": "First deployment",
+    "days": 3,
+    "pred": [
+     "E",
+     "F"
+    ],
+    "stage": "code",
+    "es": 25,
+    "ef": 28,
+    "lf": 52,
+    "ls": 49,
+    "slack": 24
+   },
+   {
+    "code": "H",
+    "name": "Progress server and log",
+    "days": 4,
+    "pred": [
+     "E"
+    ],
+    "stage": "code",
+    "es": 25,
+    "ef": 29,
+    "lf": 41,
+    "ls": 37,
+    "slack": 12
+   },
+   {
+    "code": "I",
+    "name": "Progress screen",
+    "days": 5,
+    "pred": [
+     "F",
+     "H"
+    ],
+    "stage": "code",
+    "es": 29,
+    "ef": 34,
+    "lf": 48,
+    "ls": 43,
+    "slack": 14
+   },
+   {
+    "code": "J",
+    "name": "Quotes and quote card",
+    "days": 7,
+    "pred": [
+     "E",
+     "F"
+    ],
+    "stage": "code",
+    "es": 25,
+    "ef": 32,
+    "lf": 32,
+    "ls": 25,
+    "slack": 0
+   },
+   {
+    "code": "K",
+    "name": "Statistics and annual goal",
+    "days": 7,
+    "pred": [
+     "H"
+    ],
+    "stage": "code",
+    "es": 29,
+    "ef": 36,
+    "lf": 48,
+    "ls": 41,
+    "slack": 12
+   },
+   {
+    "code": "N",
+    "name": "Community: server",
+    "days": 8,
+    "pred": [
+     "E",
+     "J"
+    ],
+    "stage": "code",
+    "es": 32,
+    "ef": 40,
+    "lf": 40,
+    "ls": 32,
+    "slack": 0
+   },
+   {
+    "code": "O",
+    "name": "Community: screens",
+    "days": 8,
+    "pred": [
+     "N",
+     "F"
+    ],
+    "stage": "code",
+    "es": 40,
+    "ef": 48,
+    "lf": 48,
+    "ls": 40,
+    "slack": 0
+   },
+   {
+    "code": "P",
+    "name": "Moderation and abuse protection",
+    "days": 4,
+    "pred": [
+     "N"
+    ],
+    "stage": "code",
+    "es": 40,
+    "ef": 44,
+    "lf": 52,
+    "ls": 48,
+    "slack": 8
+   },
+   {
+    "code": "Q",
+    "name": "Reading: EPUB import",
+    "days": 8,
+    "pred": [
+     "E"
+    ],
+    "stage": "code",
+    "es": 25,
+    "ef": 33,
+    "lf": 39,
+    "ls": 31,
+    "slack": 6
+   },
+   {
+    "code": "R",
+    "name": "Reading: screens and progress",
+    "days": 9,
+    "pred": [
+     "Q",
+     "F",
+     "J"
+    ],
+    "stage": "code",
+    "es": 33,
+    "ef": 42,
+    "lf": 48,
+    "ls": 39,
+    "slack": 6
+   },
+   {
+    "code": "L",
+    "name": "PWA and polishing",
+    "days": 4,
+    "pred": [
+     "I",
+     "K",
+     "O",
+     "R"
+    ],
+    "stage": "code",
+    "es": 48,
+    "ef": 52,
+    "lf": 52,
+    "ls": 48,
+    "slack": 0
+   },
+   {
+    "code": "M",
+    "name": "Acceptance and documentation",
+    "days": 5,
+    "pred": [
+     "G",
+     "L",
+     "P"
+    ],
+    "stage": "accept",
+    "es": 52,
+    "ef": 57,
+    "lf": 57,
+    "ls": 52,
+    "slack": 0
+   }
+  ],
+  "total": 57,
+  "sum_days": 103,
+  "critical": [
+   "A",
+   "B",
+   "C",
+   "D",
+   "E",
+   "F",
+   "J",
+   "N",
+   "O",
+   "L",
+   "M"
+  ]
+ },
+ "loc": {
+  "files": 308,
+  "lines": 22101,
+  "php": 10466,
+  "ts": 10450,
+  "other": 1185
+ },
+ "kloc": 22.101,
+ "days": 103,
+ "effort": 4.904761904761905,
+ "cost": 4904.7619047619055,
+ "people": 3,
+ "pages": 105,
+ "doc_pages": {
+  "Technical specification, version 2": 37,
+  "Preliminary design": 33,
+  "Technical design (short)": 22,
+  "Guides of the user, system programmer, programmer and operator (lab 4, Appendices C-F)": 13
+ },
+ "errors": 7,
+ "error_sources": {
+  "fix commits in git": 4,
+  "Sonar: first analysis (1 vulnerability, 2 smells)": 3
+ },
+ "stages": {
+  "design": 10,
+  "code": 88,
+  "accept": 5
+ },
+ "rule": {
+  "design": 0.4,
+  "code": 0.2,
+  "test": 0.4
+ },
+ "groups": [
+  {
+   "key": "reader",
+   "name": "Built-in reading of EPUB",
+   "works": "Q, R",
+   "files": 55,
+   "lines": 5198,
+   "days": 17,
+   "effort": 0.8095238095238095,
+   "cost": 809.5238095238095,
+   "productivity": 6421.058823529412,
+   "cost_per_loc": 0.15573755473716996
+  },
+  {
+   "key": "community",
+   "name": "Community and moderation",
+   "works": "N, O, P",
+   "files": 80,
+   "lines": 5569,
+   "days": 20,
+   "effort": 0.9523809523809523,
+   "cost": 952.3809523809523,
+   "productivity": 5847.450000000001,
+   "cost_per_loc": 0.171014715816296
+  },
+  {
+   "key": "stats",
+   "name": "Statistics and the annual goal",
+   "works": "K",
+   "files": 14,
+   "lines": 972,
+   "days": 7,
+   "effort": 0.3333333333333333,
+   "cost": 333.3333333333333,
+   "productivity": 2916.0,
+   "cost_per_loc": 0.34293552812071326
+  },
+  {
+   "key": "quotes",
+   "name": "Quotes and the quote card",
+   "works": "J",
+   "files": 21,
+   "lines": 1839,
+   "days": 7,
+   "effort": 0.3333333333333333,
+   "cost": 333.3333333333333,
+   "productivity": 5517.0,
+   "cost_per_loc": 0.181257930034439
+  },
+  {
+   "key": "progress",
+   "name": "Reading progress and the journal",
+   "works": "H, I",
+   "files": 12,
+   "lines": 532,
+   "days": 9,
+   "effort": 0.42857142857142855,
+   "cost": 428.57142857142856,
+   "productivity": 1241.3333333333335,
+   "cost_per_loc": 0.8055853920515574
+  },
+  {
+   "key": "library",
+   "name": "Library and the catalog",
+   "works": "E, F",
+   "files": 37,
+   "lines": 2493,
+   "days": 12,
+   "effort": 0.5714285714285714,
+   "cost": 571.4285714285714,
+   "productivity": 4362.75,
+   "cost_per_loc": 0.2292132256031173
+  },
+  {
+   "key": "auth",
+   "name": "Accounts and sign-in",
+   "works": "D",
+   "files": 18,
+   "lines": 1081,
+   "days": 4,
+   "effort": 0.19047619047619047,
+   "cost": 190.47619047619045,
+   "productivity": 5675.25,
+   "cost_per_loc": 0.17620369146733622
+  },
+  {
+   "key": "pwa",
+   "name": "PWA: service worker, installation, offline",
+   "works": "L",
+   "files": 11,
+   "lines": 435,
+   "days": 4,
+   "effort": 0.19047619047619047,
+   "cost": 190.47619047619045,
+   "productivity": 2283.75,
+   "cost_per_loc": 0.4378762999452654
+  },
+  {
+   "key": "infra",
+   "name": "Skeleton, containers, delivery, shared code",
+   "works": "C, G",
+   "files": 60,
+   "lines": 3982,
+   "days": 8,
+   "effort": 0.38095238095238093,
+   "cost": 380.9523809523809,
+   "productivity": 10452.75,
+   "cost_per_loc": 0.09566860395589676
+  }
+ ],
+ "fp": {
+  "counts": {
+   "EI": [
+    24,
+    5,
+    3
+   ],
+   "EO": [
+    1,
+    5,
+    2
+   ],
+   "EQ": [
+    3,
+    12,
+    1
+   ],
+   "ILF": [
+    10,
+    0,
+    0
+   ],
+   "EIF": [
+    1,
+    0,
+    0
+   ]
+  },
+  "totals": {
+   "EI": 110,
+   "EO": 43,
+   "EQ": 63,
+   "ILF": 70,
+   "EIF": 5
+  },
+  "ufp": 291,
+  "gsc_sum": 45,
+  "vaf": 1.1,
+  "fp": 320.1,
+  "algorithms": 13,
+  "feature_points": 348,
+  "feature_points_adj": 382.8,
+  "n_transactions": 56
+ },
+ "gsc": [
+  [
+   "Data communication",
+   4,
+   "A client-server application over HTTPS, a PWA, and a call to the Open Library catalog."
+  ],
+  [
+   "Distributed data processing",
+   3,
+   "Processing is split: the server stores and counts, the client draws the card, the chart and the reader."
+  ],
+  [
+   "Performance",
+   3,
+   "The technical specification sets response times, but the load of a personal tracker is small."
+  ],
+  [
+   "Heavily used configuration",
+   3,
+   "The program must run on a server with 1 GB of memory, so the stack was trimmed for it."
+  ],
+  [
+   "Transaction rate",
+   2,
+   "A reader makes a few actions a day."
+  ],
+  [
+   "On-line data entry",
+   5,
+   "All data are entered on-line; there is no batch input."
+  ],
+  [
+   "End-user efficiency",
+   4,
+   "A phone interface, one task on a screen, quick buttons like “+10 pages”."
+  ],
+  [
+   "On-line update",
+   4,
+   "Most logical files are updated on-line: progress, quotes, goals, posts, reports."
+  ],
+  [
+   "Complex processing",
+   3,
+   "The streak, the forecast of the finish date, the parsing and sanitizing of EPUB, the anchors of quotes."
+  ],
+  [
+   "Reusability",
+   2,
+   "One product, but its components (UI blocks, actions, services) are written to be reused inside it."
+  ],
+  [
+   "Installation ease",
+   4,
+   "One command for development (`make up`), a script and a pipeline for the server."
+  ],
+  [
+   "Operational ease",
+   3,
+   "A backup script and an automatic rollout exist; copies outside the server are made by hand."
+  ],
+  [
+   "Multiple sites",
+   1,
+   "One production site and one language of the interface."
+  ],
+  [
+   "Facilitate change",
+   4,
+   "Layers, small classes, more than two thousand tests, static analysis and a linter."
+  ]
+ ],
+ "loc_metrics": {
+  "productivity_loc": 4506.029126213592,
+  "productivity_kloc": 4.506029126213591,
+  "cost_per_loc": 0.22192488596723703,
+  "cost_per_kloc": 221.92488596723703,
+  "doc_per_kloc": 4.750916248133569,
+  "errors_per_kloc": 0.31672774987557123,
+  "kloc_per_person": 7.367,
+  "test_share": 0.5122591750711716
+ },
+ "fp_metrics": {
+  "productivity": 65.2631067961165,
+  "cost_per_fp": 15.322592642180272,
+  "doc_per_fp": 0.32802249297094654,
+  "errors_per_fp": 0.021868166198063102,
+  "loc_per_fp": 69.04404873477039,
+  "loc_from_fp_java": 16965.300000000003,
+  "ratio_java": 0.7676258992805757
+ },
+ "loc_per_fp_table": {
+  "Java": 53,
+  "C++": 64,
+  "Visual Basic": 32,
+  "Delphi Pascal": 29
+ },
+ "tests_lines": 23212
+}

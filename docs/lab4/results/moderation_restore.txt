@@ -1,0 +1,2 @@
+$ php artisan moderation:restore post 14
+INFO  Restored. 3 open reports closed.

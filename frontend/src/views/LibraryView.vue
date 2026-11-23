@@ -5,6 +5,7 @@ import BookCard from '@/components/BookCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 import { useLibraryStore } from '@/stores/library'
 import type { BookStatus } from '@/types/api'
 import { isLibrarySort, librarySorts, matches, sortBooks, type LibrarySort } from '@/utils/librarySearch'
@@ -171,7 +172,7 @@ onMounted(() => load())
 
   <ErrorNotice v-if="failed" :message="$t('apiErrors.generic')" retryable @retry="load(true)" />
 
-  <p v-else-if="!library.loaded" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+  <SkeletonList v-else-if="!library.loaded" />
 
   <ul v-else-if="visible.length" class="flex flex-col gap-3">
     <li v-for="userBook in visible" :key="userBook.id">

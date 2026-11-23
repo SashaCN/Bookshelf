@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Enums\BookStatus;
 use App\Models\UserBook;
+use App\Models\UserBookRead;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,14 +13,12 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class UserBookResource extends JsonResource
 {
-    private bool $withReaderDocument = false;
+    /** Whether the archived passes are listed in full (the single entry), not only counted (the library list). */
+    private bool $withReads = false;
 
-    /**
-     * The linked EPUB is only looked up for a single entry, not in the list.
-     */
-    public function withReaderDocument(): static
+    public function withReads(): static
     {
-        $this->withReaderDocument = true;
+        $this->withReads = true;
 
         return $this;
     }
@@ -39,7 +38,6 @@ class UserBookResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        /** @var array<string, mixed> $data */
         $data = [
             'id' => $this->id,
             'status' => $this->status,
@@ -48,10 +46,10 @@ class UserBookResource extends JsonResource
             'current_page' => $this->current_page,
             'total_pages' => $this->total_pages,
             'progress_percent' => $this->progressPercent(),
+            // Whether the reader uploaded the text of the book, and how far into it they are (from 0 to 1).
+            'has_text' => $this->bookText !== null,
+            'text_progress' => $this->bookText?->progress,
             'rating' => $this->rating,
-            'review' => $this->review,
-            'review_visibility' => $this->review_visibility,
-            'reviewed_at' => $this->reviewed_at?->toIso8601String(),
             'started_at' => $this->started_at?->toIso8601String(),
             'finished_at' => $this->finished_at?->toIso8601String(),
             'times_read' => $this->timesRead(),
@@ -59,9 +57,8 @@ class UserBookResource extends JsonResource
             'book' => new BookResource($this->whenLoaded('book')),
         ];
 
-        if ($this->withReaderDocument) {
-            $data['reader_document_id'] = $this->readerDocument?->id;
-            $data['reads'] = $this->reads->map(fn ($read) => [
+        if ($this->withReads) {
+            $data['reads'] = $this->reads->map(fn (UserBookRead $read) => [
                 'started_at' => $read->started_at?->toIso8601String(),
                 'finished_at' => $read->finished_at->toIso8601String(),
             ])->all();

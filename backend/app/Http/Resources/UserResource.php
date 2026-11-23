@@ -22,10 +22,9 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+            'handle' => $this->handle,
+            'bio' => $this->bio,
             'timezone' => $this->timezone,
-            'username' => $this->username,
-            'is_public' => $this->is_public,
-            'new_followers_count' => $this->newFollowersCount(),
         ];
     }
 }

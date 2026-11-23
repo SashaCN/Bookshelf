@@ -1,4 +1,5 @@
-import type { DailyStats, GoalProgress, StatsSummary, YearRecapResponse } from '@/types/api'
+import type { DailyStats, GoalProgress, StatsSummary } from '@/types/api'
+import type { YearRecapResponse } from '@/types/stats'
 import { http } from './http'
 
 export const statsApi = {

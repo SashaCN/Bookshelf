@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
-import { useAuthStore } from '@/stores/auth'
 import { useQuotesStore } from '@/stores/quotes'
 import { makeBook, makeQuote, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
@@ -11,8 +10,7 @@ import type { UserBook } from '@/types/api'
 import QuoteFormView from './QuoteFormView.vue'
 
 vi.mock('@/api/library', () => ({
-  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(),
-    reread: vi.fn(), logs: vi.fn() },
+  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(), logs: vi.fn() },
   catalogApi: { search: vi.fn() },
 }))
 vi.mock('@/api/quotes', () => ({
@@ -63,6 +61,19 @@ describe('QuoteFormView', () => {
   })
 
   describe('adding a quote', () => {
+    it('starts with the text that another app shared to Bookshelf', async () => {
+      const { wrapper } = await mountCreate({ text: '  Не все те золото, що блищить.  ' })
+
+      expect((wrapper.get('#quote-content').element as HTMLTextAreaElement).value).toBe('Не все те золото, що блищить.')
+      expect((wrapper.get('#quote-book').element as HTMLSelectElement).value).toBe('')
+    })
+
+    it('cuts shared text that is longer than a quote can be', async () => {
+      const { wrapper } = await mountCreate({ text: 'я'.repeat(5500) })
+
+      expect((wrapper.get('#quote-content').element as HTMLTextAreaElement).value).toHaveLength(5000)
+    })
+
     it('asks for the book among the books of the library, alphabetically', async () => {
       const { wrapper } = await mountCreate()
 
@@ -111,12 +122,12 @@ describe('QuoteFormView', () => {
 
     it('counts the characters of the text', async () => {
       const { wrapper } = await mountCreate()
-      expect(wrapper.text()).toContain('0 з 2000')
+      expect(wrapper.text()).toContain('0 з 5000')
 
       await wrapper.get('#quote-content').setValue('Hello')
 
-      expect(wrapper.text()).toContain('5 з 2000')
-      expect(wrapper.get('#quote-content').attributes('maxlength')).toBe('2000')
+      expect(wrapper.text()).toContain('5 з 5000')
+      expect(wrapper.get('#quote-content').attributes('maxlength')).toBe('5000')
       expect(wrapper.get('#quote-note').attributes('maxlength')).toBe('2000')
     })
 
@@ -143,36 +154,6 @@ describe('QuoteFormView', () => {
       expect(buttonWithText(wrapper, 'Інсайт').attributes('aria-pressed')).toBe('true')
     })
 
-    it('warns that a public quote stays hidden while the profile is private', async () => {
-      const { wrapper } = await mountCreate({ book: '1' })
-      const auth = useAuthStore()
-      auth.user = { id: 1, name: 'Olena', email: 'o@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
-
-      expect(wrapper.text()).toContain('лише якщо ваш профіль публічний')
-      expect(wrapper.text()).not.toContain('приватний, тож')
-
-      await buttonWithText(wrapper, 'Усі').trigger('click')
-      expect(wrapper.text()).toContain('Ваш профіль зараз приватний')
-      expect(wrapper.findAll('a[href="/profile"]').map((link) => link.text())).toContain('Налаштувати профіль')
-
-      auth.user = { ...auth.user, is_public: true, new_followers_count: 0 }
-      await wrapper.vm.$nextTick()
-      expect(wrapper.text()).not.toContain('Ваш профіль зараз приватний')
-    })
-
-    it('makes a quote public when asked to', async () => {
-      const { wrapper } = await mountCreate({ book: '1' })
-      vi.mocked(quotesApi.create).mockResolvedValue(makeQuote())
-
-      expect(buttonWithText(wrapper, 'Тільки я').attributes('aria-pressed')).toBe('true')
-      await buttonWithText(wrapper, 'Усі').trigger('click')
-      await wrapper.get('#quote-content').setValue('Text')
-      await wrapper.get('form').trigger('submit')
-      await flushPromises()
-
-      expect(quotesApi.create).toHaveBeenCalledWith(1, expect.objectContaining({ visibility: 'public' }))
-    })
-
     it('saves the quote under the chosen book and leaves for the list', async () => {
       const { wrapper, router } = await mountCreate({ book: '1' })
       vi.mocked(quotesApi.create).mockResolvedValue(makeQuote({ id: 8 }))
@@ -186,7 +167,6 @@ describe('QuoteFormView', () => {
 
       expect(quotesApi.create).toHaveBeenCalledWith(1, {
         type: 'insight',
-        visibility: 'private',
         content: 'A thought worth keeping.',
         note: 'Mine.',
         page: 42,
@@ -203,7 +183,7 @@ describe('QuoteFormView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(quotesApi.create).toHaveBeenCalledWith(1, { type: 'quote', visibility: 'private', content: 'Just the text', note: null, page: null, tags: [] })
+      expect(quotesApi.create).toHaveBeenCalledWith(1, { type: 'quote', content: 'Just the text', note: null, page: null, tags: [] })
     })
 
     describe('tags', () => {
@@ -403,7 +383,7 @@ describe('QuoteFormView', () => {
           }),
         )
 
-        expect(wrapper.get('#quote-content-error').text()).toBe('Введіть текст, не довший за 2000 символів.')
+        expect(wrapper.get('#quote-content-error').text()).toBe('Введіть текст, не довший за 5000 символів.')
         expect(wrapper.get('#quote-note-error').text()).toBe('Думка має бути не довшою за 2000 символів.')
         expect(wrapper.find('#quote-page-error').exists()).toBe(false)
       })
@@ -485,13 +465,6 @@ describe('QuoteFormView', () => {
       expect(field(wrapper, '#quote-page').attributes('max')).toBe('320')
     })
 
-    it('shows the visibility the quote already has', async () => {
-      vi.mocked(quotesApi.get).mockResolvedValue({ ...existing, visibility: 'public' })
-      const { wrapper } = await mountEdit()
-
-      expect(buttonWithText(wrapper, 'Усі').attributes('aria-pressed')).toBe('true')
-    })
-
     it('saves the changes and updates the list', async () => {
       vi.mocked(quotesApi.get).mockResolvedValue(existing)
       const { wrapper, router } = await mountEdit()
@@ -504,7 +477,7 @@ describe('QuoteFormView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(quotesApi.update).toHaveBeenCalledWith(5, { type: 'quote', visibility: 'private', content: 'New text', note: null, page: null, tags: [] })
+      expect(quotesApi.update).toHaveBeenCalledWith(5, { type: 'quote', content: 'New text', note: null, page: null, tags: [] })
       expect(quotesApi.create).not.toHaveBeenCalled()
       expect(router.currentRoute.value.name).toBe('quotes')
     })

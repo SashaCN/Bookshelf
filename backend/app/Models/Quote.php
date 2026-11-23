@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\QuoteType;
-use App\Enums\QuoteVisibility;
 use Database\Factories\QuoteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -12,7 +11,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 #[Fillable([
@@ -23,7 +21,10 @@ use Illuminate\Support\Facades\DB;
     'note',
     'page',
     'is_favorite',
-    'visibility',
+    'book_text_id',
+    'chapter_position',
+    'start_offset',
+    'end_offset',
 ])]
 class Quote extends Model
 {
@@ -38,7 +39,6 @@ class Quote extends Model
     protected $attributes = [
         'type' => 'quote',
         'is_favorite' => false,
-        'visibility' => 'private',
     ];
 
     protected function casts(): array
@@ -47,7 +47,39 @@ class Quote extends Model
             'type' => QuoteType::class,
             'page' => 'integer',
             'is_favorite' => 'boolean',
-            'visibility' => QuoteVisibility::class,
+            'chapter_position' => 'integer',
+            'start_offset' => 'integer',
+            'end_offset' => 'integer',
+        ];
+    }
+
+    /**
+     * The text this quote was selected from, when it was saved from the reader.
+     *
+     * @return BelongsTo<BookText, $this>
+     */
+    public function bookText(): BelongsTo
+    {
+        return $this->belongsTo(BookText::class);
+    }
+
+    /**
+     * Where the quote sits in its text: chapter and character offsets, or null for a quote typed in by hand
+     * (or one whose text has been removed).
+     *
+     * @return array{book_text_id: int, chapter: int, start: int, end: int}|null
+     */
+    public function anchor(): ?array
+    {
+        if ($this->book_text_id === null || $this->chapter_position === null || $this->start_offset === null || $this->end_offset === null) {
+            return null;
+        }
+
+        return [
+            'book_text_id' => $this->book_text_id,
+            'chapter' => $this->chapter_position,
+            'start' => $this->start_offset,
+            'end' => $this->end_offset,
         ];
     }
 
@@ -68,32 +100,8 @@ class Quote extends Model
     }
 
     /**
-     * @return BelongsToMany<User, $this>
-     */
-    public function likes(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'quote_likes')->withPivot('created_at');
-    }
-
-    /**
-     * The like rows themselves: counting them does not join users, which the planner would otherwise drive from.
+     * The reader's private labels on this quote. Never part of a Post snapshot or any public response.
      *
-     * @return HasMany<QuoteLike, $this>
-     */
-    public function likeRows(): HasMany
-    {
-        return $this->hasMany(QuoteLike::class);
-    }
-
-    /**
-     * @return HasMany<QuoteComment, $this>
-     */
-    public function comments(): HasMany
-    {
-        return $this->hasMany(QuoteComment::class);
-    }
-
-    /**
      * @return BelongsToMany<Tag, $this>
      */
     public function tags(): BelongsToMany
@@ -146,53 +154,5 @@ class Quote extends Model
         $query
             ->whereRaw('MATCH (content, note) AGAINST (? IN BOOLEAN MODE)', [$boolean])
             ->orderByRaw('MATCH (content, note) AGAINST (? IN BOOLEAN MODE) DESC', [$boolean]);
-    }
-
-    /**
-     * Quotes the viewer may like and comment on: public, from a public profile, with no block either way.
-     * The same rule as the feed and profiles.
-     *
-     * @param  Builder<Quote>  $query
-     */
-    #[Scope]
-    protected function sharedWith(Builder $query, ?User $viewer): void
-    {
-        $query
-            ->where('visibility', QuoteVisibility::Public)
-            ->whereHas('user', fn ($user) => $user->where('is_public', true)->visibleTo($viewer));
-    }
-
-    /**
-     * Adds comments_count: the comments the viewer can see (not those of readers blocked either way), in the same query.
-     * A correlated subquery with two small NOT IN lookups per quote on the (quote_id, id) index, so it stays cheap.
-     *
-     * @param  Builder<Quote>  $query
-     */
-    #[Scope]
-    protected function withComments(Builder $query, ?User $viewer = null): void
-    {
-        $query->withCount(['comments' => fn ($comments) => $comments->visibleTo($viewer)]);
-    }
-
-    /**
-     * Adds likes_count (without likes of readers blocked either way, like comments_count) and, for a signed-in viewer,
-     * liked_by_me, in the same query (no query per quote).
-     *
-     * @param  Builder<Quote>  $query
-     */
-    #[Scope]
-    protected function withLikes(Builder $query, ?User $viewer = null): void
-    {
-        $query->withCount(['likeRows as likes_count' => function ($likes) use ($viewer): void {
-            if ($viewer !== null) {
-                $likes
-                    ->whereNotIn('quote_likes.user_id', DB::table('user_blocks')->where('blocker_id', $viewer->id)->select('blocked_id'))
-                    ->whereNotIn('quote_likes.user_id', DB::table('user_blocks')->where('blocked_id', $viewer->id)->select('blocker_id'));
-            }
-        }]);
-
-        if ($viewer !== null) {
-            $query->withExists(['likeRows as liked_by_me' => fn ($likes) => $likes->where('quote_likes.user_id', $viewer->id)]);
-        }
     }
 }

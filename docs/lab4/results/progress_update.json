@@ -1,0 +1,38 @@
+{
+  "data": {
+    "id": 27,
+    "status": "reading",
+    "allowed_statuses": [
+      "finished",
+      "abandoned"
+    ],
+    "current_page": 25,
+    "total_pages": 640,
+    "progress_percent": 3,
+    "has_text": false,
+    "text_progress": null,
+    "rating": null,
+    "started_at": "2026-11-03T13:12:32+00:00",
+    "finished_at": null,
+    "created_at": "2026-11-03T13:12:32+00:00",
+    "book": {
+      "id": 26,
+      "title": "Kobzar",
+      "subtitle": null,
+      "authors": [
+        "Taras Shevchenko"
+      ],
+      "isbn_13": null,
+      "cover_url": null,
+      "page_count": 640,
+      "published_year": null,
+      "subjects": [],
+      "source": "manual"
+    }
+  },
+  "meta": {
+    "pages": 25,
+    "reached_end": false,
+    "streak": 1
+  }
+}

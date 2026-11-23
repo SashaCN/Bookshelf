@@ -3,12 +3,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
-import LoadMore from '@/components/LoadMore.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import QuoteCard from '@/components/QuoteCard.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 import { quotesApi } from '@/api/quotes'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
-import { useLoadMore } from '@/composables/useLoadMore'
 import { useLibraryStore } from '@/stores/library'
 import { useQuotesStore } from '@/stores/quotes'
 import type { QuoteFilters } from '@/types/api'
@@ -19,9 +18,8 @@ const quotes = useQuotesStore()
 const library = useLibraryStore()
 const errorMessage = useApiErrorMessage()
 
-const { moreError, loadMore } = useLoadMore(() => quotes.loadMore())
-
 const error = ref('')
+const moreError = ref('')
 const exporting = ref(false)
 const exportError = ref('')
 
@@ -54,7 +52,9 @@ const filters = computed(() => {
   if (tagFilter.value !== undefined) result.tag = tagFilter.value
   return result
 })
-const hasFilters = computed(() => favoritesOnly.value || bookFilter.value !== undefined || searchFilter.value !== undefined || tagFilter.value !== undefined)
+const hasFilters = computed(
+  () => favoritesOnly.value || bookFilter.value !== undefined || searchFilter.value !== undefined || tagFilter.value !== undefined,
+)
 
 function select(next: { favorite?: boolean; book?: number; q?: string; tag?: string }) {
   const query: Record<string, string> = {}
@@ -103,7 +103,8 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
 
 const book = computed({
   get: () => bookFilter.value ?? '',
-  set: (value: number | '') => select({ favorite: favoritesOnly.value, book: value === '' ? undefined : value, q: searchFilter.value, tag: tagFilter.value }),
+  set: (value: number | '') =>
+    select({ favorite: favoritesOnly.value, book: value === '' ? undefined : value, q: searchFilter.value, tag: tagFilter.value }),
 })
 
 async function load() {
@@ -114,6 +115,16 @@ async function load() {
     await quotes.load(filters.value)
   } catch (e) {
     error.value = errorMessage(e)
+  }
+}
+
+async function loadMore() {
+  moreError.value = ''
+
+  try {
+    await quotes.loadMore()
+  } catch (e) {
+    moreError.value = errorMessage(e)
   }
 }
 
@@ -253,7 +264,7 @@ onMounted(() => {
 
   <ErrorNotice v-if="error" :message="error" retryable @retry="load" />
 
-  <p v-else-if="!quotes.loaded" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+  <SkeletonList v-else-if="!quotes.loaded" />
 
   <template v-if="quotes.loaded">
     <ul v-if="quotes.items.length" class="mt-4 flex flex-col gap-3">
@@ -268,11 +279,7 @@ onMounted(() => {
       :title="$t('quotes.search.emptyTitle')"
       :text="$t('quotes.search.emptyText', { q: searchFilter })"
     >
-      <button
-        type="button"
-        class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium"
-        @click="clearSearch"
-      >
+      <button type="button" class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium" @click="clearSearch">
         {{ $t('quotes.search.clear') }}
       </button>
     </EmptyState>
@@ -301,6 +308,16 @@ onMounted(() => {
       </RouterLink>
     </EmptyState>
 
-    <LoadMore :has-more="quotes.hasMore" :loading="quotes.loadingMore" :error="moreError" @more="loadMore" />
+    <ErrorNotice v-if="moreError" :message="moreError" retryable class="mt-4" @retry="loadMore" />
+
+    <button
+      v-if="quotes.hasMore && !moreError"
+      type="button"
+      :disabled="quotes.loadingMore"
+      class="mt-4 min-h-11 w-full rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
+      @click="loadMore"
+    >
+      {{ $t('quotes.more') }}
+    </button>
   </template>
 </template>

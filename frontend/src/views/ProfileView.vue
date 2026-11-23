@@ -3,32 +3,35 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { authApi } from '@/api/auth'
-import { apiErrorCode } from '@/api/errors'
+import { isApiErrorCode } from '@/api/errors'
 import { ApiError } from '@/api/http'
 import DeleteAccountDialog from '@/components/DeleteAccountDialog.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import FormField from '@/components/FormField.vue'
+import InstallCard from '@/components/InstallCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useAuthStore } from '@/stores/auth'
 
 /** Revoking the link at once can cancel the download in some browsers. */
 const REVOKE_DELAY_MS = 10_000
-const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/
+const BIO_MAX = 280
+const appVersion = __APP_VERSION__
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const errorMessage = useApiErrorMessage()
 
 const name = ref(auth.user?.name ?? '')
-const username = ref(auth.user?.username ?? '')
-const isPublic = ref(auth.user?.is_public ?? false)
+const handle = ref(auth.user?.handle ?? '')
+const bio = ref(auth.user?.bio ?? '')
+const handleError = ref('')
+const bioError = ref('')
 const timezone = ref(auth.user?.timezone ?? 'Europe/Kyiv')
 const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
-const usernameError = ref('')
 
 // The reader's day boundary decides which day a page counts for, so the time zone is editable.
 const timezones = computed(() => {
@@ -36,49 +39,46 @@ const timezones = computed(() => {
   return all.includes(timezone.value) ? all : [timezone.value, ...all]
 })
 
-/** What the reader typed, in the form it is saved. */
-const cleanUsername = computed(() => username.value.trim().toLowerCase())
+/** Show 422 answers next to the fields they are about. Returns false when no field is to blame. */
+function showFieldErrors(e: ApiError): boolean {
+  const handleMessages = e.fieldErrors.handle
+  const bioMessages = e.fieldErrors.bio
 
-/** Shown as soon as the reader has typed something, before any request is made. */
-const formatError = computed(() =>
-  cleanUsername.value && !USERNAME_PATTERN.test(cleanUsername.value) ? t('profile.usernameInvalid') : '',
-)
-const shownUsernameError = computed(() => formatError.value || usernameError.value)
-
-/** Server answers about the username go next to its field; returns false when something else is to blame. */
-function showUsernameError(e: unknown): boolean {
-  if (!(e instanceof ApiError)) return false
-
-  if (apiErrorCode(e) === 'profile.username_required') {
-    usernameError.value = t('apiErrors.profile.username_required')
-  } else if (e.status === 422 && e.fieldErrors.username?.length) {
-    // The format is checked before sending, so what the server still refuses is a name somebody else has.
-    usernameError.value = t('profile.usernameTaken')
-  } else {
-    return false
+  if (handleMessages?.length) {
+    const code = handleMessages.find(isApiErrorCode)
+    handleError.value = code && te(`apiErrors.${code}`) ? t(`apiErrors.${code}`) : t('social.errors.handle')
   }
 
-  return true
+  if (bioMessages?.length) {
+    bioError.value = t('social.errors.bio')
+  }
+
+  return Boolean(handleMessages?.length || bioMessages?.length)
 }
 
 async function save() {
-  if (formatError.value || saving.value) return
+  if (saving.value) return
 
   saving.value = true
   saved.value = false
   error.value = ''
-  usernameError.value = ''
+  handleError.value = ''
+  bioError.value = ''
 
   try {
     await auth.updateProfile({
       name: name.value.trim(),
       timezone: timezone.value,
-      username: cleanUsername.value || null,
-      is_public: isPublic.value,
+      handle: handle.value.trim(),
+      bio: bio.value.trim() || null,
     })
+    // The server keeps handles in lower case.
+    handle.value = auth.user?.handle ?? handle.value
     saved.value = true
   } catch (e) {
-    if (!showUsernameError(e)) error.value = errorMessage(e)
+    if (!(e instanceof ApiError && e.status === 422 && showFieldErrors(e))) {
+      error.value = errorMessage(e)
+    }
   } finally {
     saving.value = false
   }
@@ -109,15 +109,9 @@ const newPassword = ref('')
 const newPasswordConfirmation = ref('')
 const changingPassword = ref(false)
 const passwordChanged = ref(false)
-const passwordOpen = ref(false)
 const passwordError = ref('')
 const currentPasswordError = ref('')
 const newPasswordError = ref('')
-
-function togglePassword() {
-  passwordOpen.value = !passwordOpen.value
-  passwordChanged.value = false
-}
 
 async function changePassword() {
   if (changingPassword.value) return
@@ -128,7 +122,7 @@ async function changePassword() {
   passwordChanged.value = false
 
   if (newPassword.value !== newPasswordConfirmation.value) {
-    newPasswordError.value = t('profile.password.mismatch')
+    newPasswordError.value = t('account.password.mismatch')
     return
   }
 
@@ -144,11 +138,10 @@ async function changePassword() {
     newPassword.value = ''
     newPasswordConfirmation.value = ''
     passwordChanged.value = true
-    passwordOpen.value = false
   } catch (e) {
     if (e instanceof ApiError && e.status === 422 && (e.fieldErrors.current_password || e.fieldErrors.password)) {
-      if (e.fieldErrors.current_password) currentPasswordError.value = t('profile.password.currentWrong')
-      if (e.fieldErrors.password) newPasswordError.value = t('profile.password.newInvalid')
+      if (e.fieldErrors.current_password) currentPasswordError.value = t('account.password.currentWrong')
+      if (e.fieldErrors.password) newPasswordError.value = t('account.password.newInvalid')
     } else {
       passwordError.value = errorMessage(e)
     }
@@ -178,7 +171,7 @@ async function downloadData() {
     setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS)
   } catch (e) {
     // The limit is three an hour, so the generic "try in a minute" would mislead.
-    exportError.value = e instanceof ApiError && e.status === 429 ? t('profile.data.tooMany') : errorMessage(e)
+    exportError.value = e instanceof ApiError && e.status === 429 ? t('account.data.tooMany') : errorMessage(e)
   } finally {
     exporting.value = false
   }
@@ -207,7 +200,7 @@ async function deleteAccount(password: string) {
     await router.push({ name: 'login', query: { deleted: '1' } })
   } catch (e) {
     if (e instanceof ApiError && e.status === 422 && e.fieldErrors.password) {
-      deletePasswordError.value = t('profile.danger.passwordWrong')
+      deletePasswordError.value = t('account.danger.passwordWrong')
     } else {
       deleteError.value = errorMessage(e)
     }
@@ -224,213 +217,189 @@ function closeDelete() {
 <template>
   <PageHeader :title="$t('profile.title')" :back-to="{ name: 'home' }" />
 
-  <RouterLink
-    v-if="auth.user?.username && auth.user.new_followers_count > 0"
-    :to="{ name: 'followers', params: { username: auth.user.username } }"
-    data-test="new-followers-line"
-    class="mb-4 flex min-h-11 items-center rounded-2xl border border-accent bg-surface px-4 py-3 font-medium"
-  >
-    {{ $t('profile.newFollowers', auth.user.new_followers_count) }}
-  </RouterLink>
+  <form class="flex flex-col gap-4" @submit.prevent="save" @input="saved = false" @change="saved = false">
+    <ErrorNotice v-if="error" :message="error" />
 
-  <div class="flex flex-col gap-4">
-    <!-- Cards 1 and 2 are one form: the profile is saved in one request, so there is one button, at the end. -->
-    <form class="flex flex-col gap-4" @submit.prevent="save" @input="saved = false" @change="saved = false">
-      <ErrorNotice v-if="error" :message="error" />
-
-      <section class="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4" aria-labelledby="profile-main-title">
-        <h2 id="profile-main-title" class="font-display text-lg font-semibold">{{ $t('profile.sections.main') }}</h2>
-
-        <div class="flex flex-col gap-1.5">
-          <label for="profile-name" class="text-sm font-medium">{{ $t('auth.fields.name') }}</label>
-          <input
-            id="profile-name"
-            v-model="name"
-            type="text"
-            required
-            maxlength="255"
-            autocomplete="name"
-            class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-          >
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <p class="text-sm font-medium">{{ $t('auth.fields.email') }}</p>
-          <p class="min-h-11 content-center text-ink-muted">{{ auth.user?.email }}</p>
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <label for="profile-timezone" class="text-sm font-medium">{{ $t('profile.timezone') }}</label>
-          <select
-            id="profile-timezone"
-            v-model="timezone"
-            aria-describedby="profile-timezone-hint"
-            class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-          >
-            <option v-for="zone in timezones" :key="zone" :value="zone">{{ zone }}</option>
-          </select>
-          <p id="profile-timezone-hint" class="text-sm text-ink-muted">{{ $t('profile.timezoneHint') }}</p>
-        </div>
-      </section>
-
-      <section class="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4" aria-labelledby="profile-public-title">
-        <h2 id="profile-public-title" class="font-display text-lg font-semibold">{{ $t('profile.sections.public') }}</h2>
-
-        <div class="flex flex-col gap-1.5">
-          <label for="profile-username" class="text-sm font-medium">{{ $t('profile.username') }}</label>
-          <input
-            id="profile-username"
-            v-model="username"
-            type="text"
-            maxlength="30"
-            autocapitalize="none"
-            autocomplete="username"
-            spellcheck="false"
-            :aria-invalid="shownUsernameError ? 'true' : undefined"
-            :aria-describedby="shownUsernameError ? 'profile-username-error' : 'profile-username-hint'"
-            class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger"
-            @input="usernameError = ''"
-          >
-          <p v-if="shownUsernameError" id="profile-username-error" class="text-sm text-danger">{{ shownUsernameError }}</p>
-          <p v-else id="profile-username-hint" class="text-sm text-ink-muted">{{ $t('profile.usernameHint') }}</p>
-        </div>
-
-        <div class="flex items-start gap-3">
-          <input
-            id="profile-public"
-            v-model="isPublic"
-            type="checkbox"
-            aria-describedby="profile-public-hint"
-            class="mt-1 size-5 accent-accent"
-          >
-          <div class="flex flex-col">
-            <label for="profile-public" class="text-sm font-medium">{{ $t('profile.isPublic') }}</label>
-            <p id="profile-public-hint" class="text-sm text-ink-muted">{{ $t('profile.isPublicHint') }}</p>
-          </div>
-        </div>
-
-        <RouterLink
-          v-if="auth.user?.username && auth.user.is_public"
-          :to="{ name: 'public-profile', params: { username: auth.user.username } }"
-          class="text-sm font-medium text-accent underline-offset-2 hover:underline"
-        >
-          {{ $t('profile.publicLink') }}
-        </RouterLink>
-
-        <RouterLink
-          :to="{ name: 'blocks' }"
-          data-test="blocked-link"
-          class="inline-flex min-h-11 items-center self-start text-sm font-medium text-accent underline-offset-2 hover:underline"
-        >
-          {{ $t('profile.blocked') }}
-        </RouterLink>
-
-        <button
-          type="submit"
-          :disabled="saving"
-          class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
-        >
-          {{ $t('common.save') }}
-        </button>
-        <p v-if="saved" role="status" class="text-sm text-ink-muted">{{ $t('profile.saved') }}</p>
-      </section>
-    </form>
-
-    <section class="rounded-2xl border border-line bg-surface p-4" aria-labelledby="profile-security-title">
-      <h2 id="profile-security-title" class="mb-3 font-display text-lg font-semibold">{{ $t('profile.sections.security') }}</h2>
-      <button
-        type="button"
-        data-test="password-toggle"
-        :aria-expanded="passwordOpen"
-        aria-controls="profile-password-panel"
-        class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium"
-        @click="togglePassword"
+    <div class="flex flex-col gap-1.5">
+      <label for="profile-name" class="text-sm font-medium">{{ $t('auth.fields.name') }}</label>
+      <input
+        id="profile-name"
+        v-model="name"
+        type="text"
+        required
+        maxlength="100"
+        autocomplete="name"
+        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       >
-        {{ $t('profile.password.title') }}
-      </button>
-      <p v-if="passwordChanged && !passwordOpen" role="status" data-test="password-done" class="mt-3 text-sm text-ink-muted">
-        {{ $t('profile.password.done') }}
-      </p>
-      <div v-if="passwordOpen" id="profile-password-panel" class="mt-4">
-        <form class="flex flex-col gap-4" data-test="password-form" @submit.prevent="changePassword">
-          <ErrorNotice v-if="passwordError" :message="passwordError" />
-          <FormField
-            id="profile-current-password"
-            v-model="currentPassword"
-            type="password"
-            autocomplete="current-password"
-            :label="$t('profile.password.current')"
-            :error="currentPasswordError"
-          />
-          <FormField
-            id="profile-new-password"
-            v-model="newPassword"
-            type="password"
-            autocomplete="new-password"
-            :label="$t('profile.password.new')"
-            :hint="$t('auth.hints.password')"
-            :error="newPasswordError"
-          />
-          <FormField
-            id="profile-confirm-password"
-            v-model="newPasswordConfirmation"
-            type="password"
-            autocomplete="new-password"
-            :label="$t('profile.password.confirm')"
-          />
-          <button
-            type="submit"
-            :disabled="changingPassword"
-            class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
-          >
-            {{ $t('profile.password.submit') }}
-          </button>
-        </form>
-      </div>
-    </section>
-
-    <section class="rounded-2xl border border-line bg-surface p-4" aria-labelledby="profile-data-title">
-      <h2 id="profile-data-title" class="mb-1 font-display text-lg font-semibold">{{ $t('profile.data.title') }}</h2>
-      <p id="profile-data-hint" class="mb-3 text-sm text-ink-muted">{{ $t('profile.data.hint') }}</p>
-      <ErrorNotice v-if="exportError" :message="exportError" class="mb-3" />
-      <button
-        type="button"
-        data-test="export-data"
-        :disabled="exporting"
-        aria-describedby="profile-data-hint"
-        class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
-        @click="downloadData"
-      >
-        {{ exporting ? $t('profile.data.downloading') : $t('profile.data.download') }}
-      </button>
-    </section>
-
-    <div>
-      <ErrorNotice v-if="logoutError" :message="logoutError" class="mb-3" />
-      <button
-        type="button"
-        data-test="logout"
-        :disabled="loggingOut"
-        class="min-h-11 w-full rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
-        @click="logout"
-      >
-        {{ $t('profile.logout') }}
-      </button>
     </div>
 
-    <section class="rounded-2xl border border-line bg-surface p-4" aria-labelledby="profile-danger-title">
-      <h2 id="profile-danger-title" class="mb-1 font-display text-lg font-semibold text-danger">{{ $t('profile.danger.title') }}</h2>
-      <p class="mb-3 text-sm text-ink-muted">{{ $t('profile.danger.text') }}</p>
-      <button
-        type="button"
-        data-test="delete-account"
-        class="min-h-11 rounded-lg border border-danger bg-surface px-4 font-medium text-danger"
-        @click="openDelete"
+    <div class="flex flex-col gap-1.5">
+      <label for="profile-handle" class="text-sm font-medium">{{ $t('social.fields.handle') }}</label>
+      <div class="flex items-center gap-2">
+        <span class="text-ink-muted" aria-hidden="true">@</span>
+        <input
+          id="profile-handle"
+          v-model="handle"
+          type="text"
+          required
+          minlength="3"
+          maxlength="30"
+          autocapitalize="none"
+          autocomplete="off"
+          spellcheck="false"
+          :aria-invalid="handleError ? 'true' : undefined"
+          :aria-describedby="handleError ? 'profile-handle-error' : 'profile-handle-hint'"
+          class="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger"
+        >
+      </div>
+      <p v-if="handleError" id="profile-handle-error" class="text-sm text-danger">{{ handleError }}</p>
+      <p v-else id="profile-handle-hint" class="text-sm text-ink-muted">{{ $t('social.fields.handleHint') }}</p>
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <label for="profile-bio" class="text-sm font-medium">{{ $t('social.fields.bio') }}</label>
+      <textarea
+        id="profile-bio"
+        v-model="bio"
+        rows="3"
+        :maxlength="BIO_MAX"
+        :aria-invalid="bioError ? 'true' : undefined"
+        :aria-describedby="bioError ? 'profile-bio-error' : 'profile-bio-hint'"
+        class="rounded-lg border border-line bg-surface px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger"
+      />
+      <p v-if="bioError" id="profile-bio-error" class="text-sm text-danger">{{ bioError }}</p>
+      <p id="profile-bio-hint" class="flex justify-between gap-3 text-sm text-ink-muted">
+        <span>{{ $t('social.fields.bioHint') }}</span>
+        <span class="tabular-nums">{{ $t('social.fields.bioCounter', { count: bio.length, max: BIO_MAX }) }}</span>
+      </p>
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <p class="text-sm font-medium">{{ $t('auth.fields.email') }}</p>
+      <p class="min-h-11 content-center text-ink-muted">{{ auth.user?.email }}</p>
+      <p class="text-sm text-ink-muted">{{ $t('social.fields.publicNote') }}</p>
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <label for="profile-timezone" class="text-sm font-medium">{{ $t('profile.timezone') }}</label>
+      <select
+        id="profile-timezone"
+        v-model="timezone"
+        aria-describedby="profile-timezone-hint"
+        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       >
-        {{ $t('profile.danger.open') }}
-      </button>
-    </section>
+        <option v-for="zone in timezones" :key="zone" :value="zone">{{ zone }}</option>
+      </select>
+      <p id="profile-timezone-hint" class="text-sm text-ink-muted">{{ $t('profile.timezoneHint') }}</p>
+    </div>
+
+    <button
+      type="submit"
+      :disabled="saving"
+      class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+    >
+      {{ $t('common.save') }}
+    </button>
+    <p v-if="saved" role="status" class="text-sm text-ink-muted">{{ $t('profile.saved') }}</p>
+  </form>
+
+  <nav class="mt-6 flex flex-col gap-1" :aria-label="$t('social.tab')">
+    <RouterLink
+      v-if="auth.user?.handle"
+      :to="{ name: 'reader', params: { handle: auth.user.handle } }"
+      class="inline-flex min-h-11 items-center font-medium text-accent underline underline-offset-2"
+    >
+      {{ $t('social.fields.viewPublic') }}
+    </RouterLink>
+    <RouterLink
+      :to="{ name: 'community-blocked' }"
+      class="inline-flex min-h-11 items-center font-medium text-accent underline underline-offset-2"
+    >
+      {{ $t('social.blocked.link') }}
+    </RouterLink>
+  </nav>
+
+  <InstallCard class="mt-6" />
+
+  <div class="mt-8 border-t border-line pt-4">
+    <ErrorNotice v-if="logoutError" :message="logoutError" class="mb-3" />
+    <button
+      type="button"
+      :disabled="loggingOut"
+      class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
+      @click="logout"
+    >
+      {{ $t('profile.logout') }}
+    </button>
   </div>
+
+  <section class="mt-8 border-t border-line pt-4" aria-labelledby="profile-password-title">
+    <h2 id="profile-password-title" class="mb-3 text-lg font-semibold">{{ $t('account.password.title') }}</h2>
+    <form class="flex flex-col gap-4" data-test="password-form" @submit.prevent="changePassword" @input="passwordChanged = false">
+      <ErrorNotice v-if="passwordError" :message="passwordError" />
+      <FormField
+        id="profile-current-password"
+        v-model="currentPassword"
+        type="password"
+        autocomplete="current-password"
+        :label="$t('account.password.current')"
+        :error="currentPasswordError"
+      />
+      <FormField
+        id="profile-new-password"
+        v-model="newPassword"
+        type="password"
+        autocomplete="new-password"
+        :label="$t('account.password.new')"
+        :hint="$t('auth.hints.password')"
+        :error="newPasswordError"
+      />
+      <FormField
+        id="profile-confirm-password"
+        v-model="newPasswordConfirmation"
+        type="password"
+        autocomplete="new-password"
+        :label="$t('account.password.confirm')"
+      />
+      <button
+        type="submit"
+        :disabled="changingPassword"
+        class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+      >
+        {{ $t('account.password.submit') }}
+      </button>
+      <p v-if="passwordChanged" role="status" class="text-sm text-ink-muted">{{ $t('account.password.done') }}</p>
+    </form>
+  </section>
+
+  <section class="mt-8 border-t border-line pt-4" aria-labelledby="profile-data-title">
+    <h2 id="profile-data-title" class="mb-1 text-lg font-semibold">{{ $t('account.data.title') }}</h2>
+    <p id="profile-data-hint" class="mb-3 text-sm text-ink-muted">{{ $t('account.data.hint') }}</p>
+    <ErrorNotice v-if="exportError" :message="exportError" class="mb-3" />
+    <button
+      type="button"
+      data-test="export-data"
+      :disabled="exporting"
+      aria-describedby="profile-data-hint"
+      class="min-h-11 rounded-lg border border-line bg-surface px-4 font-medium disabled:opacity-60"
+      @click="downloadData"
+    >
+      {{ exporting ? $t('account.data.downloading') : $t('account.data.download') }}
+    </button>
+  </section>
+
+  <section class="mt-8 border-t border-line pt-4" aria-labelledby="profile-danger-title">
+    <h2 id="profile-danger-title" class="mb-1 text-lg font-semibold text-danger">{{ $t('account.danger.title') }}</h2>
+    <p class="mb-3 text-sm text-ink-muted">{{ $t('account.danger.text') }}</p>
+    <button
+      type="button"
+      data-test="delete-account"
+      class="min-h-11 rounded-lg border border-danger bg-surface px-4 font-medium text-danger"
+      @click="openDelete"
+    >
+      {{ $t('account.danger.open') }}
+    </button>
+  </section>
 
   <DeleteAccountDialog
     v-if="deleteOpen"
@@ -440,4 +409,6 @@ function closeDelete() {
     @cancel="closeDelete"
     @confirm="deleteAccount"
   />
+
+  <p class="mt-8 text-center text-sm text-ink-muted" data-test="app-version">{{ $t('profile.version', { version: appVersion }) }}</p>
 </template>

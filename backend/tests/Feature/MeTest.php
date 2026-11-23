@@ -22,10 +22,9 @@ it('returns the authenticated user', function () {
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'handle' => $user->handle,
+            'bio' => null,
             'timezone' => 'Europe/Kyiv',
-            'username' => null,
-            'is_public' => false,
-            'new_followers_count' => 0,
         ]]);
 });
 
@@ -40,6 +39,23 @@ it('updates the name and time zone', function () {
     expect($user->fresh())
         ->name->toBe('New Name')
         ->timezone->toBe('America/New_York');
+});
+
+it('stores a legacy time zone name under its canonical one', function () {
+    $user = User::factory()->create(['timezone' => 'America/New_York']);
+
+    $this->actingAs($user)->patchJson('/api/me', ['timezone' => 'Europe/Kiev'])
+        ->assertOk()->assertJsonPath('data.timezone', 'Europe/Kyiv');
+
+    expect($user->fresh()->timezone)->toBe('Europe/Kyiv');
+});
+
+it('limits the name to 100 characters', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->patchJson('/api/me', ['name' => str_repeat('я', 101)])
+        ->assertUnprocessable()->assertJsonValidationErrors('name');
+    $this->actingAs($user)->patchJson('/api/me', ['name' => str_repeat('я', 100)])->assertOk();
 });
 
 it('rejects an unknown time zone', function () {

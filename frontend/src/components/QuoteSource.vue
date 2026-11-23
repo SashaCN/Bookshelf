@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Quote } from '@/types/api'
 
-const props = defineProps<{ quote: Quote; plain?: boolean }>()
+const props = defineProps<{ quote: Quote }>()
 const { t } = useI18n()
 
 /** "James Clear · с. 42": whatever is known besides the title. */
@@ -16,9 +16,7 @@ const details = computed(() => {
 
 <template>
   <p class="text-sm text-ink-muted">
-    <span v-if="plain" class="font-medium text-ink">{{ quote.book.title }}</span>
     <RouterLink
-      v-else
       :to="{ name: 'book', params: { id: quote.user_book_id } }"
       class="font-medium text-ink underline-offset-2 hover:underline"
     >

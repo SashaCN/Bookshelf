@@ -27,24 +27,20 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
+            'handle' => 'reader_'.fake()->unique()->numberBetween(100000, 99999999),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'timezone' => User::DEFAULT_TIMEZONE,
-            'username' => null,
-            'is_public' => false,
             'remember_token' => Str::random(10),
         ];
     }
 
     /**
-     * A reader with a public profile.
+     * A moderator: a technical flag, the moderation commands themselves run in a console.
      */
-    public function public(): static
+    public function admin(): static
     {
-        return $this->state(fn () => [
-            'username' => 'reader_'.fake()->unique()->numerify('########'),
-            'is_public' => true,
-        ]);
+        return $this->state(fn (array $attributes) => ['is_admin' => true]);
     }
 
     /**

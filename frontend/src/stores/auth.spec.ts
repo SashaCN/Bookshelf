@@ -1,19 +1,17 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '@/api/auth'
-import { ApiError } from '@/api/http'
-import { clearApiCache } from '@/pwa/clearApiCache'
+import { ApiError, NetworkError } from '@/api/http'
 import { makeQuote } from '@/test/fixtures'
 import type { User } from '@/types/api'
 import { useAuthStore } from './auth'
 import { useQuotesStore } from './quotes'
 
-vi.mock('@/pwa/clearApiCache', () => ({ clearApiCache: vi.fn() }))
 vi.mock('@/api/auth', () => ({
-  authApi: { me: vi.fn(), followersSeen: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(), changePassword: vi.fn(), deleteMe: vi.fn() },
+  authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(), changePassword: vi.fn(), deleteMe: vi.fn() },
 }))
 
-const user: User = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
+const user: User = { id: 1, name: 'Olena', email: 'olena@example.com', handle: 'olena', bio: null, timezone: 'Europe/Kyiv' }
 
 describe('auth store', () => {
   beforeEach(() => {
@@ -31,21 +29,6 @@ describe('auth store', () => {
     expect(auth.initialized).toBe(true)
   })
 
-  it('forgets cached API answers when init finds the session gone, and on every sign-in', async () => {
-    vi.mocked(authApi.me).mockRejectedValueOnce(new ApiError(401, null))
-    const auth = useAuthStore()
-    await auth.init()
-    expect(clearApiCache).toHaveBeenCalledTimes(1)
-
-    vi.mocked(authApi.login).mockResolvedValue({})
-    vi.mocked(authApi.register).mockResolvedValue({})
-    vi.mocked(authApi.me).mockResolvedValue(user)
-    await auth.login({ email: user.email, password: 'secret-password' })
-    expect(clearApiCache).toHaveBeenCalledTimes(2)
-    await auth.register({ name: user.name, email: user.email, password: 'secret-password', timezone: user.timezone })
-    expect(clearApiCache).toHaveBeenCalledTimes(3)
-  })
-
   it('restores the session on init', async () => {
     vi.mocked(authApi.me).mockResolvedValue(user)
     const auth = useAuthStore()
@@ -56,11 +39,51 @@ describe('auth store', () => {
   })
 
   it('does not swallow unexpected errors on init', async () => {
-    vi.mocked(authApi.me).mockRejectedValue(new ApiError(500, null))
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(403, null))
     const auth = useAuthStore()
 
     await expect(auth.init()).rejects.toBeInstanceOf(ApiError)
     expect(auth.initialized).toBe(false)
+  })
+
+  it.each([500, 502, 503, 504])('does not take a server that answers %i for a guest either', async (status) => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(status, null))
+    const auth = useAuthStore()
+
+    await auth.init()
+
+    expect(auth.unreachable).toBe(true)
+    expect(auth.isAuthenticated).toBe(false)
+    expect(auth.initialized).toBe(false)
+  })
+
+  it('does not take a missing network for a guest, and can try again', async () => {
+    vi.mocked(authApi.me).mockRejectedValueOnce(new NetworkError()).mockResolvedValueOnce(user)
+    const auth = useAuthStore()
+
+    await auth.init()
+
+    expect(auth.unreachable).toBe(true)
+    expect(auth.initialized).toBe(false)
+    expect(auth.isAuthenticated).toBe(false)
+
+    await auth.init()
+
+    expect(auth.unreachable).toBe(false)
+    expect(auth.initialized).toBe(true)
+    expect(auth.user).toEqual(user)
+  })
+
+  it('forgets the reader and their data when the session expires', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+    const auth = useAuthStore()
+    await auth.init()
+    useQuotesStore().items.push(makeQuote())
+
+    auth.expireSession()
+
+    expect(auth.isAuthenticated).toBe(false)
+    expect(useQuotesStore().items).toEqual([])
   })
 
   it('loads the user after logging in and clears it on logout', async () => {
@@ -95,35 +118,6 @@ describe('auth store', () => {
     quotes.daily = makeQuote()
     await auth.logout()
     expect(quotes.daily).toBeNull()
-  })
-
-  it('drops the new-follower count once the list is marked as seen', async () => {
-    vi.mocked(authApi.followersSeen).mockResolvedValue(null)
-    const auth = useAuthStore()
-    auth.user = { ...user, new_followers_count: 3 }
-
-    await auth.markFollowersSeen()
-
-    expect(authApi.followersSeen).toHaveBeenCalledOnce()
-    expect(auth.user?.new_followers_count).toBe(0)
-  })
-
-  it('does not call the server when there is nothing new', async () => {
-    const auth = useAuthStore()
-    auth.user = { ...user }
-
-    await auth.markFollowersSeen()
-
-    expect(authApi.followersSeen).not.toHaveBeenCalled()
-  })
-
-  it('keeps the count when the server refuses', async () => {
-    vi.mocked(authApi.followersSeen).mockRejectedValue(new ApiError(500, null))
-    const auth = useAuthStore()
-    auth.user = { ...user, new_followers_count: 3 }
-
-    await expect(auth.markFollowersSeen()).rejects.toBeInstanceOf(ApiError)
-    expect(auth.user?.new_followers_count).toBe(3)
   })
 
   it('passes a password change to the API and keeps the session', async () => {

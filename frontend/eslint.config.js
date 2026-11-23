@@ -14,7 +14,12 @@ export default defineConfig([
     languageOptions: { parserOptions: { parser: tseslint.parser } },
   },
   {
-    languageOptions: { globals: globals.browser },
+    languageOptions: { globals: { ...globals.browser, __APP_VERSION__: 'readonly' } },
+  },
+  {
+    // Filled in at build time by vite.sw.config.ts.
+    files: ['src/sw/sw.ts'],
+    languageOptions: { globals: { __PRECACHE__: 'readonly', __VERSION__: 'readonly' } },
   },
   {
     // Layout of templates is a formatting concern; long Tailwind class lists make these rules noisy.

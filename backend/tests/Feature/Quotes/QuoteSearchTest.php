@@ -74,7 +74,7 @@ function searchFixtures(): array
     $stranger = User::factory()->create(['email' => 'stranger'.SEARCH_EMAIL_DOMAIN]);
     $f['own']['quotes'] = [
         'mine' => $quote($f['own']['book'], 'Моя таємна цитата.'),
-        'foreign' => $quote(UserBook::factory()->for($stranger)->create(), 'Чужа таємна цитата.', null, ['visibility' => 'public']),
+        'foreign' => $quote(UserBook::factory()->for($stranger)->create(), 'Чужа таємна цитата.', null),
     ];
     $f['export']['quotes'] = [
         $quote($f['export']['book'], 'Зірки далеко.'),
@@ -126,8 +126,8 @@ afterAll(function () {
     }
 
     expect($column('SELECT id FROM users WHERE email LIKE ?'))->toBe([])
-        ->and($pdo->query('SELECT COUNT(*) FROM quotes q LEFT JOIN user_books ub ON ub.id = q.user_book_id WHERE ub.id IS NULL')->fetchColumn())->toBe('0')
-        ->and($pdo->query('SELECT COUNT(*) FROM quotes')->fetchColumn())->toBe('0');
+        ->and($pdo->query('SELECT COUNT(*) FROM quotes q LEFT JOIN user_books ub ON ub.id = q.user_book_id WHERE ub.id IS NULL')->fetchColumn())->toEqual(0)
+        ->and($pdo->query('SELECT COUNT(*) FROM quotes')->fetchColumn())->toEqual(0);
 });
 
 /** @return array{user: User, book: UserBook, other: UserBook, quotes: array<string, Quote>} */

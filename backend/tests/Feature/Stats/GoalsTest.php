@@ -67,7 +67,7 @@ describe('being on track this year', function () {
         $this->actingAs($this->user)->getJson('/api/goals/2026')
             ->assertJsonPath('data.target_books', 12)
             ->assertJsonPath('data.expected_books', 6)
-            ->assertJsonPath('data.due_books', 6)
+            ->assertJsonPath('data.due_books', 7)
             ->assertJsonPath('data.remaining_books', 12);
     });
 
@@ -79,42 +79,67 @@ describe('being on track this year', function () {
 
         $this->actingAs($this->user)->getJson('/api/goals/2026')
             ->assertJsonPath('data.finished_books', 5)
-            ->assertJsonPath('data.due_books', 6)
+            ->assertJsonPath('data.due_books', 7)
             ->assertJsonPath('data.on_track', false);
     });
 
-    it('is on track once the books that are due are done, even if a fraction is still due', function () {
+    it('is behind while any part of a book is still due: the expectation is a real number', function () {
         ReadingGoal::factory()->for($this->user)->create(['year' => 2026, 'target_books' => 12]);
         foreach (range(1, 6) as $month) {
             finishedBook($this->user, "2026-0{$month}-15 10:00:00");
         }
 
-        // 6.016 books are due by now; the 6 whole ones are finished.
+        // 12 * 183 / 365 = 6.016 books are due by now; 6 finished is not enough.
         $this->actingAs($this->user)->getJson('/api/goals/2026')
             ->assertJsonPath('data.finished_books', 6)
-            ->assertJsonPath('data.remaining_books', 6)
-            ->assertJsonPath('data.on_track', true);
+            ->assertJsonPath('data.due_books', 7)
+            ->assertJsonPath('data.on_track', false);
+
+        finishedBook($this->user, '2026-06-20 10:00:00');
+
+        $this->actingAs($this->user)->getJson('/api/goals/2026')->assertJsonPath('data.on_track', true);
     });
 
-    it('is on track at the very start of the year with nothing read', function () {
+    it('needs 4 books for a goal of 12 on day 100', function () {
+        // 12 * 100 / 365 = 3.29 books.
+        $this->travelTo(Carbon::parse('2026-04-10 12:00:00', 'UTC'));
+        ReadingGoal::factory()->for($this->user)->create(['year' => 2026, 'target_books' => 12]);
+        foreach (range(1, 3) as $month) {
+            finishedBook($this->user, "2026-0{$month}-15 10:00:00");
+        }
+
+        $this->actingAs($this->user)->getJson('/api/goals/2026')
+            ->assertJsonPath('data.due_books', 4)
+            ->assertJsonPath('data.on_track', false);
+
+        finishedBook($this->user, '2026-04-01 10:00:00');
+
+        $this->actingAs($this->user)->getJson('/api/goals/2026')->assertJsonPath('data.on_track', true);
+    });
+
+    it('is on track exactly when the expectation is met', function () {
+        // 365 books a year is one a day: on day 2 two books are exactly enough.
+        $this->travelTo(Carbon::parse('2026-01-02 12:00:00', 'UTC'));
+        ReadingGoal::factory()->for($this->user)->create(['year' => 2026, 'target_books' => 365]);
+        finishedBook($this->user, '2026-01-01 08:00:00');
+
+        $this->actingAs($this->user)->getJson('/api/goals/2026')
+            ->assertJsonPath('data.due_books', 2)
+            ->assertJsonPath('data.on_track', false);
+
+        finishedBook($this->user, '2026-01-02 08:00:00');
+
+        $this->actingAs($this->user)->getJson('/api/goals/2026')->assertJsonPath('data.on_track', true);
+    });
+
+    it('is on track on the first day only once a book is finished', function () {
         $this->travelTo(Carbon::parse('2026-01-01 12:00:00', 'UTC'));
         ReadingGoal::factory()->for($this->user)->create(['year' => 2026, 'target_books' => 12]);
 
         $this->actingAs($this->user)->getJson('/api/goals/2026')
             ->assertJsonPath('data.expected_books', 0)
-            ->assertJsonPath('data.on_track', true);
-    });
-
-    it('is behind as soon as the first whole book is due', function () {
-        // 12 books over 365 days: the first is due on day 31.
-        $this->travelTo(Carbon::parse('2026-01-31 12:00:00', 'UTC'));
-        ReadingGoal::factory()->for($this->user)->create(['year' => 2026, 'target_books' => 12]);
-
-        $this->actingAs($this->user)->getJson('/api/goals/2026')->assertJsonPath('data.on_track', false);
-
-        finishedBook($this->user, '2026-01-20 10:00:00');
-
-        $this->actingAs($this->user)->getJson('/api/goals/2026')->assertJsonPath('data.on_track', true);
+            ->assertJsonPath('data.due_books', 1)
+            ->assertJsonPath('data.on_track', false);
     });
 
     it('never has remaining books below zero', function () {

@@ -1,0 +1,230 @@
+/*
+ * The look of the reader. Every color comes from the --reader-* variables that the reader sets on its root
+ * (see useReaderSettings), so the theme of the reader does not depend on the one of the app.
+ */
+
+.reader {
+  background: var(--reader-bg);
+  color: var(--reader-ink);
+}
+
+.reader-muted {
+  color: var(--reader-muted);
+}
+
+.reader-bar {
+  background: var(--reader-surface);
+  border-color: var(--reader-line);
+}
+
+.reader-sheet {
+  background: var(--reader-surface);
+  color: var(--reader-ink);
+  border-top: 1px solid var(--reader-line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.reader-line {
+  border-color: var(--reader-line);
+}
+
+.reader-track {
+  background: var(--reader-line);
+}
+
+.reader-fill {
+  background: var(--reader-accent);
+}
+
+.reader-link {
+  color: var(--reader-accent);
+}
+
+.reader-danger {
+  color: var(--reader-danger);
+}
+
+.reader-icon {
+  color: var(--reader-muted);
+}
+
+.reader-icon:hover,
+.reader-icon:focus-visible {
+  background: var(--reader-line);
+  color: var(--reader-ink);
+}
+
+.reader-btn {
+  background: var(--reader-surface);
+  border: 1px solid var(--reader-line);
+  color: var(--reader-ink);
+}
+
+.reader-btn:disabled {
+  opacity: 0.5;
+}
+
+.reader-btn[aria-pressed='true'],
+.reader-btn[aria-current='true'] {
+  border-color: var(--reader-accent);
+  box-shadow: inset 0 0 0 1px var(--reader-accent);
+}
+
+.reader-btn-primary {
+  background: var(--reader-accent);
+  color: var(--reader-on-accent);
+  border: 1px solid transparent;
+}
+
+.reader-btn-primary:disabled {
+  opacity: 0.5;
+}
+
+.reader-field {
+  background: var(--reader-bg);
+  border: 1px solid var(--reader-line);
+  color: var(--reader-ink);
+}
+
+.reader-field:focus {
+  border-color: var(--reader-accent);
+  outline: 2px solid color-mix(in srgb, var(--reader-accent) 35%, transparent);
+}
+
+.reader :focus-visible {
+  outline: 2px solid var(--reader-accent);
+  outline-offset: 2px;
+}
+
+.reader-toast {
+  background: var(--reader-ink);
+  color: var(--reader-bg);
+}
+
+/* The text of the chapter. It is HTML the server has rebuilt: only the elements below, and none has an attribute. */
+.reader-content {
+  font-family: var(--reader-font);
+  font-size: var(--reader-size);
+  line-height: var(--reader-leading);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  -webkit-touch-callout: default;
+  user-select: text;
+}
+
+.reader-content p,
+.reader-content ul,
+.reader-content ol,
+.reader-content blockquote,
+.reader-content pre,
+.reader-content table {
+  margin: 0 0 0.9em;
+}
+
+.reader-content h1,
+.reader-content h2,
+.reader-content h3,
+.reader-content h4,
+.reader-content h5,
+.reader-content h6 {
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 1.4em 0 0.6em;
+  text-wrap: balance;
+}
+
+.reader-content h1 {
+  font-size: 1.6em;
+}
+
+.reader-content h2 {
+  font-size: 1.35em;
+}
+
+.reader-content h3 {
+  font-size: 1.15em;
+}
+
+.reader-content ul,
+.reader-content ol {
+  padding-left: 1.4em;
+}
+
+.reader-content ul {
+  list-style: disc;
+}
+
+.reader-content ol {
+  list-style: decimal;
+}
+
+.reader-content blockquote {
+  border-left: 3px solid var(--reader-line);
+  padding-left: 1em;
+  color: var(--reader-muted);
+}
+
+.reader-content pre,
+.reader-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+.reader-content pre {
+  white-space: pre-wrap;
+  background: var(--reader-surface);
+  padding: 0.75em 1em;
+  border-radius: 0.5rem;
+}
+
+.reader-content hr {
+  border: 0;
+  border-top: 1px solid var(--reader-line);
+  margin: 1.6em 0;
+}
+
+.reader-content table {
+  border-collapse: collapse;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.reader-content td,
+.reader-content th {
+  border: 1px solid var(--reader-line);
+  padding: 0.3em 0.6em;
+  vertical-align: top;
+}
+
+.reader-content mark {
+  background: var(--reader-mark);
+  color: inherit;
+  border-radius: 0.2em;
+  cursor: pointer;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.reader-content mark.reader-flash {
+  animation: reader-flash 2.4s ease-out;
+}
+
+@keyframes reader-flash {
+  0%,
+  35% {
+    outline: 3px solid var(--reader-accent);
+    outline-offset: 2px;
+  }
+  100% {
+    outline: 3px solid transparent;
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-content mark.reader-flash {
+    animation: none;
+    outline: 3px solid var(--reader-accent);
+  }
+}

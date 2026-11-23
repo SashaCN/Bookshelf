@@ -8,6 +8,7 @@ import GoalCard from '@/components/GoalCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PagesChart from '@/components/PagesChart.vue'
 import StatTile from '@/components/StatTile.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import type { DailyPages, GoalProgress, StatsSummary } from '@/types/api'
 import { formatDay, formatNumber } from '@/utils/format'
@@ -21,11 +22,6 @@ const summary = ref<StatsSummary | null>(null)
 const goal = ref<GoalProgress | null>(null)
 const days = ref<DailyPages[]>([])
 const range = ref<(typeof RANGES)[number]>(30)
-
-// The tile group is for readers who use the built-in reader; it stays out of the way of everybody else.
-const hasReaderActivity = computed(
-  () => !!summary.value && (summary.value.reader.documents_in_progress > 0 || summary.value.reader.chapters_this_year > 0),
-)
 
 /** The year of the recap link: the reader's own current year. */
 const recapYear = computed(() => Number(summary.value?.today.date.slice(0, 4)))
@@ -108,7 +104,7 @@ onMounted(load)
 
   <ErrorNotice v-if="failed" :message="$t('apiErrors.generic')" retryable @retry="load" />
 
-  <p v-else-if="!summary || !goal" class="py-10 text-center text-ink-muted">{{ $t('common.loading') }}</p>
+  <SkeletonList v-else-if="!summary || !goal" tall />
 
   <div v-else class="flex flex-col gap-4">
     <GoalCard :goal="goal" :busy="goalBusy" :error="goalError" @save="saveGoal" @remove="removeGoal" />
@@ -141,31 +137,14 @@ onMounted(load)
       />
     </div>
 
-    <nav class="flex flex-wrap gap-x-4 gap-y-1" :aria-label="$t('stats.recap.title', { year: recapYear })">
+    <nav class="flex flex-wrap gap-x-4 gap-y-1" :aria-label="$t('recap.pageTitle')">
       <RouterLink :to="{ name: 'year-recap', params: { year: recapYear } }" class="inline-flex min-h-11 items-center font-semibold text-accent">
-        {{ $t('stats.recap.link') }}
+        {{ $t('recap.link') }}
       </RouterLink>
       <RouterLink :to="{ name: 'year-recap', params: { year: recapYear - 1 } }" class="inline-flex min-h-11 items-center text-ink-muted underline">
-        {{ $t('stats.recap.linkYear', { year: recapYear - 1 }) }}
+        {{ $t('recap.linkYear', { year: recapYear - 1 }) }}
       </RouterLink>
     </nav>
-
-    <section v-if="hasReaderActivity" class="flex flex-col gap-2" :aria-label="$t('stats.reader.title')">
-      <h2 class="font-display text-xl font-semibold">{{ $t('stats.reader.title') }}</h2>
-      <div class="grid grid-cols-3 gap-3">
-        <StatTile
-          :label="t('stats.reader.month')"
-          :value="formatNumber(summary.reader.chapters_this_month)"
-          :hint="t('stats.chapters', { n: summary.reader.chapters_this_month }, summary.reader.chapters_this_month)"
-        />
-        <StatTile
-          :label="t('stats.reader.year')"
-          :value="formatNumber(summary.reader.chapters_this_year)"
-          :hint="t('stats.chapters', { n: summary.reader.chapters_this_year }, summary.reader.chapters_this_year)"
-        />
-        <StatTile :label="t('stats.reader.inProgress')" :value="formatNumber(summary.reader.documents_in_progress)" />
-      </div>
-    </section>
 
     <section class="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
       <div class="flex items-center justify-between gap-3">

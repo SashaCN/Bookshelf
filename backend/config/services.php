@@ -41,7 +41,9 @@ return [
         'base_url' => env('OPENLIBRARY_BASE_URL', 'https://openlibrary.org'),
         'covers_url' => env('OPENLIBRARY_COVERS_URL', 'https://covers.openlibrary.org'),
         'user_agent' => env('OPENLIBRARY_USER_AGENT', 'Bookshelf/1.0 (+https://github.com/SashaCN/Bookshelf)'),
-        'timeout' => (int) env('OPENLIBRARY_TIMEOUT', 8),
+        // Spec 5.1.3: a search that takes longer than 3 s gives up and the reader is offered manual entry. Every
+        // call is interactive (search, add from the catalog), so there is no retry: the worst case stays ~3 s.
+        'timeout' => (int) env('OPENLIBRARY_TIMEOUT', 3),
         'cache_ttl' => (int) env('OPENLIBRARY_CACHE_TTL', 86400),
     ],
 

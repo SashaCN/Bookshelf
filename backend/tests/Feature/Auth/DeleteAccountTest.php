@@ -1,56 +1,55 @@
 <?php
 
+use App\Models\BookChapter;
+use App\Models\BookText;
+use App\Models\Comment;
+use App\Models\Post;
 use App\Models\Quote;
-use App\Models\ReaderBookmark;
-use App\Models\ReaderDocument;
 use App\Models\ReadingGoal;
 use App\Models\ReadingLog;
+use App\Models\Report;
 use App\Models\User;
 use App\Models\UserBook;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
-    Storage::fake('local');
-    $this->user = User::factory()->create(['is_public' => true, 'username' => 'olena']);
-    $this->other = User::factory()->create(['is_public' => true, 'username' => 'taras']);
+    $this->user = User::factory()->create();
+    $this->other = User::factory()->create();
 });
 
-function populate(User $user): array
+/**
+ * Something of every kind that belongs to the reader.
+ */
+function populate(User $user): UserBook
 {
     $userBook = UserBook::factory()->reading()->for($user)->create();
-    $quote = Quote::factory()->public()->create(['user_book_id' => $userBook->id]);
+    Quote::factory()->create(['user_book_id' => $userBook->id]);
     ReadingLog::factory()->create(['user_book_id' => $userBook->id]);
     ReadingGoal::factory()->for($user)->create(['year' => 2026]);
-    $document = ReaderDocument::factory()->for($user)->create();
-    ReaderBookmark::factory()->create(['reader_document_id' => $document->id]);
-    DB::table('user_book_reads')->insert(['user_book_id' => $userBook->id, 'started_at' => now()->subDays(9), 'finished_at' => now()->subDays(2)]);
-    Storage::disk('local')->put($document->path, 'epub');
+    $text = BookText::factory()->create(['user_book_id' => $userBook->id]);
+    BookChapter::factory()->create(['book_text_id' => $text->id]);
 
-    return [$quote, $document];
+    return $userBook;
 }
 
-it('removes the account with all its data and files', function () {
-    [$quote, $document] = populate($this->user);
+it('removes the account with all its data', function () {
+    populate($this->user);
     $this->other->following()->attach($this->user->id);
     $this->user->following()->attach($this->other->id);
-    DB::table('quote_likes')->insert(['user_id' => $this->other->id, 'quote_id' => $quote->id, 'created_at' => now()]);
-    DB::table('quote_likes')->insert(['user_id' => $this->user->id, 'quote_id' => Quote::factory()->public()->create()->id, 'created_at' => now()]);
+    $this->user->blockedReaders()->attach($this->other->id);
+    $this->other->blockedReaders()->attach($this->user->id);
 
     $this->actingAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertNoContent();
 
     expect(User::find($this->user->id))->toBeNull();
-    // The one book and quote left belong to the stranger whose quote the user liked.
-    foreach (['user_books' => 1, 'quotes' => 1, 'reading_logs' => 0, 'reading_goals' => 0, 'reader_documents' => 0, 'reader_bookmarks' => 0, 'user_book_reads' => 0, 'follows' => 0] as $table => $left) {
-        expect(DB::table($table)->count())->toBe($left, $table);
+    foreach (['user_books', 'quotes', 'reading_logs', 'reading_goals', 'book_texts', 'book_chapters', 'follows', 'blocks'] as $table) {
+        expect(DB::table($table)->count())->toBe(0, $table);
     }
-    expect(DB::table('quote_likes')->count())->toBe(0);
-    Storage::disk('local')->assertMissing($document->path);
 });
 
-it('leaves other readers data untouched and updates their counts', function () {
+it('leaves other readers data untouched', function () {
     populate($this->user);
-    [$theirQuote, $theirDocument] = populate($this->other);
+    populate($this->other);
     $this->other->following()->attach($this->user->id);
     $this->user->following()->attach($this->other->id);
 
@@ -58,30 +57,76 @@ it('leaves other readers data untouched and updates their counts', function () {
 
     expect($this->other->userBooks()->count())->toBe(1)
         ->and($this->other->quotes()->count())->toBe(1)
-        ->and($this->other->readerDocuments()->count())->toBe(1)
         ->and($this->other->readingGoals()->count())->toBe(1)
+        ->and(BookText::query()->where('user_id', $this->other->id)->count())->toBe(1)
+        ->and(BookChapter::query()->count())->toBe(1)
         ->and($this->other->following()->count())->toBe(0)
         ->and($this->other->followers()->count())->toBe(0);
-    Storage::disk('local')->assertExists($theirDocument->path);
 });
 
-it('does not mind files that are already missing', function () {
-    ReaderDocument::factory()->for($this->user)->create();
+it('removes the posts, with the comments, likes and reports under them', function () {
+    $mine = Post::factory()->create(['user_id' => $this->user->id, 'likes_count' => 1, 'comments_count' => 1]);
+    DB::table('likes')->insert(['user_id' => $this->other->id, 'post_id' => $mine->id, 'created_at' => now()]);
+    $underMine = Comment::factory()->create(['post_id' => $mine->id, 'user_id' => $this->other->id]);
+    Report::factory()->about($mine)->create(['reporter_id' => $this->other->id]);
+    Report::factory()->about($underMine)->create(['reporter_id' => $this->other->id]);
 
     $this->actingAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertNoContent();
 
-    expect(User::find($this->user->id))->toBeNull();
+    foreach (['posts', 'comments', 'likes', 'reports'] as $table) {
+        expect(DB::table($table)->count())->toBe(0, $table);
+    }
+    expect(User::find($this->other->id))->not->toBeNull();
+});
+
+it('keeps the counters of other readers posts right', function () {
+    $theirs = Post::factory()->create(['user_id' => $this->other->id]);
+    $stranger = User::factory()->create();
+    // The counters are kept by the application: two likes (mine and a stranger's), three visible comments (two mine), one hidden.
+    DB::table('likes')->insert([
+        ['user_id' => $this->user->id, 'post_id' => $theirs->id, 'created_at' => now()],
+        ['user_id' => $stranger->id, 'post_id' => $theirs->id, 'created_at' => now()],
+    ]);
+    Comment::factory()->count(2)->create(['post_id' => $theirs->id, 'user_id' => $this->user->id]);
+    Comment::factory()->create(['post_id' => $theirs->id, 'user_id' => $stranger->id]);
+    Comment::factory()->hidden()->create(['post_id' => $theirs->id, 'user_id' => $this->user->id]);
+    Comment::factory()->hidden()->create(['post_id' => $theirs->id, 'user_id' => $stranger->id]);
+    $theirs->forceFill(['likes_count' => 2, 'comments_count' => 3])->save();
+    $untouched = Post::factory()->create(['user_id' => $stranger->id, 'likes_count' => 5, 'comments_count' => 4]);
+
+    $this->actingAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertNoContent();
+
+    expect($theirs->fresh()->likes_count)->toBe(1)
+        ->and($theirs->fresh()->comments_count)->toBe(1)
+        ->and(Comment::query()->where('post_id', $theirs->id)->count())->toBe(2)
+        ->and($untouched->fresh()->likes_count)->toBe(5)
+        ->and($untouched->fresh()->comments_count)->toBe(4);
+});
+
+it('removes the reports about the comments of the account', function () {
+    $theirs = Post::factory()->create(['user_id' => $this->other->id]);
+    $mine = Comment::factory()->create(['post_id' => $theirs->id, 'user_id' => $this->user->id]);
+    $kept = Comment::factory()->create(['post_id' => $theirs->id, 'user_id' => $this->other->id]);
+    Report::factory()->about($mine)->create(['reporter_id' => $this->other->id]);
+    Report::factory()->about($kept)->create(['reporter_id' => $this->user->id]);
+    Report::factory()->about($theirs)->create(['reporter_id' => $this->user->id]);
+    $stays = Report::factory()->about($theirs)->create(['reporter_id' => $this->other->id]);
+
+    $this->actingAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertNoContent();
+
+    // Neither the report about the removed comment nor the reports the reader filed are left.
+    expect(Report::query()->pluck('id')->all())->toBe([$stays->id]);
 });
 
 it('rejects a wrong password and deletes nothing', function () {
-    [, $document] = populate($this->user);
+    populate($this->user);
 
     $this->actingAs($this->user)->deleteJson('/api/me', ['password' => 'wrong'])
         ->assertUnprocessable()->assertJsonValidationErrors('password');
     $this->actingAs($this->user)->deleteJson('/api/me')->assertUnprocessable()->assertJsonValidationErrors('password');
 
-    expect(User::find($this->user->id))->not->toBeNull();
-    Storage::disk('local')->assertExists($document->path);
+    expect(User::find($this->user->id))->not->toBeNull()
+        ->and(UserBook::query()->count())->toBe(1);
 });
 
 it('answers 401 to a guest', function () {
@@ -98,6 +143,18 @@ it('cannot log in after deletion', function () {
     $this->assertGuest();
 });
 
+it('deletes the account of a session signed in with a password', function () {
+    // A real session login, unlike actingAs().
+    $this->withHeader('Referer', config('app.url'));
+    $this->postJson('/api/auth/login', ['email' => $this->user->email, 'password' => 'password'])->assertSuccessful();
+
+    $this->deleteJson('/api/me', ['password' => 'password'])->assertNoContent();
+
+    expect(User::find($this->user->id))->toBeNull();
+    $this->actAsGuest();
+    $this->getJson('/api/me')->assertUnauthorized();
+});
+
 it('throttles wrong passwords and keeps the account', function () {
     foreach (range(1, 5) as $attempt) {
         $this->actAs($this->user)->deleteJson('/api/me', ['password' => 'wrong'])->assertUnprocessable();
@@ -108,18 +165,7 @@ it('throttles wrong passwords and keeps the account', function () {
     expect(User::find($this->user->id))->not->toBeNull();
 });
 
-it('also removes comments, blocks, chapter reads, other sessions and reset tokens', function () {
-    [$quote, $document] = populate($this->user);
-    $theirs = Quote::factory()->public()->create();
-    DB::table('quote_comments')->insert([
-        ['quote_id' => $quote->id, 'user_id' => $this->other->id, 'body' => 'on mine', 'created_at' => now(), 'updated_at' => now()],
-        ['quote_id' => $theirs->id, 'user_id' => $this->user->id, 'body' => 'by me', 'created_at' => now(), 'updated_at' => now()],
-    ]);
-    DB::table('user_blocks')->insert([
-        ['blocker_id' => $this->user->id, 'blocked_id' => $this->other->id, 'created_at' => now()],
-        ['blocker_id' => $this->other->id, 'blocked_id' => $this->user->id, 'created_at' => now()],
-    ]);
-    DB::table('reader_chapter_reads')->insert(['reader_document_id' => $document->id, 'chapter' => 0, 'read_on' => '2026-11-01', 'created_at' => now()]);
+it('also removes other sessions and reset tokens', function () {
     DB::table('sessions')->insert(['id' => 'other-device', 'user_id' => $this->user->id, 'payload' => '', 'last_activity' => time()]);
     DB::table('sessions')->insert(['id' => 'stranger', 'user_id' => $this->other->id, 'payload' => '', 'last_activity' => time()]);
     DB::table('password_reset_tokens')->insert([
@@ -129,9 +175,6 @@ it('also removes comments, blocks, chapter reads, other sessions and reset token
 
     $this->actingAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertNoContent();
 
-    foreach (['quote_comments', 'user_blocks', 'reader_chapter_reads'] as $table) {
-        expect(DB::table($table)->count())->toBe(0, $table);
-    }
-    expect(DB::table('sessions')->pluck('id')->all())->toBe(['stranger']);
-    expect(DB::table('password_reset_tokens')->pluck('email')->all())->toBe([$this->other->email]);
+    expect(DB::table('sessions')->pluck('id')->all())->toBe(['stranger'])
+        ->and(DB::table('password_reset_tokens')->pluck('email')->all())->toBe([$this->other->email]);
 });

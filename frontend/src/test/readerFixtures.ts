@@ -1,25 +1,38 @@
-import type { ReaderBookmark, ReaderChapter, ReaderDocument } from '@/types/api'
+import type { BookText, Chapter, ChapterSummary, Highlight } from '@/types/reader'
 
-export function makeReaderDoc(overrides: Partial<ReaderDocument> = {}): ReaderDocument {
+export function makeChapterSummary(overrides: Partial<ChapterSummary> = {}): ChapterSummary {
+  return { position: 0, title: 'Перший розділ', characters: 100, ...overrides }
+}
+
+export function makeBookText(overrides: Partial<BookText> = {}): BookText {
   return {
-    id: 1,
-    title: 'Кобзар',
-    author: 'Тарас Шевченко',
-    user_book_id: null,
-    user_book: null,
-    chapters_count: 12,
-    position: { chapter: 0, fraction: 0 },
+    id: 10,
+    user_book_id: 1,
+    source_name: 'book.epub',
+    chapters_count: 3,
+    characters_count: 300,
+    position: { chapter: 0, chapter_progress: 0, updated_at: null },
     progress: 0,
-    last_read_at: null,
-    created_at: '2026-01-01T00:00:00Z',
+    chapters: [
+      makeChapterSummary({ position: 0, title: 'Перший розділ' }),
+      makeChapterSummary({ position: 1, title: 'Second chapter' }),
+      makeChapterSummary({ position: 2, title: null }),
+    ],
     ...overrides,
   }
 }
 
-export function makeReaderChapter(overrides: Partial<ReaderChapter> = {}): ReaderChapter {
-  return { index: 0, count: 12, title: null, html: '<p>Текст розділу</p>', ...overrides }
+export function makeChapter(overrides: Partial<Chapter> = {}): Chapter {
+  return {
+    position: 0,
+    title: 'Перший розділ',
+    html: '<p>Hello brave new world.</p><p>Second paragraph 😀 here.</p>',
+    characters: 47,
+    highlights: [],
+    ...overrides,
+  }
 }
 
-export function makeReaderBookmark(overrides: Partial<ReaderBookmark> = {}): ReaderBookmark {
-  return { id: 1, chapter: 0, chapter_title: null, note: null, created_at: '2026-01-01T00:00:00Z', ...overrides }
+export function makeHighlight(overrides: Partial<Highlight> = {}): Highlight {
+  return { id: 5, start: 6, end: 11, content: 'brave', note: null, ...overrides }
 }

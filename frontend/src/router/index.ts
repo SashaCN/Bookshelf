@@ -1,103 +1,69 @@
-import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/components/AppLayout.vue'
+import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
-import { safeRedirect } from './redirect'
 import HomeView from '@/views/HomeView.vue'
 import LoginView from '@/views/LoginView.vue'
+import { redirectFor } from './access'
+import { accountRoutes } from './account'
+import { libraryImportRoutes } from './libraryImport'
+import { readerRoutes } from './reader'
+import { socialRoutes } from './social'
+import { statsRoutes } from './stats'
 
 export const router = createRouter({
-  // The standalone demo is opened from a file, where there is no server to answer deep links.
-  history: import.meta.env.VITE_DEMO ? createWebHashHistory() : createWebHistory(),
+  history: createWebHistory(),
   routes: [
     {
       path: '/',
       component: AppLayout,
       meta: { requiresAuth: true },
       children: [
-        { path: '', name: 'home', component: HomeView, meta: { tab: 'home' } },
-        { path: 'library', name: 'library', component: () => import('@/views/LibraryView.vue'), meta: { tab: 'library' } },
-        { path: 'library/add', name: 'library-add', component: () => import('@/views/AddBookView.vue'), meta: { tab: 'library' } },
-        {
-          path: 'library/import',
-          name: 'library-import',
-          component: () => import('@/views/LibraryImportView.vue'),
-          meta: { tab: 'library' },
-        },
+        { path: '', name: 'home', component: HomeView, meta: { tab: 'home', title: 'tabs.reading' } },
+        { path: 'library', name: 'library', component: () => import('@/views/LibraryView.vue'), meta: { tab: 'library', title: 'library.title' } },
+        { path: 'library/add', name: 'library-add', component: () => import('@/views/AddBookView.vue'), meta: { tab: 'library', title: 'add.title' } },
         {
           path: 'library/:id(\\d+)',
           name: 'book',
           component: () => import('@/views/BookView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
-          meta: { tab: 'library' },
+          meta: { tab: 'library', title: 'book.title' },
         },
-        { path: 'quotes', name: 'quotes', component: () => import('@/views/QuotesView.vue'), meta: { tab: 'quotes' } },
-        { path: 'quotes/new', name: 'quote-new', component: () => import('@/views/QuoteFormView.vue'), meta: { tab: 'quotes' } },
+        { path: 'quotes', name: 'quotes', component: () => import('@/views/QuotesView.vue'), meta: { tab: 'quotes', title: 'quotes.title' } },
+        {
+          path: 'quotes/new',
+          name: 'quote-new',
+          component: () => import('@/views/QuoteFormView.vue'),
+          meta: { tab: 'quotes', title: 'quotes.form.createTitle' },
+        },
         {
           path: 'quotes/:id(\\d+)/edit',
           name: 'quote-edit',
           component: () => import('@/views/QuoteFormView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
-          meta: { tab: 'quotes' },
+          meta: { tab: 'quotes', title: 'quotes.form.editTitle' },
         },
         {
           path: 'quotes/:id(\\d+)/share',
           name: 'quote-share',
           component: () => import('@/views/QuoteShareView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
-          meta: { tab: 'quotes' },
+          meta: { tab: 'quotes', title: 'quotes.shareCard.title' },
         },
-        { path: 'feed', name: 'feed', component: () => import('@/views/FeedView.vue') },
-        { path: 'people', name: 'people-search', component: () => import('@/views/PeopleSearchView.vue') },
-        {
-          path: 'u/:username',
-          name: 'public-profile',
-          component: () => import('@/views/PublicProfileView.vue'),
-          props: (route) => ({ username: String(route.params.username) }),
-          // Shared profile links work for guests too; signed-in readers get the usual layout.
-          meta: { requiresAuth: false },
-        },
-        {
-          path: 'u/:username/followers',
-          name: 'followers',
-          component: () => import('@/views/PeopleListView.vue'),
-          props: (route) => ({ username: String(route.params.username), kind: 'followers' }),
-        },
-        {
-          path: 'u/:username/following',
-          name: 'following',
-          component: () => import('@/views/PeopleListView.vue'),
-          props: (route) => ({ username: String(route.params.username), kind: 'following' }),
-        },
-        { path: 'blocks', name: 'blocks', component: () => import('@/views/BlockedUsersView.vue') },
-        { path: 'reader', name: 'reader', component: () => import('@/views/ReaderListView.vue') },
-        {
-          path: 'reader/:id(\\d+)',
-          name: 'reader-view',
-          component: () => import('@/views/ReaderView.vue'),
-          props: (route) => ({ id: Number(route.params.id) }),
-        },
-        { path: 'stats', name: 'stats', component: () => import('@/views/StatsView.vue'), meta: { tab: 'stats' } },
-        {
-          path: 'stats/year/:year(\\d{4})',
-          name: 'year-recap',
-          component: () => import('@/views/YearRecapView.vue'),
-          props: (route) => ({ year: Number(route.params.year) }),
-          meta: { tab: 'stats' },
-        },
-        { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue') },
+        { path: 'stats', name: 'stats', component: () => import('@/views/StatsView.vue'), meta: { tab: 'stats', title: 'stats.title' } },
+        { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { title: 'profile.title' } },
+        ...statsRoutes,
+        ...libraryImportRoutes,
+        ...socialRoutes,
+        // Last: anything that matched nothing above. Inside the layout, so the reader keeps the tab bar.
+        { path: ':pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFoundView.vue'), meta: { title: 'notFound.title' } },
       ],
     },
-    { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true } },
-    { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { guestOnly: true } },
-    { path: '/forgot-password', name: 'forgot-password', component: () => import('@/views/ForgotPasswordView.vue'), meta: { guestOnly: true } },
-    {
-      path: '/reset-password/:token',
-      name: 'reset-password',
-      component: () => import('@/views/ResetPasswordView.vue'),
-      props: (route) => ({ token: String(route.params.token) }),
-      meta: { guestOnly: true },
-    },
-    { path: '/:pathMatch(.*)*', redirect: { name: 'home' } },
+    // Full-screen screens, outside of the layout with the tab bar.
+    ...readerRoutes,
+    { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true, title: 'auth.login.title' } },
+    { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { guestOnly: true, title: 'auth.register.title' } },
+    ...accountRoutes,
   ],
 })
 
@@ -107,15 +73,14 @@ router.beforeEach(async (to) => {
   try {
     await auth.init()
   } catch {
-    // The API is unreachable: treat the visitor as a guest, the login form will show the error.
+    // The API answered with something unexpected: treat the visitor as a guest, the login form will show the error.
   }
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    // Remember where the visitor was going, so signing in takes them there instead of to the home page.
-    return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } }
-  }
+  return redirectFor(to, auth) ?? undefined
+})
 
-  if (to.meta.guestOnly && auth.isAuthenticated) {
-    return safeRedirect(to.query.redirect) ?? { name: 'home' }
-  }
+// The title names the screen in the task switcher, in the history and for screen readers.
+router.afterEach((to) => {
+  const title = to.meta.title ? i18n.global.t(to.meta.title) : null
+  document.title = title ? `${title} · Bookshelf` : 'Bookshelf'
 })

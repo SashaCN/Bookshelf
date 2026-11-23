@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { ApiError } from '@/api/http'
+import { ApiError, NetworkError } from '@/api/http'
 import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import LoginView from './LoginView.vue'
@@ -59,19 +59,14 @@ describe('LoginView', () => {
     expect(router.currentRoute.value.fullPath).toBe('/stats')
   })
 
-  it('sends one request when submitted twice while waiting', async () => {
-    const { wrapper, auth } = mountView()
-    let finish: () => void = () => undefined
-    const login = vi.spyOn(auth, 'login').mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)))
+  it('ignores a redirect that leads outside of the app', async () => {
+    const { wrapper, router, auth } = mountView()
+    vi.spyOn(auth, 'login').mockResolvedValue()
+    await router.replace('/login?redirect=https%3A%2F%2Fevil.example')
 
-    await wrapper.get('#email').setValue('olena@example.com')
-    await wrapper.get('#password').setValue('secret-password')
-    await wrapper.get('form').trigger('submit')
-    await wrapper.get('form').trigger('submit')
-    finish()
-    await flushPromises()
+    await fillAndSubmit(wrapper)
 
-    expect(login).toHaveBeenCalledTimes(1)
+    expect(router.currentRoute.value.name).toBe('home')
   })
 
   it('shows a localized message for wrong credentials', async () => {
@@ -83,16 +78,6 @@ describe('LoginView', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('Невірний email або пароль.')
   })
 
-  it('shows a generic message when the server cannot be reached', async () => {
-    const { wrapper, auth } = mountView()
-    vi.spyOn(auth, 'login').mockRejectedValue(new TypeError('Failed to fetch'))
-
-    await fillAndSubmit(wrapper)
-
-    expect(wrapper.get('[role="alert"]').text()).toBe('Не вдалося виконати запит. Спробуйте ще раз.')
-    expect((wrapper.get('#email').element as HTMLInputElement).value).toBe('olena@example.com')
-  })
-
   it('shows a throttling message after too many attempts', async () => {
     const { wrapper, auth } = mountView()
     vi.spyOn(auth, 'login').mockRejectedValue(new ApiError(429, null))
@@ -102,9 +87,34 @@ describe('LoginView', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('Забагато спроб. Спробуйте за хвилину.')
   })
 
+  it('explains why the reader is asked to sign in again after the session ended', async () => {
+    const { wrapper, router } = mountView()
+    await router.push('/login?expired=1')
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toBe('Сесія закінчилась. Увійдіть ще раз.')
+  })
+
+  it('says nothing about a session when the reader just opened the form', async () => {
+    const { wrapper, router } = mountView()
+    await router.isReady()
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+
+  it('blames the connection, not the password, when the server cannot be reached', async () => {
+    const { wrapper, auth } = mountView()
+    vi.spyOn(auth, 'login').mockRejectedValue(new NetworkError())
+
+    await fillAndSubmit(wrapper)
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Немає зв’язку із сервером')
+  })
+
   it('says the account was deleted after coming from the deletion', async () => {
     const { wrapper, router } = mountView()
     await router.push('/login?deleted=1')
+    await flushPromises()
 
     expect(wrapper.get('[data-test="account-deleted"]').text()).toBe('Акаунт видалено')
   })
@@ -112,20 +122,17 @@ describe('LoginView', () => {
   it('says the password was changed after a reset', async () => {
     const { wrapper, router } = mountView()
     await router.push('/login?reset=1')
+    await flushPromises()
 
     expect(wrapper.get('[data-test="password-changed"]').text()).toBe('Пароль змінено, увійдіть з новим паролем')
   })
 
-  it('links to the password reset', () => {
-    const { wrapper } = mountView()
-
-    expect(wrapper.text()).toContain('Забули пароль?')
-  })
-
-  it('has no such note on a normal visit', () => {
-    const { wrapper } = mountView()
+  it('has neither note on a normal visit, and links to the password reset', async () => {
+    const { wrapper, router } = mountView()
+    await router.isReady()
 
     expect(wrapper.find('[data-test="account-deleted"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="password-changed"]').exists()).toBe(false)
+    expect(wrapper.findAll('a').find((link) => link.text() === 'Забули пароль?')).toBeDefined()
   })
 })

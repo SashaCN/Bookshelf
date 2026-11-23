@@ -2,6 +2,7 @@
 
 use App\Models\Author;
 use App\Models\Book;
+use App\Models\Post;
 use App\Models\Quote;
 use App\Models\ReadingGoal;
 use App\Models\ReadingLog;
@@ -63,8 +64,10 @@ describe('a realistic two-year fixture', function () {
 
         Quote::factory()->create(['user_book_id' => $dune->id, 'user_id' => $this->user->id, 'created_at' => '2025-12-31 22:30:00']); // Jan 1 in Kyiv
         Quote::factory()->create(['user_book_id' => $dune->id, 'user_id' => $this->user->id, 'created_at' => '2026-03-01 10:00:00']);
-        $big->forceFill(['review' => 'Great', 'reviewed_at' => '2026-05-21 10:00:00'])->save();
-        $unrated->forceFill(['review' => 'Meh', 'reviewed_at' => '2025-12-31 21:30:00'])->save(); // still 2025
+        Post::factory()->review(5)->create(['user_id' => $this->user->id, 'book_id' => $big->book_id, 'created_at' => '2026-05-21 10:00:00']);
+        Post::factory()->review(2)->create(['user_id' => $this->user->id, 'book_id' => $unrated->book_id, 'created_at' => '2025-12-31 21:30:00']); // 31 Dec in Kyiv: still 2025
+        // Quote posts are not reviews.
+        Post::factory()->create(['user_id' => $this->user->id, 'book_id' => $big->book_id, 'created_at' => '2026-05-22 10:00:00']);
 
         // Another reader's data must not leak in.
         $theirs = recapBook($this->stranger, 'Theirs', 'X', 999, 5, '2026-04-01 10:00:00');
@@ -81,7 +84,6 @@ describe('a realistic two-year fixture', function () {
             ->assertJsonPath('data.pages_read', 50 + 30 + 150)
             ->assertJsonPath('data.days_with_reading', 3)
             ->assertJsonPath('data.longest_streak_in_year', 2)
-            ->assertJsonPath('data.chapters_read', 0)
             ->assertJsonPath('data.quotes_added', 2)
             ->assertJsonPath('data.reviews_written', 1)
             ->assertJsonPath('data.average_rating', 4) // 5, 3, 3, 5 (the unrated is skipped)
@@ -143,7 +145,6 @@ it('answers an empty year with zeros and nulls', function () {
             'pages_read' => 0,
             'days_with_reading' => 0,
             'longest_streak_in_year' => 0,
-            'chapters_read' => 0,
             'quotes_added' => 0,
             'reviews_written' => 0,
             'average_rating' => null,

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { statsApi } from '@/api/stats'
 import { createTestEnvironment } from '@/test/utils'
-import type { YearRecap, YearRecapResponse } from '@/types/api'
+import type { YearRecap, YearRecapResponse } from '@/types/stats'
 import YearRecapView from './YearRecapView.vue'
 
 vi.mock('@/api/stats', () => ({ statsApi: { year: vi.fn() } }))
@@ -16,7 +16,6 @@ function makeRecap(overrides: Partial<YearRecap> = {}, meta = { first_year: 2024
       pages_read: 1840,
       days_with_reading: 90,
       longest_streak_in_year: 12,
-      chapters_read: 0,
       quotes_added: 7,
       reviews_written: 2,
       average_rating: 4.2,
@@ -61,14 +60,6 @@ describe('YearRecapView', () => {
     expect(wrapper.text()).toContain('Прочитано сторінок')
     expect(wrapper.text()).toContain('Найдовша серія: 12 днів')
     expect(wrapper.text()).toContain('4,2')
-    expect(wrapper.text()).not.toContain('Розділів у Читанці')
-  })
-
-  it('shows the chapters only when there are some', async () => {
-    vi.mocked(statsApi.year).mockResolvedValue(makeRecap({ chapters_read: 21 }))
-    const wrapper = await mountView()
-
-    expect(wrapper.text()).toContain('Розділів у Читанці')
   })
 
   it('shows the goal result', async () => {

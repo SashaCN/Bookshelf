@@ -1,141 +1,99 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError } from '@/api/http'
+import { authApi } from '@/api/auth'
 import { socialApi } from '@/api/social'
-import { makeFeedQuote, makeProfile, makePublicReview, makeQuote } from '@/test/fixtures'
-import { useSocialStore } from './social'
+import { makeComment, makePost, makeProfile, makeReader } from '@/test/socialFixtures'
+import { useAuthStore } from './auth'
+import { useBlocksStore } from './blocks'
+import { useCommentsStore } from './comments'
+import { useFeedStore } from './feed'
+import { usePostsStore } from './posts'
+import { useProfilesStore } from './profiles'
+import { resetSocialData } from './social'
 
+vi.mock('@/api/auth', () => ({
+  authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() },
+}))
 vi.mock('@/api/social', () => ({
-  socialApi: { profile: vi.fn(), quotes: vi.fn(), reviews: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
+  socialApi: { feed: vi.fn(), profile: vi.fn(), comments: vi.fn(), blocks: vi.fn() },
 }))
 
-describe('social store', () => {
+async function fillEverything() {
+  vi.mocked(socialApi.feed).mockResolvedValue({ data: [makePost({ id: 1 })], links: { next: null } })
+  vi.mocked(socialApi.profile).mockResolvedValue(makeProfile())
+  vi.mocked(socialApi.comments).mockResolvedValue({ data: [makeComment()], links: { next: null } })
+  vi.mocked(socialApi.blocks).mockResolvedValue({ data: [makeReader()], links: { next: null } })
+
+  await useFeedStore().load('all')
+  await useProfilesStore().load('olena_k')
+  await useCommentsStore().load(1)
+  await useBlocksStore().load()
+}
+
+function expectEverythingForgotten() {
+  expect(usePostsStore().get(1)).toBeUndefined()
+  expect(useFeedStore().items).toEqual([])
+  expect(useFeedStore().loaded).toBe(false)
+  expect(useProfilesStore().profile).toBeNull()
+  expect(useCommentsStore().items).toEqual([])
+  expect(useCommentsStore().loaded).toBe(false)
+  expect(useBlocksStore().items).toEqual([])
+  expect(useBlocksStore().loaded).toBe(false)
+}
+
+describe('resetting the community', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.resetAllMocks()
   })
 
-  it('loads a profile with its first page of quotes', async () => {
-    vi.mocked(socialApi.profile).mockResolvedValue(makeProfile())
-    vi.mocked(socialApi.quotes).mockResolvedValue({ data: [makeQuote({ id: 2 })], links: { next: '/n' } })
-    const social = useSocialStore()
+  it('forgets the posts, the feed, the profile, the comments and the blocked readers', async () => {
+    await fillEverything()
+    expect(usePostsStore().get(1)).toBeDefined()
 
-    await social.loadProfile('olena')
+    resetSocialData()
 
-    expect(social.profile?.username).toBe('olena')
-    expect(social.profileQuotes.items.map((q) => q.id)).toEqual([2])
-    expect(social.profileQuotes.hasMore).toBe(true)
+    expectEverythingForgotten()
   })
 
-  it('loads the reviews of the shown profile only when asked, and drops them with the profile', async () => {
-    vi.mocked(socialApi.profile).mockResolvedValue(makeProfile())
-    vi.mocked(socialApi.quotes).mockResolvedValue({ data: [], links: { next: null } })
-    vi.mocked(socialApi.reviews).mockResolvedValue({ data: [makePublicReview({ id: 7 })], links: { next: null } })
-    const social = useSocialStore()
+  describe('when somebody else signs in on the same device', () => {
+    const user = { id: 2, name: 'Taras', email: 't@example.com', handle: 'taras', bio: null, timezone: 'Europe/Kyiv' }
 
-    await social.loadProfile('olena')
-    expect(socialApi.reviews).not.toHaveBeenCalled()
+    it('forgets it on login', async () => {
+      await fillEverything()
+      vi.mocked(authApi.login).mockResolvedValue({})
+      vi.mocked(authApi.me).mockResolvedValue(user)
 
-    await social.loadProfileReviews()
-    expect(socialApi.reviews).toHaveBeenCalledWith('olena', 1)
-    expect(social.profileReviews.items.map((r) => r.id)).toEqual([7])
+      await useAuthStore().login({ email: 't@example.com', password: 'secret-password' })
 
-    await social.loadProfile('olena')
-    expect(social.profileReviews.loaded).toBe(false)
-  })
-
-  it('leaves no profile behind when it is not found', async () => {
-    vi.mocked(socialApi.profile).mockRejectedValue(new ApiError(404, null))
-    const social = useSocialStore()
-
-    await expect(social.loadProfile('ghost')).rejects.toBeInstanceOf(ApiError)
-
-    expect(social.profile).toBeNull()
-  })
-
-  it('appends the next page without repeating a quote', async () => {
-    vi.mocked(socialApi.feed)
-      .mockResolvedValueOnce({ data: [makeFeedQuote({ id: 3 }), makeFeedQuote({ id: 2 })], links: { next: '/n' } })
-      .mockResolvedValueOnce({ data: [makeFeedQuote({ id: 2 }), makeFeedQuote({ id: 1 })], links: { next: null } })
-    const social = useSocialStore()
-    await social.loadFeed()
-
-    await social.feed.loadMore()
-    await social.feed.loadMore()
-
-    expect(socialApi.feed).toHaveBeenLastCalledWith(2)
-    expect(socialApi.feed).toHaveBeenCalledTimes(2)
-    expect(social.feed.items.map((q) => q.id)).toEqual([3, 2, 1])
-    expect(social.feed.hasMore).toBe(false)
-  })
-
-  it('loads followers or following of a reader', async () => {
-    vi.mocked(socialApi.followers).mockResolvedValue({ data: [{ username: 'a', name: 'A' }], links: { next: null } })
-    vi.mocked(socialApi.following).mockResolvedValue({ data: [{ username: 'b', name: 'B' }], links: { next: null } })
-    const social = useSocialStore()
-
-    await social.loadPeople('olena', 'followers')
-    expect(social.people.items[0].username).toBe('a')
-
-    await social.loadPeople('olena', 'following')
-    expect(social.people.items[0].username).toBe('b')
-  })
-
-  describe('following', () => {
-    async function loaded(overrides = {}) {
-      vi.mocked(socialApi.profile).mockResolvedValue(makeProfile(overrides))
-      vi.mocked(socialApi.quotes).mockResolvedValue({ data: [], links: { next: null } })
-      const social = useSocialStore()
-      await social.loadProfile('olena')
-      return social
-    }
-
-    it('follows at once and counts the new follower', async () => {
-      vi.mocked(socialApi.follow).mockResolvedValue(null)
-      const social = await loaded({ followers_count: 3 })
-
-      await social.setFollowing(true)
-
-      expect(socialApi.follow).toHaveBeenCalledWith('olena')
-      expect(social.profile).toMatchObject({ is_following: true, followers_count: 4 })
+      expectEverythingForgotten()
     })
 
-    it('unfollows', async () => {
-      vi.mocked(socialApi.unfollow).mockResolvedValue(null)
-      const social = await loaded({ is_following: true, followers_count: 3 })
+    it('forgets it on registration', async () => {
+      await fillEverything()
+      vi.mocked(authApi.register).mockResolvedValue({})
+      vi.mocked(authApi.me).mockResolvedValue(user)
 
-      await social.setFollowing(false)
+      await useAuthStore().register({ name: 'Taras', email: 't@example.com', password: 'secret-password', timezone: 'Europe/Kyiv' })
 
-      expect(socialApi.unfollow).toHaveBeenCalledWith('olena')
-      expect(social.profile).toMatchObject({ is_following: false, followers_count: 2 })
+      expectEverythingForgotten()
     })
 
-    it('goes back when the server refuses', async () => {
-      vi.mocked(socialApi.follow).mockRejectedValue(new ApiError(500, null))
-      const social = await loaded({ followers_count: 3 })
+    it('forgets it on logout', async () => {
+      await fillEverything()
+      vi.mocked(authApi.logout).mockResolvedValue({})
 
-      await expect(social.setFollowing(true)).rejects.toBeInstanceOf(ApiError)
+      await useAuthStore().logout()
 
-      expect(social.profile).toMatchObject({ is_following: false, followers_count: 3 })
+      expectEverythingForgotten()
     })
 
-    it('does not follow oneself', async () => {
-      const social = await loaded({ is_me: true })
+    it('forgets it when the session expires', async () => {
+      await fillEverything()
 
-      await social.setFollowing(true)
+      useAuthStore().expireSession()
 
-      expect(socialApi.follow).not.toHaveBeenCalled()
+      expectEverythingForgotten()
     })
-  })
-
-  it('forgets everything on reset', async () => {
-    vi.mocked(socialApi.feed).mockResolvedValue({ data: [makeFeedQuote()], links: { next: null } })
-    const social = useSocialStore()
-    await social.loadFeed()
-
-    social.reset()
-
-    expect(social.feed.items).toEqual([])
-    expect(social.feed.loaded).toBe(false)
   })
 })

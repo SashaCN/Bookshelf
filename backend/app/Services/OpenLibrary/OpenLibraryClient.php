@@ -85,10 +85,10 @@ class OpenLibraryClient
             $response = Http::baseUrl((string) config('services.openlibrary.base_url'))
                 ->withUserAgent((string) config('services.openlibrary.user_agent'))
                 ->acceptJson()
+                // One attempt only: the reader is waiting, and a retry would push the worst case beyond the 3 s of
+                // the spec. A slow or failing catalog means "unavailable" and the client offers manual entry.
                 ->timeout((int) config('services.openlibrary.timeout'))
-                // A rejected request will not get better by repeating it; an outage or a 429 might.
-                ->retry(2, 150, when: fn (\Throwable $e) => ! ($e instanceof RequestException)
-                    || $e->response->serverError() || $e->response->status() === 429, throw: false)
+                ->connectTimeout((int) config('services.openlibrary.timeout'))
                 ->get('/search.json', ['q' => $query, 'limit' => $limit, 'fields' => self::FIELDS]);
 
             $response->throw();

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Dumps the database to a compressed file and removes dumps older than 14 days.
-# Run it by hand or from cron, e.g. every night at 03:00:
-#   0 3 * * * /opt/bookshelf/backup.sh
+# bootstrap-server.sh installs a cron job for it (every night at 03:00); it can also be run by hand.
+# The dumps stay on this machine: copy them off the host (see docs/deploy.md).
 set -euo pipefail
 
 cd /opt/bookshelf

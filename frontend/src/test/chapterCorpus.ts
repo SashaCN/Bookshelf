@@ -1,0 +1,384 @@
+/**
+ * Chapters as the server cleans them up (backend/app/Services/Epub/HtmlSanitizer.php), for the awkward markup that a
+ * browser repairs when it reads HTML: tables with loose text, text in a list, a block in a paragraph, the newline after
+ * <pre>. `html` is what the server wrote for `input`, `text` is the text it counts offsets in.
+ *
+ * It is a copy of backend/tests/fixtures/chapter-corpus.json (the backend test checks the server still writes exactly this;
+ * when the sanitizer changes on purpose, regenerate the JSON from there and paste it here, and the test of this
+ * side tells whether a browser still reads the same text).
+ */
+export interface CorpusCase {
+  input: string
+  html: string
+  text: string
+  characters: number
+}
+
+export const chapterCorpus: CorpusCase[] = [
+  {
+    "input": "<table>a<tr>b<td>c</td>d</tr>e</table>",
+    "html": "<table><tr><td>a</td></tr><tr><td>b</td><td>c</td><td>d</td></tr><tr><td>e</td></tr></table>",
+    "text": "abcde",
+    "characters": 5
+  },
+  {
+    "input": "<pre>\n\nfoo</pre>",
+    "html": "<pre>foo</pre>",
+    "text": "foo",
+    "characters": 3
+  },
+  {
+    "input": "<pre><code>\nx</code></pre>",
+    "html": "<pre><code>\nx</code></pre>",
+    "text": "\nx",
+    "characters": 2
+  },
+  {
+    "input": "<pre>\r\nwin</pre>",
+    "html": "<pre>win</pre>",
+    "text": "win",
+    "characters": 3
+  },
+  {
+    "input": "<ul>x<li>a</li>y</ul>",
+    "html": "<ul>x<li>a</li>y</ul>",
+    "text": "xay",
+    "characters": 3
+  },
+  {
+    "input": "<ol><li>a<ul>b<li>c</li></ul>d</li></ol>",
+    "html": "<ol><li>a<ul>b<li>c</li></ul>d</li></ol>",
+    "text": "abcd",
+    "characters": 4
+  },
+  {
+    "input": "<p>a<div>b</div>c</p>",
+    "html": "<p>a<div>b</div>c</p>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<p>a<ul><li>b</li></ul>c</p>",
+    "html": "<p>a<ul><li>b</li></ul>c</p>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<p>a<table><tr><td>b</td></tr></table>c</p>",
+    "html": "<p>a<table><tr><td>b</td></tr></table>c</p>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<h1>a<h2>b</h2>c</h1>",
+    "html": "<h1>a<h2>b</h2>c</h1>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<b>a<p>b</p>c</b>",
+    "html": "<b>a<p>b</p>c</b>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<p><em>a<p>b</p>c</em></p>",
+    "html": "<p><em>a<p>b</p>c</em></p>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<div><li>a</li></div>",
+    "html": "<div><li>a</li></div>",
+    "text": "a",
+    "characters": 1
+  },
+  {
+    "input": "<div><td>a</td><td>b</td></div>",
+    "html": "<div><td>a</td><td>b</td></div>",
+    "text": "ab",
+    "characters": 2
+  },
+  {
+    "input": "<div><tr><td>a</td></tr></div>",
+    "html": "<div><tr><td>a</td></tr></div>",
+    "text": "a",
+    "characters": 1
+  },
+  {
+    "input": "<p>1 &lt; 2 &amp; 3 &gt; 0 😀 e&#769; &nbsp;x</p>",
+    "html": "<p>1 &lt; 2 &amp; 3 &gt; 0 😀 é  x</p>",
+    "text": "1 < 2 & 3 > 0 😀 é  x",
+    "characters": 22
+  },
+  {
+    "input": "<table><br/><tr><td>x</td></tr></table>",
+    "html": "<table><tr><td><br></td></tr><tr><td>x</td></tr></table>",
+    "text": "x",
+    "characters": 1
+  },
+  {
+    "input": "<table><tr><br/><td>x</td></tr></table>",
+    "html": "<table><tr><td><br></td><td>x</td></tr></table>",
+    "text": "x",
+    "characters": 1
+  },
+  {
+    "input": "<dl><dt>a</dt><dd>b</dd></dl>",
+    "html": "<div><div>a</div><div>b</div></div>",
+    "text": "ab",
+    "characters": 2
+  },
+  {
+    "input": "<table><caption>cap</caption><tr><td>a</td></tr></table>",
+    "html": "<table><tr><td><div>cap</div></td></tr><tr><td>a</td></tr></table>",
+    "text": "capa",
+    "characters": 4
+  },
+  {
+    "input": "<table><tr><td><p>a</p><p>b</p></td></tr></table>",
+    "html": "<table><tr><td><p>a</p><p>b</p></td></tr></table>",
+    "text": "ab",
+    "characters": 2
+  },
+  {
+    "input": "<table><tr><td> </td><td>x</td></tr></table>",
+    "html": "<table><tr><td></td><td>x</td></tr></table>",
+    "text": "x",
+    "characters": 1
+  },
+  {
+    "input": "<table><tr><td>a</td></tr><tr><td><table><tr>deep<td>d</td></tr></table></td></tr></table>",
+    "html": "<table><tr><td>a</td></tr><tr><td><table><tr><td>deep</td><td>d</td></tr></table></td></tr></table>",
+    "text": "adeepd",
+    "characters": 6
+  },
+  {
+    "input": "<p>a<br/>b<br/><br/>c</p>",
+    "html": "<p>a<br>b<br><br>c</p>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<blockquote>q<p>r</p>s</blockquote>",
+    "html": "<blockquote>q<p>r</p>s</blockquote>",
+    "text": "qrs",
+    "characters": 3
+  },
+  {
+    "input": "<span>a<div>b</div>c</span>",
+    "html": "<span>a<div>b</div>c</span>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<p><span>a</span> <span>b</span></p>",
+    "html": "<p><span>a</span> <span>b</span></p>",
+    "text": "a b",
+    "characters": 3
+  },
+  {
+    "input": "<h1>t</h1><hr/>text<hr/>",
+    "html": "<h1>t</h1><hr>text<hr>",
+    "text": "ttext",
+    "characters": 5
+  },
+  {
+    "input": "<p><b><i>x</i></b><u>y</u><sub>1</sub><sup>2</sup></p>",
+    "html": "<p><b><i>x</i></b><u>y</u><sub>1</sub><sup>2</sup></p>",
+    "text": "xy12",
+    "characters": 4
+  },
+  {
+    "input": "<table><tr><th>h</th><td>d</td></tr><tr><td colspan=\"2\">wide</td></tr></table>",
+    "html": "<table><tr><th>h</th><td>d</td></tr><tr><td>wide</td></tr></table>",
+    "text": "hdwide",
+    "characters": 6
+  },
+  {
+    "input": "<ul><li><p>a</p></li><li><p>b</p></li></ul>",
+    "html": "<ul><li><p>a</p></li><li><p>b</p></li></ul>",
+    "text": "ab",
+    "characters": 2
+  },
+  {
+    "input": "<div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div>deep</div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>tail</div>",
+    "html": "<div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div><div>deep</div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>tail</div>",
+    "text": "deeptail",
+    "characters": 8
+  },
+  {
+    "input": "<table><tr><td>x</td></tr>text between<tr><td>y</td></tr></table>",
+    "html": "<table><tr><td>x</td></tr><tr><td>text between</td></tr><tr><td>y</td></tr></table>",
+    "text": "xtext betweeny",
+    "characters": 14
+  },
+  {
+    "input": "<pre>a<span>b</span>\nc</pre>",
+    "html": "<pre>a<span>b</span>\nc</pre>",
+    "text": "ab\nc",
+    "characters": 4
+  },
+  {
+    "input": "<pre><span>\nx</span></pre>",
+    "html": "<pre><span>\nx</span></pre>",
+    "text": "\nx",
+    "characters": 2
+  },
+  {
+    "input": "<p>­soft​hyphen</p>",
+    "html": "<p>­soft​hyphen</p>",
+    "text": "­soft​hyphen",
+    "characters": 12
+  },
+  {
+    "input": "<li>a</li><li>b</li>",
+    "html": "<li>a</li><li>b</li>",
+    "text": "ab",
+    "characters": 2
+  },
+  {
+    "input": "<td>a</td>",
+    "html": "<td>a</td>",
+    "text": "a",
+    "characters": 1
+  },
+  {
+    "input": "<tr><td>a</td></tr>",
+    "html": "<tr><td>a</td></tr>",
+    "text": "a",
+    "characters": 1
+  },
+  {
+    "input": "<p>a<hr/>b</p>",
+    "html": "<p>a<hr>b</p>",
+    "text": "ab",
+    "characters": 2
+  },
+  {
+    "input": "<h2><p>x</p></h2>",
+    "html": "<h2><p>x</p></h2>",
+    "text": "x",
+    "characters": 1
+  },
+  {
+    "input": "<p>one<p>two</p>three</p>",
+    "html": "<p>one<p>two</p>three</p>",
+    "text": "onetwothree",
+    "characters": 11
+  },
+  {
+    "input": "<p>Привіт, <em>світе</em>! «Їжак» — це 🦔 і 👨‍👩‍👧 разом.</p><h2>Розділ</h2><p>Текст</p>",
+    "html": "<p>Привіт, <em>світе</em>! «Їжак» — це 🦔 і 👨‍👩‍👧 разом.</p><h2>Розділ</h2><p>Текст</p>",
+    "text": "Привіт, світе! «Їжак» — це 🦔 і 👨‍👩‍👧 разом.РозділТекст",
+    "characters": 58
+  },
+  {
+    "input": "<pre>  indented\n    more\n\n  end\n</pre>",
+    "html": "<pre>  indented\n    more\n\n  end\n</pre>",
+    "text": "  indented\n    more\n\n  end\n",
+    "characters": 27
+  },
+  {
+    "input": "<p><a href=\"x\">one</a> <a href=\"y\">two</a><img alt=\"pic\" src=\"x\"/>three</p>",
+    "html": "<p>one two pic three</p>",
+    "text": "one two pic three",
+    "characters": 17
+  },
+  {
+    "input": "<table><tr><td>a<td>b</td>c</td></tr></table>",
+    "html": "<table><tr><td>abc</td></tr></table>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<table><tr><td>a<tr><td>b</td></tr>c</td></tr></table>",
+    "html": "<table><tr><td>abc</td></tr></table>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<table><tr><td>a<th>b</th>c</td></tr></table>",
+    "html": "<table><tr><td>abc</td></tr></table>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<td>a<td>b</td>c</td>",
+    "html": "<td>abc</td>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<td>a<tr><td>b</td></tr>c</td>",
+    "html": "<td>abc</td>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<td>a<th>b</th>c</td>",
+    "html": "<td>abc</td>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<table><tr><td>a<span><td>b</td></span>c</td></tr></table>",
+    "html": "<table><tr><td>a<span>b</span>c</td></tr></table>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<table><tr><sub><th>x</th>y</sub></tr></table>",
+    "html": "<table><tr><td><sub>xy</sub></td></tr></table>",
+    "text": "xy",
+    "characters": 2
+  },
+  {
+    "input": "<table><tr><td>a<table><tr><td>b</td></tr></table>c</td></tr></table>",
+    "html": "<table><tr><td>a<table><tr><td>b</td></tr></table>c</td></tr></table>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<table><tr><td><ul><li>a<td>b</td></li>c</ul>d</td></tr></table>",
+    "html": "<table><tr><td><ul><li>ab</li>c</ul>d</td></tr></table>",
+    "text": "abcd",
+    "characters": 4
+  },
+  {
+    "input": "<table><tr>a<tr><td>b</td></tr>c</tr></table>",
+    "html": "<table><tr><td>abc</td></tr></table>",
+    "text": "abc",
+    "characters": 3
+  },
+  {
+    "input": "<pre>l1&#13;&#10;l2&#13;l3</pre>",
+    "html": "<pre>l1\nl2\nl3</pre>",
+    "text": "l1\nl2\nl3",
+    "characters": 8
+  },
+  {
+    "input": "<pre>&#13;x</pre>",
+    "html": "<pre>x</pre>",
+    "text": "x",
+    "characters": 1
+  },
+  {
+    "input": "<p>a&#13;b&#13;&#10;c</p>",
+    "html": "<p>a b c</p>",
+    "text": "a b c",
+    "characters": 5
+  },
+  {
+    "input": "<pre><th>&#13;&#10;x</th></pre>",
+    "html": "<pre><th>\nx</th></pre>",
+    "text": "\nx",
+    "characters": 2
+  },
+  {
+    "input": "<table><tr><td><pre>&#13;<th>&#10;y</th></pre></td></tr></table>",
+    "html": "<table><tr><td><pre>y</pre></td></tr></table>",
+    "text": "y",
+    "characters": 1
+  }
+]

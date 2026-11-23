@@ -1,63 +1,83 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createTestRouter } from '@/test/utils'
+import { createPinia } from 'pinia'
 import { i18n } from '@/i18n'
 import AppLayout from './AppLayout.vue'
-import PageHeader from './PageHeader.vue'
 
-const page = (title: string) => ({ components: { PageHeader }, template: `<PageHeader title="${title}" />` })
+// Plain component definitions: these are test doubles, not components of the app.
+const Broken = {
+  setup() {
+    throw new Error('A screen that cannot be drawn')
+  },
+  template: '<div />',
+}
 
-async function setUp() {
-  const pinia = createPinia()
-  setActivePinia(pinia)
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      {
-        path: '/',
-        component: AppLayout,
-        children: [
-          { path: '', name: 'home', component: page('Home') },
-          { path: 'library', name: 'library', component: page('Library') },
-          { path: 'quotes', name: 'quotes', component: page('Quotes') },
-          { path: 'stats', name: 'stats', component: page('Stats') },
-          { path: 'profile', name: 'profile', component: page('Profile') },
-        ],
-      },
-    ],
-  })
-  await router.push('/')
-  const wrapper = mount({ template: '<RouterView />' }, { attachTo: document.body, global: { plugins: [pinia, router, i18n] } })
+const Fine = { template: '<p>All is well</p>' }
+
+async function mountLayout() {
+  const router = createTestRouter()
+  router.addRoute({ path: '/broken', name: 'broken', component: Broken })
+  router.addRoute({ path: '/fine', name: 'fine', component: Fine })
+  await router.push('/fine')
+
+  const wrapper = mount(AppLayout, { global: { plugins: [createPinia(), router, i18n] } })
   await flushPromises()
+
   return { wrapper, router }
 }
 
 describe('AppLayout', () => {
-  it('moves focus to the heading of the new screen', async () => {
-    const { wrapper, router } = await setUp()
-
-    await router.push('/stats')
-    await flushPromises()
-
-    expect(document.activeElement?.tagName).toBe('H1')
-    expect(document.activeElement?.textContent).toBe('Stats')
-    wrapper.unmount()
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
-  it('leaves focus alone when only the query string changes', async () => {
-    const { wrapper, router } = await setUp()
-    await router.push('/library')
+  it('shows the screen and the tab bar', async () => {
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.text()).toContain('All is well')
+    expect(wrapper.find('nav').exists()).toBe(true)
+  })
+
+  it('shows a way out instead of a blank page when a screen fails, and recovers on the next screen', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { wrapper, router } = await mountLayout()
+
+    await router.push('/broken')
     await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Щось пішло не так')
+    expect(wrapper.find('nav').exists()).toBe(true)
+
+    await router.push('/fine')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('All is well')
+  })
+
+  it('moves focus to the heading of the new screen, but not when only the query string changes', async () => {
+    const { wrapper, router } = await mountLayout()
+    const Heading = { template: '<h1 tabindex="-1">Screen</h1>' }
+    router.addRoute({ path: '/heading', name: 'heading', component: Heading })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const attached = mount(AppLayout, { attachTo: host, global: { plugins: [createPinia(), router, i18n] } })
+
+    await router.push('/heading')
+    await flushPromises()
+    expect(document.activeElement?.tagName).toBe('H1')
+
     const input = document.createElement('input')
     document.body.append(input)
     input.focus()
-
-    await router.replace({ path: '/library', query: { status: 'reading' } })
+    await router.replace({ path: '/heading', query: { status: 'reading' } })
     await flushPromises()
-
     expect(document.activeElement).toBe(input)
+
     input.remove()
+    attached.unmount()
     wrapper.unmount()
+    host.remove()
   })
 })

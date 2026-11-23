@@ -3,6 +3,8 @@
 Проєкт: Bookshelf (Laravel API + Vue 3 PWA). Інструмент: SonarQube Community Build, локальний екземпляр.
 Налаштування та запуск описані в [`sonar.md`](sonar.md). Показники нижче взято з останнього аналізу.
 
+> Note: this report and its screenshots were made on the standalone version of the project before the features were merged. Run `make sonar` and refresh the figures and screenshots before submitting.
+
 **Quality Gate: Passed.**
 
 ## Оцінки якості

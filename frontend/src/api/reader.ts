@@ -1,27 +1,23 @@
-import type { ReaderBookmark, ReaderChapter, ReaderDocument, ReaderPosition } from '@/types/api'
-import { http } from './http'
+import type { BookText, Chapter, PositionPayload, PositionResult } from '@/types/reader'
+import { http, type RequestOptions } from './http'
 
 export const readerApi = {
-  list: () => http.get<{ data: ReaderDocument[] }>('/api/reader').then((response) => response.data),
-  get: (id: number) => http.get<{ data: ReaderDocument }>(`/api/reader/${id}`).then((response) => response.data),
-  upload: (file: File) => {
+  /** Upload an EPUB for a library entry: the server reads it, keeps the cleaned-up text and answers with its contents. */
+  upload: (userBookId: number, file: File, timeoutMs?: number) => {
     const form = new FormData()
     form.append('file', file)
-    return http.post<{ data: ReaderDocument }>('/api/reader', form).then((response) => response.data)
+
+    return http.upload<{ data: BookText }>(`/api/library/${userBookId}/text`, form, timeoutMs).then((response) => response.data)
   },
-  remove: (id: number) => http.delete<null>(`/api/reader/${id}`),
-  savePosition: (id: number, position: ReaderPosition) =>
-    http.put<{ data: ReaderDocument }>(`/api/reader/${id}/position`, position).then((response) => response.data),
-  link: (id: number, userBookId: number | null) =>
-    http.patch<{ data: ReaderDocument }>(`/api/reader/${id}`, { user_book_id: userBookId }).then((response) => response.data),
-  chapter: (id: number, index: number) =>
-    http.get<{ data: ReaderChapter }>(`/api/reader/${id}/chapters/${index}`).then((response) => response.data),
-  bookmarks: (id: number) =>
-    http.get<{ data: ReaderBookmark[] }>(`/api/reader/${id}/bookmarks`).then((response) => response.data),
-  /** Adds the chapter to the bookmarks, or only changes the note when it is already there. Without `note` an old note stays. */
-  saveBookmark: (id: number, chapter: number, note?: string | null) =>
-    http
-      .post<{ data: ReaderBookmark }>(`/api/reader/${id}/bookmarks`, note === undefined ? { chapter } : { chapter, note })
-      .then((response) => response.data),
-  removeBookmark: (id: number, bookmarkId: number) => http.delete<null>(`/api/reader/${id}/bookmarks/${bookmarkId}`),
+  /** The text of a library entry: its contents and where the reader is. Answers 404 when there is none. */
+  text: (userBookId: number) => http.get<{ data: BookText }>(`/api/library/${userBookId}/text`).then((response) => response.data),
+  removeText: (userBookId: number) => http.delete<null>(`/api/library/${userBookId}/text`),
+  chapter: (textId: number, position: number) =>
+    http.get<{ data: Chapter }>(`/api/book-texts/${textId}/chapters/${position}`).then((response) => response.data),
+  /** `keepalive` for a position sent as the page is left, so that the request is not cut off with it. */
+  savePosition: (textId: number, payload: PositionPayload, options?: Pick<RequestOptions, 'keepalive'>) => {
+    const path = `/api/book-texts/${textId}/position`
+
+    return options ? http.put<PositionResult>(path, payload, options) : http.put<PositionResult>(path, payload)
+  },
 }

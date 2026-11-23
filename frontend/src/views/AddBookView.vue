@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { apiErrorCode } from '@/api/errors'
-import { ApiError } from '@/api/http'
+import { ApiError, NetworkError } from '@/api/http'
 import { catalogApi } from '@/api/library'
 import BaseDialog from '@/components/BaseDialog.vue'
 import BookCover from '@/components/BookCover.vue'
@@ -65,7 +65,8 @@ async function runSearch(text: string) {
   } catch (e) {
     if (id !== searchId) return
     results.value = []
-    if (apiErrorCode(e) === 'catalog.unavailable') {
+    // No answer within the time limit counts as an unavailable catalog: the manual-entry link is right below.
+    if (apiErrorCode(e) === 'catalog.unavailable' || e instanceof NetworkError) {
       searchState.value = 'unavailable'
     } else {
       searchState.value = 'failed'
@@ -130,7 +131,7 @@ const scanProblem = computed(() => {
 
 // --- manual entry -----------------------------------------------------------------------------------------------
 
-const form = reactive({ title: '', authors: '', pages: '', year: '' })
+const form = reactive({ title: '', authors: '', pages: '', year: '', cover: '' })
 
 function toNumber(value: string): number | null {
   const parsed = Number.parseInt(value, 10)
@@ -150,6 +151,7 @@ async function addManually() {
     authors,
     total_pages: toNumber(form.pages),
     published_year: toNumber(form.year),
+    ...(form.cover.trim() ? { cover_url: form.cover.trim() } : {}),
   })
 }
 
@@ -341,6 +343,22 @@ function showManual() {
           class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
         >
       </div>
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <label for="manual-cover" class="text-sm font-medium">{{ $t('add.fields.cover') }}</label>
+      <input
+        id="manual-cover"
+        v-model="form.cover"
+        type="url"
+        inputmode="url"
+        pattern="https://.*"
+        maxlength="2048"
+        placeholder="https://"
+        aria-describedby="manual-cover-hint"
+        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+      >
+      <p id="manual-cover-hint" class="text-sm text-ink-muted">{{ $t('add.fields.coverHint') }}</p>
     </div>
 
     <button

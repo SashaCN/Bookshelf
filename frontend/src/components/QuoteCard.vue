@@ -1,55 +1,21 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref } from 'vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
-import { useAuthStore } from '@/stores/auth'
 import { useQuotesStore } from '@/stores/quotes'
-import { useSocialStore } from '@/stores/social'
-import type { FeedQuote, Quote } from '@/types/api'
+import type { Quote } from '@/types/api'
 import ErrorNotice from './ErrorNotice.vue'
-import QuoteComments from './QuoteComments.vue'
+import PublishQuoteButton from './PublishQuoteButton.vue'
 import QuoteSource from './QuoteSource.vue'
 
-/** `readonly` is for somebody else's quote: no favorite star, no actions, and the book is not a link into the own library. */
-const props = defineProps<{ quote: Quote | FeedQuote; readonly?: boolean }>()
+const props = defineProps<{ quote: Quote }>()
 
 const quotes = useQuotesStore()
-const social = useSocialStore()
-const auth = useAuthStore()
-const { t } = useI18n()
 const errorMessage = useApiErrorMessage()
 
 const error = ref('')
 const busy = ref(false)
 const confirmingDelete = ref(false)
-const commentsOpen = ref(false)
-const commentsCount = ref(props.quote.comments_count ?? 0)
-watch(
-  () => props.quote.comments_count,
-  (count) => {
-    commentsCount.value = count ?? 0
-  },
-)
 let togglingFavorite = false
-let togglingLike = false
-
-const likesCount = computed(() => props.quote.likes_count ?? 0)
-const likesText = computed(() => t('quotes.likes', likesCount.value))
-
-async function toggleLike() {
-  if (togglingLike) return
-
-  togglingLike = true
-  error.value = ''
-
-  try {
-    await social.toggleLike(props.quote)
-  } catch (e) {
-    error.value = errorMessage(e)
-  } finally {
-    togglingLike = false
-  }
-}
 
 async function toggleFavorite() {
   // A second tap while the first is on its way would race it for the final state.
@@ -84,21 +50,6 @@ async function remove() {
 
 <template>
   <article class="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
-    <div v-if="'author' in quote" class="flex items-center gap-3">
-      <span class="grid size-9 shrink-0 place-items-center rounded-full bg-sunken text-sm font-semibold" aria-hidden="true">
-        {{ quote.author.name.trim().charAt(0).toUpperCase() }}
-      </span>
-      <p class="min-w-0 text-sm text-ink-muted">
-        <RouterLink
-          :to="{ name: 'public-profile', params: { username: quote.author.username } }"
-          class="inline-flex min-h-11 items-center font-medium text-ink underline-offset-2 hover:underline"
-        >
-          {{ quote.author.name }}
-        </RouterLink>
-        <span class="break-all"> @{{ quote.author.username }}</span>
-      </p>
-    </div>
-
     <div class="flex items-start gap-2">
       <div class="flex min-w-0 flex-1 flex-col gap-2">
         <span v-if="quote.type === 'insight'" class="self-start rounded-full bg-sunken px-2.5 py-0.5 text-xs font-medium">
@@ -110,7 +61,6 @@ async function remove() {
       </div>
 
       <button
-        v-if="!readonly"
         type="button"
         :aria-pressed="quote.is_favorite"
         :aria-label="$t('quotes.favorite')"
@@ -134,80 +84,19 @@ async function remove() {
 
     <p v-if="quote.note" class="whitespace-pre-line break-words text-sm text-ink-muted">{{ quote.note }}</p>
 
-    <QuoteSource :quote="quote" :plain="readonly" />
+    <QuoteSource :quote="quote" />
 
-    <ul v-if="!readonly && quote.tags?.length" :aria-label="$t('quotes.tags.label')" class="-mx-1 flex flex-wrap">
+    <ul v-if="quote.tags?.length" :aria-label="$t('quotes.tags.label')" class="-mx-1 flex flex-wrap">
       <li v-for="tag in quote.tags" :key="tag">
-        <RouterLink
-          :to="{ name: 'quotes', query: { tag } }"
-          class="inline-flex min-h-11 items-center px-1 text-sm"
-        >
+        <RouterLink :to="{ name: 'quotes', query: { tag } }" class="inline-flex min-h-11 items-center px-1 text-sm">
           <span class="rounded-full bg-sunken px-2.5 py-0.5 text-ink-muted">#{{ tag }}</span>
         </RouterLink>
       </li>
     </ul>
 
-    <div v-if="readonly && (quote.likes_count !== undefined || quote.comments_count !== undefined)" class="-mx-2 flex items-center gap-1">
-      <template v-if="quote.likes_count !== undefined">
-        <button
-          v-if="auth.isAuthenticated"
-          type="button"
-          :aria-pressed="quote.liked_by_me === true"
-          :aria-label="t(quote.liked_by_me ? 'quotes.unlike' : 'quotes.like', { count: likesText })"
-          class="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2 text-sm hover:bg-sunken"
-          :class="quote.liked_by_me ? 'text-accent' : 'text-ink-muted'"
-          @click="toggleLike"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            class="size-6"
-            :fill="quote.liked_by_me ? 'currentColor' : 'none'"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 20.5s-8.5-5.1-8.5-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8.5 2.5c0 5.9-8.5 11-8.5 11z" />
-          </svg>
-          <span v-if="likesCount > 0" aria-hidden="true">{{ likesCount }}</span>
-        </button>
-        <p v-else class="px-2 text-sm text-ink-muted" data-test="likes-count">{{ likesText }}</p>
-      </template>
-
-      <button
-        v-if="quote.comments_count !== undefined"
-        type="button"
-        :aria-expanded="commentsOpen"
-        :aria-controls="`comments-${quote.id}`"
-        :aria-label="t('quotes.comments.toggle', { count: t('quotes.comments.count', commentsCount) })"
-        class="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2 text-sm hover:bg-sunken"
-        :class="commentsOpen ? 'text-ink' : 'text-ink-muted'"
-        @click="commentsOpen = !commentsOpen"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          class="size-6"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />
-        </svg>
-        <span v-if="commentsCount > 0" aria-hidden="true">{{ commentsCount }}</span>
-      </button>
-    </div>
-    <p v-else-if="!readonly && likesCount > 0" class="text-xs text-ink-muted" data-test="likes-count">{{ likesText }}</p>
-
-    <div v-if="readonly && commentsOpen && quote.comments_count !== undefined" :id="`comments-${quote.id}`">
-      <QuoteComments :quote-id="quote.id" @added="commentsCount++" @removed="commentsCount = Math.max(0, commentsCount - 1)" />
-    </div>
-
     <ErrorNotice v-if="error" :message="error" />
 
-    <div v-if="!readonly && !confirmingDelete" class="flex flex-wrap gap-2 border-t border-line pt-3">
+    <div v-if="!confirmingDelete" class="flex flex-wrap gap-2 border-t border-line pt-3">
       <RouterLink
         :to="{ name: 'quote-share', params: { id: quote.id } }"
         class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium"
@@ -220,12 +109,20 @@ async function remove() {
       >
         {{ $t('quotes.edit') }}
       </RouterLink>
+      <RouterLink
+        v-if="quote.anchor"
+        :to="{ name: 'read', params: { id: quote.user_book_id }, query: { chapter: quote.anchor.chapter, highlight: quote.id } }"
+        class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium"
+      >
+        {{ $t('reader.openInText') }}
+      </RouterLink>
+      <PublishQuoteButton :quote-id="quote.id" />
       <button type="button" class="ml-auto min-h-11 px-2 text-sm font-medium text-danger" @click="confirmingDelete = true">
         {{ $t('quotes.remove') }}
       </button>
     </div>
 
-    <div v-else-if="!readonly" class="flex flex-col gap-2 border-t border-line pt-3">
+    <div v-else class="flex flex-col gap-2 border-t border-line pt-3">
       <p class="text-sm">{{ $t('quotes.removeConfirm') }}</p>
       <div class="flex gap-2">
         <button

@@ -33,7 +33,7 @@ describe('RatingStars', () => {
     expect(wrapper.findAll('button')).toHaveLength(0)
   })
 
-  it('can be disabled while a rating is being saved', async () => {
+  it('can be disabled while a rating is being saved', () => {
     const wrapper = mount(RatingStars, { props: { modelValue: null, label: 'Rating', disabled: true } })
 
     expect(wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined)).toBe(true)

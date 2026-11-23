@@ -7,10 +7,10 @@ use Illuminate\Support\Str;
 /*
  * Query plans at a realistic volume. Data is bulk-inserted inside the test transaction (rolled back afterwards);
  * every SELECT of a hot endpoint is captured and EXPLAINed, and none may scan a big table in full.
- * Set PERF_REPORT=1 to print the timings of each endpoint to stderr.
+ * Set PERF_REPORT=1 to print the timings of each endpoint to stderr, PERF_PLANS=1 to print every plan.
  */
 
-const PERF_BIG_TABLES = ['quotes', 'follows', 'quote_likes', 'quote_comments', 'quote_tag', 'tags', 'reading_logs', 'user_books', 'reader_chapter_reads', 'reader_documents'];
+const PERF_BIG_TABLES = ['posts', 'follows', 'likes', 'comments', 'quotes', 'quote_tag', 'reading_logs', 'user_books', 'user_book_reads', 'blocks'];
 
 /** @param  list<array<string, mixed>>  $rows */
 function perfInsert(string $table, array $rows): void
@@ -53,7 +53,7 @@ function perfAccess(mixed $node): array
     return $lines;
 }
 
-/** @return array{me: User, star: string, quote: int} */
+/** @return array{me: User, star: string, post: int, book: int} */
 function perfSeed(): array
 {
     mt_srand(42);
@@ -62,15 +62,13 @@ function perfSeed(): array
 
     $rows = [];
     for ($i = 1; $i <= $users; $i++) {
-        $public = $i % 2 === 1;
         $rows[] = [
             'id' => $i,
             'name' => 'Reader '.Str::random(6).' '.$i,
             'email' => "perf{$i}@example.test",
+            'handle' => 'reader'.$i,
             'password' => 'x',
             'timezone' => 'Europe/Kyiv',
-            'username' => $public ? 'reader'.$i : null,
-            'is_public' => $public,
             'created_at' => $now,
             'updated_at' => $now,
         ];
@@ -79,11 +77,11 @@ function perfSeed(): array
 
     $books = [];
     for ($i = 1; $i <= 500; $i++) {
-        $books[] = ['id' => $i, 'title' => "Book $i", 'source' => 'manual', 'created_at' => $now, 'updated_at' => $now];
+        $books[] = ['id' => $i, 'title' => "Book $i", 'source' => 'openlibrary', 'created_at' => $now, 'updated_at' => $now];
     }
     perfInsert('books', $books);
 
-    // User 1 ("me") and user 3 ("star", public) get the heavy data; the rest is spread around.
+    // User 1 ("me") gets the heavy data; user 3 is the "star" everybody follows.
     $userBooks = [];
     $seen = [];
     for ($i = 1; $i <= 5000; $i++) {
@@ -96,13 +94,18 @@ function perfSeed(): array
         $status = ['want', 'reading', 'finished'][$i % 3];
         $userBooks[] = [
             'user_id' => $user, 'book_id' => $book, 'status' => $status, 'current_page' => 10, 'total_pages' => 300,
-            'started_at' => $now, 'finished_at' => $status === 'finished' ? $now : null,
-            'review_visibility' => 'private', 'created_at' => $now, 'updated_at' => $now,
+            'started_at' => $now, 'finished_at' => $status === 'finished' ? $now : null, 'created_at' => $now, 'updated_at' => $now,
         ];
     }
     perfInsert('user_books', $userBooks);
     $myBook = (int) DB::table('user_books')->where('user_id', 1)->value('id');
     $firstBook = (int) DB::table('user_books')->min('id');
+
+    $reads = [];
+    foreach (DB::table('user_books')->where('status', 'finished')->limit(1500)->pluck('id') as $id) {
+        $reads[] = ['user_book_id' => $id, 'started_at' => $now, 'finished_at' => $now, 'created_at' => $now, 'updated_at' => $now];
+    }
+    perfInsert('user_book_reads', $reads);
 
     $follows = [];
     // "me" follows 300 readers; "star" (user 3) has 400 followers.
@@ -122,55 +125,77 @@ function perfSeed(): array
     unset($follows['3-3']);
     perfInsert('follows', array_values($follows));
 
+    $blocks = [];
+    for ($i = 0; $i < 30; $i++) {
+        $blocks['1-'.(1500 + $i)] = ['user_id' => 1, 'blocked_id' => 1500 + $i, 'created_at' => $now];
+        $blocks[(1600 + $i).'-1'] = ['user_id' => 1600 + $i, 'blocked_id' => 1, 'created_at' => $now];
+    }
+    perfInsert('blocks', array_values($blocks));
+
     $quotes = [];
     for ($i = 1; $i <= 30000; $i++) {
-        $user = $i <= 1000 ? 1 : ($i <= 4000 ? 3 : mt_rand(1, $users));
+        $user = $i <= 1000 ? 1 : mt_rand(1, $users);
         $quotes[] = [
             'user_book_id' => $user === 1 ? $myBook : $firstBook, 'user_id' => $user, 'type' => $i % 5 === 0 ? 'insight' : 'quote',
-            'content' => 'Some quote text '.$i, 'is_favorite' => $i % 7 === 0,
-            'visibility' => $i % 10 < 3 ? 'public' : 'private', 'created_at' => $now, 'updated_at' => $now,
+            'content' => 'Some quote text number '.$i, 'note' => $i % 3 === 0 ? 'A note about it' : null, 'is_favorite' => $i % 7 === 0,
+            'created_at' => $now, 'updated_at' => $now,
         ];
     }
     perfInsert('quotes', $quotes);
-    $quote = (int) DB::table('quotes')->where('user_id', 3)->where('visibility', 'public')->value('id');
+    $myQuotes = DB::table('quotes')->where('user_id', 1)->limit(500)->pluck('id');
 
-    // Auto-increment ids do not restart after a rolled-back transaction, so the real range is read back.
-    $firstQuote = (int) DB::table('quotes')->min('id');
-    $lastQuote = (int) DB::table('quotes')->max('id');
+    $tags = [];
+    foreach (range(1, 20) as $n) {
+        $tags[] = ['id' => $n, 'user_id' => 1, 'name' => "tag$n", 'created_at' => $now, 'updated_at' => $now];
+    }
+    perfInsert('tags', $tags);
+    $quoteTags = [];
+    foreach ($myQuotes as $index => $quoteId) {
+        $quoteTags[] = ['quote_id' => $quoteId, 'tag_id' => ($index % 20) + 1];
+    }
+    perfInsert('quote_tag', $quoteTags);
+
+    // Posts: mostly quote posts; one review per (reader, book) at most, as the unique key demands.
+    $posts = [];
+    $reviewed = [];
+    for ($i = 1; $i <= 30000; $i++) {
+        $user = $i <= 1000 ? 3 : mt_rand(1, $users);
+        $book = mt_rand(1, 500);
+        $review = $i % 6 === 0 && ! isset($reviewed["$user-$book"]);
+        if ($review) {
+            $reviewed["$user-$book"] = true;
+        }
+        $posts[] = [
+            'user_id' => $user, 'book_id' => $book, 'type' => $review ? 'review' : 'quote',
+            'content' => 'Post text '.$i, 'rating' => $review ? mt_rand(1, 5) : null,
+            'created_at' => $now, 'updated_at' => $now,
+        ];
+    }
+    perfInsert('posts', $posts);
+    $post = (int) DB::table('posts')->where('user_id', 3)->value('id');
+    $firstPost = (int) DB::table('posts')->min('id');
+    $lastPost = (int) DB::table('posts')->max('id');
+    // The reviews of a book of my own library (the reviews of any other book are not for me to list), a few hundred of them.
+    $reviewedBook = (int) DB::table('user_books')->where('user_id', 1)->value('book_id');
+    $reviews = [];
+    for ($u = 10; $u < 410; $u++) {
+        $reviews[] = ['user_id' => $u, 'book_id' => $reviewedBook, 'type' => 'review', 'content' => 'A review', 'rating' => mt_rand(1, 5), 'created_at' => $now, 'updated_at' => $now];
+    }
+    DB::table('posts')->insertOrIgnore($reviews);
 
     $likes = [];
     while (count($likes) < 20000) {
         $u = mt_rand(1, $users);
-        $q = mt_rand($firstQuote, $lastQuote);
-        $likes["$u-$q"] = ['user_id' => $u, 'quote_id' => $q, 'created_at' => $now];
+        $p = mt_rand($firstPost, $lastPost);
+        $likes["$u-$p"] = ['user_id' => $u, 'post_id' => $p, 'created_at' => $now];
     }
-    perfInsert('quote_likes', array_values($likes));
+    perfInsert('likes', array_values($likes));
 
     $comments = [];
     for ($i = 1; $i <= 5000; $i++) {
-        $comments[] = ['quote_id' => $i <= 400 ? $quote : mt_rand($firstQuote, $lastQuote), 'user_id' => mt_rand(1, $users), 'body' => 'Comment '.$i, 'created_at' => $now, 'updated_at' => $now];
+        $comments[] = ['post_id' => $i <= 400 ? $post : mt_rand($firstPost, $lastPost), 'user_id' => mt_rand(1, $users), 'content' => 'Comment '.$i, 'created_at' => $now, 'updated_at' => $now];
     }
-    perfInsert('quote_comments', $comments);
-
-    // "me" has a tag on 600 of their quotes, and 5000 foreign tags are spread around.
-    $myQuotes = DB::table('quotes')->where('user_id', 1)->limit(600)->pluck('id');
-    $tags = [['user_id' => 1, 'name' => 'perf', 'created_at' => $now, 'updated_at' => $now]];
-    for ($i = 1; $i <= 5000; $i++) {
-        $tags[] = ['user_id' => mt_rand(2, $users), 'name' => 'tag'.$i, 'created_at' => $now, 'updated_at' => $now];
-    }
-    perfInsert('tags', $tags);
-    $perfTag = (int) DB::table('tags')->where('user_id', 1)->where('name', 'perf')->value('id');
-    $firstTag = (int) DB::table('tags')->min('id');
-    $links = [];
-    foreach ($myQuotes as $id) {
-        $links["$id-$perfTag"] = ['quote_id' => $id, 'tag_id' => $perfTag];
-    }
-    while (count($links) < 15000) {
-        $q = mt_rand($firstQuote, $lastQuote);
-        $t = mt_rand($firstTag, $firstTag + 5000);
-        $links["$q-$t"] = ['quote_id' => $q, 'tag_id' => $t];
-    }
-    perfInsert('quote_tag', array_values($links));
+    perfInsert('comments', $comments);
 
     $logs = [];
     for ($i = 0; $i < 10000; $i++) {
@@ -179,49 +204,28 @@ function perfSeed(): array
     }
     perfInsert('reading_logs', $logs);
 
-    // Reader: 5 EPUBs for "me", 1000 for the others, and 20000 chapter reads, a third of them "mine".
-    $documents = [];
-    for ($i = 1; $i <= 1005; $i++) {
-        $documents[] = [
-            'user_id' => $i <= 5 ? 1 : mt_rand(2, $users), 'title' => "Epub $i", 'path' => "reader/perf/$i.epub",
-            'chapters' => '[]', 'chapters_count' => 400, 'position_chapter' => 3, 'position_fraction' => 0.5,
-            'created_at' => $now, 'updated_at' => $now,
-        ];
-    }
-    perfInsert('reader_documents', $documents);
-    $firstDocument = (int) DB::table('reader_documents')->min('id');
-
-    $reads = [];
-    for ($i = 0; $i < 20000; $i++) {
-        $document = $i < 7000 ? $firstDocument + ($i % 5) : $firstDocument + 5 + ($i % 1000);
-        $reads["$document-".intdiv($i, 5)] = [
-            'reader_document_id' => $document, 'chapter' => intdiv($i, 5), 'read_on' => now('Europe/Kyiv')->subDays($i % 400)->toDateString(), 'created_at' => $now,
-        ];
-    }
-    perfInsert('reader_chapter_reads', array_values($reads));
-
-    return ['me' => User::findOrFail(1), 'star' => 'reader3', 'quote' => $quote];
+    return ['me' => User::findOrFail(1), 'star' => 'reader3', 'post' => $post, 'book' => $reviewedBook];
 }
 
 /** @return list<array{string, string, int}> label, path, status */
 function perfEndpoints(array $seed): array
 {
     return [
-        ['feed', '/api/feed', 200],
-        ['profile', "/api/users/{$seed['star']}", 200],
-        ['profile quotes', "/api/users/{$seed['star']}/quotes", 200],
-        ['followers', "/api/users/{$seed['star']}/followers", 200],
-        ['search prefix', '/api/users?q=reader12', 200],
-        ['search name', '/api/users?q=Reader', 200],
+        ['feed following', '/api/feed', 200],
+        ['feed all', '/api/feed?scope=all', 200],
+        ['profile', "/api/profiles/{$seed['star']}", 200],
+        ['profile posts', "/api/profiles/{$seed['star']}/posts", 200],
+        ['search prefix', '/api/profiles?q=reader12', 200],
+        ['search name', '/api/profiles?q=Reader', 200],
+        ['post', "/api/posts/{$seed['post']}", 200],
+        ['comments', "/api/posts/{$seed['post']}/comments", 200],
+        ['book reviews', "/api/books/{$seed['book']}/reviews", 200],
+        ['blocks', '/api/blocks', 200],
         ['quotes list', '/api/quotes', 200],
         ['quotes filtered', '/api/quotes?favorite=1&type=quote', 200],
-        // Rows inserted in the test transaction are invisible to the FULLTEXT index, but the plan must still use it.
-        ['quotes by tag', '/api/quotes?tag=perf', 200],
-        ['quotes by tag filtered', '/api/quotes?tag=perf&favorite=1', 200],
-        ['tags', '/api/tags', 200],
-        ['quotes search', '/api/quotes?q=quote', 200],
-        ['quotes search filtered', '/api/quotes?q=quote+text&favorite=1', 200],
-        ['comments', "/api/quotes/{$seed['quote']}/comments", 200],
+        ['quotes search', '/api/quotes?q=quote+text', 200],
+        ['quotes tag', '/api/quotes?tag=tag3', 200],
+        ['quote of the day', '/api/quotes/daily', 200],
         ['stats summary', '/api/stats/summary', 200],
         ['stats daily', '/api/stats/daily?days=365', 200],
         ['stats year', '/api/stats/year/'.now()->year, 200],
@@ -232,7 +236,7 @@ function perfEndpoints(array $seed): array
 
 it('keeps every hot endpoint off full table scans at volume', function () {
     $seed = perfSeed();
-    $this->actingAs($seed['me'], 'sanctum');
+    $this->actAs($seed['me']);
 
     $failures = [];
     $report = [];
@@ -244,7 +248,7 @@ it('keeps every hot endpoint off full table scans at volume', function () {
     foreach (perfEndpoints($seed) as [$label, $path, $status]) {
         $queries = [];
         $started = hrtime(true);
-        $this->getJson($path)->assertStatus($status);
+        expect($this->getJson($path)->getStatusCode())->toBe($status, "$label ($path)");
         $ms = (hrtime(true) - $started) / 1e6;
 
         $report[] = sprintf('%-16s %7.1f ms  %2d queries', $label, $ms, count($queries));

@@ -32,7 +32,6 @@ it('is all zeros for a reader who has not read anything', function () {
         'month' => ['pages' => 0, 'books_finished' => 0],
         'year' => ['pages' => 0, 'books_finished' => 0],
         'forecasts' => [],
-        'reader' => ['chapters_this_month' => 0, 'chapters_this_year' => 0, 'documents_in_progress' => 0],
     ]]);
 });
 

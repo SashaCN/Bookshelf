@@ -30,6 +30,37 @@ describe('quotes store', () => {
     vi.resetAllMocks()
   })
 
+  describe('when the text of a book goes', () => {
+    const anchor = { book_text_id: 10, chapter: 1, start: 2, end: 9 }
+
+    it('forgets where the quotes of that book were selected, and no other', () => {
+      const quotes = useQuotesStore()
+      quotes.items = [
+        makeQuote({ id: 1, user_book_id: 7, anchor }),
+        makeQuote({ id: 2, user_book_id: 8, anchor }),
+        makeQuote({ id: 3, user_book_id: 7, anchor: null }),
+      ]
+      quotes.daily = makeQuote({ id: 4, user_book_id: 7, anchor })
+
+      quotes.clearAnchors(7)
+
+      expect(quotes.items.map((quote) => quote.anchor)).toEqual([null, anchor, null])
+      expect(quotes.items.map((quote) => quote.id)).toEqual([1, 2, 3])
+      expect(quotes.daily?.anchor).toBeNull()
+    })
+
+    it('leaves the quote of the day of another book alone, and works without one', () => {
+      const quotes = useQuotesStore()
+      quotes.daily = makeQuote({ id: 4, user_book_id: 8, anchor })
+
+      quotes.clearAnchors(7)
+      expect(quotes.daily.anchor).toEqual(anchor)
+
+      quotes.daily = null
+      expect(() => quotes.clearAnchors(7)).not.toThrow()
+    })
+  })
+
   describe('the list', () => {
     it('loads the first page for the given filters', async () => {
       vi.mocked(quotesApi.list).mockResolvedValue(page([3, 2], '/api/quotes?page=2'))

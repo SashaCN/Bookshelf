@@ -30,11 +30,6 @@ class UserBookFactory extends Factory
         ];
     }
 
-    public function unstarted(): static
-    {
-        return $this->state(fn () => ['status' => BookStatus::Want]);
-    }
-
     public function reading(int $currentPage = 100): static
     {
         return $this->state(fn () => [

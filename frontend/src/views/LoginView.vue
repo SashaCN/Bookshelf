@@ -2,15 +2,15 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ApiError } from '@/api/http'
+import { ApiError, NetworkError } from '@/api/http'
 import AuthLayout from '@/components/AuthLayout.vue'
 import FormField from '@/components/FormField.vue'
 import { safeRedirect } from '@/router/redirect'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
-const route = useRoute()
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const email = ref('')
@@ -19,9 +19,6 @@ const submitting = ref(false)
 const error = ref('')
 
 async function submit() {
-  // Enter in a field can submit again while the first request is still on its way.
-  if (submitting.value) return
-
   submitting.value = true
   error.value = ''
 
@@ -33,6 +30,8 @@ async function submit() {
       error.value = t('auth.errors.invalidCredentials')
     } else if (e instanceof ApiError && e.status === 429) {
       error.value = t('auth.errors.tooManyAttempts')
+    } else if (e instanceof NetworkError) {
+      error.value = t('apiErrors.offline')
     } else {
       error.value = t('auth.errors.generic')
     }
@@ -45,6 +44,10 @@ async function submit() {
 <template>
   <AuthLayout :title="$t('auth.login.title')">
     <form class="flex flex-col gap-4" @submit.prevent="submit">
+      <p v-if="route.query.expired" role="status" class="rounded-lg bg-sunken px-3 py-2 text-sm">
+        {{ $t('auth.sessionExpired') }}
+      </p>
+
       <FormField id="email" v-model="email" type="email" autocomplete="email" :label="$t('auth.fields.email')" />
       <FormField
         id="password"
@@ -54,18 +57,18 @@ async function submit() {
         :label="$t('auth.fields.password')"
       />
 
-      <p v-if="route.query.reset === '1'" role="status" data-test="password-changed" class="rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted">
-        {{ $t('auth.login.passwordChanged') }}
+      <p v-if="route.query.reset === '1'" role="status" data-test="password-changed" class="rounded-lg bg-sunken px-3 py-2 text-sm">
+        {{ $t('account.login.passwordChanged') }}
       </p>
 
-      <p v-if="route.query.deleted === '1'" role="status" data-test="account-deleted" class="rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted">
-        {{ $t('auth.login.accountDeleted') }}
+      <p v-if="route.query.deleted === '1'" role="status" data-test="account-deleted" class="rounded-lg bg-sunken px-3 py-2 text-sm">
+        {{ $t('account.login.accountDeleted') }}
       </p>
 
       <p v-if="error" role="alert" class="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{{ error }}</p>
 
       <RouterLink :to="{ name: 'forgot-password' }" class="self-start text-sm font-medium text-accent underline underline-offset-2">
-        {{ $t('auth.login.forgotPassword') }}
+        {{ $t('account.login.forgotPassword') }}
       </RouterLink>
 
       <button

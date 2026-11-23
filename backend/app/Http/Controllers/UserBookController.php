@@ -27,7 +27,7 @@ class UserBookController extends Controller
         $validated = $request->validate(['status' => ['nullable', Rule::enum(BookStatus::class)]]);
 
         $userBooks = $request->user()->userBooks()
-            ->with('book.authors')
+            ->with('book.authors', 'bookText')
             ->withCount('reads')
             ->when($validated['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
             ->latest('updated_at')
@@ -49,7 +49,7 @@ class UserBookController extends Controller
     {
         Gate::authorize('view', $userBook);
 
-        return (new UserBookResource($userBook->load('book.authors', 'reads')->loadCount('reads')))->withReaderDocument();
+        return (new UserBookResource($userBook->load('book.authors', 'bookText', 'reads')->loadCount('reads')))->withReads();
     }
 
     /**
@@ -71,7 +71,9 @@ class UserBookController extends Controller
             $book = $userBook->book;
             $userBook->delete();
 
-            if ($book->source === BookSource::Manual && ! $book->userBooks()->exists()) {
+            // Posts in the community point at the book itself and would be deleted with it: a book that still has
+            // posts stays in the catalog (its title is shown with them), whoever keeps it on a shelf.
+            if ($book->source === BookSource::Manual && ! $book->userBooks()->exists() && ! $book->posts()->exists()) {
                 $book->delete();
             }
         });

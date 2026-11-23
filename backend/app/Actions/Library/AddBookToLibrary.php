@@ -70,7 +70,7 @@ class AddBookToLibrary
             ]);
 
             // A different starting status goes through the same rules as any later change.
-            $extra = array_intersect_key($data, array_flip(['status', 'started_at', 'finished_at', 'rating', 'review']));
+            $extra = array_intersect_key($data, array_flip(['status', 'started_at', 'finished_at', 'rating']));
 
             return $extra === [] ? $userBook->load('book.authors') : $this->updateUserBook->handle($userBook, $extra);
         });
@@ -120,6 +120,7 @@ class AddBookToLibrary
             'page_count' => $data['total_pages'] ?? null,
             'published_year' => $data['published_year'] ?? null,
             'isbn_13' => $data['isbn_13'] ?? null,
+            'cover_url' => $data['cover_url'] ?? null,
             'source' => BookSource::Manual,
             'created_by' => $user->id,
         ]);

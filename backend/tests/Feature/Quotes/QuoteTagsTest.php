@@ -224,33 +224,11 @@ describe('listing tags', function () {
 describe('exposure', function () {
     it('shows tags to the owner in the list, one quote and the quote of the day', function () {
         $this->actingAs($this->user);
-        $id = createTagged($this, ['мої'], ['visibility' => 'public'])->json('data.id');
+        $id = createTagged($this, ['мої'])->json('data.id');
 
         $this->getJson('/api/quotes')->assertJsonPath('data.0.tags', ['мої']);
         $this->getJson("/api/quotes/{$id}")->assertJsonPath('data.tags', ['мої']);
         $this->getJson('/api/quotes/daily')->assertJsonPath('data.tags', ['мої']);
-    });
-
-    it('hides tags from guests and other readers on public profiles and in the feed', function () {
-        $this->user->update(['username' => 'owner', 'is_public' => true]);
-        $this->actingAs($this->user);
-        createTagged($this, ['secret'], ['visibility' => 'public'])->assertCreated();
-
-        $this->stranger->following()->attach($this->user->id);
-
-        $this->actAsGuest();
-        $guest = $this->getJson('/api/users/owner/quotes')->assertOk();
-        expect($guest->getContent())->not->toContain('secret')->and($guest->json('data.0'))->not->toHaveKey('tags');
-
-        $this->actingAs($this->stranger);
-        $profile = $this->getJson('/api/users/owner/quotes')->assertOk();
-        $feed = $this->getJson('/api/feed')->assertOk();
-        expect($profile->json('data'))->toHaveCount(1)->and($profile->getContent())->not->toContain('secret')
-            ->and($feed->json('data'))->toHaveCount(1)->and($feed->getContent())->not->toContain('secret');
-
-        // Not even to the owner on their own public profile: those are shared resources.
-        $this->actingAs($this->user);
-        expect($this->getJson('/api/users/owner/quotes')->assertOk()->getContent())->not->toContain('secret');
     });
 });
 

@@ -3,24 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
-import { readerApi } from '@/api/reader'
-import { makeReaderDoc } from '@/test/readerFixtures'
 import { makeBook, makeQuote, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
-import type { Quote, ReaderDocument, UserBook } from '@/types/api'
+import type { Quote, UserBook } from '@/types/api'
 import HomeView from './HomeView.vue'
 
 vi.mock('@/api/library', () => ({
-  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(),
-    reread: vi.fn(), logs: vi.fn() },
+  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(), logs: vi.fn() },
   catalogApi: { search: vi.fn() },
 }))
 vi.mock('@/api/quotes', () => ({
   quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
-}))
-
-vi.mock('@/api/reader', () => ({
-  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), link: vi.fn(), chapter: vi.fn() },
 }))
 
 const reading = (id: number, title: string) =>
@@ -33,18 +26,13 @@ const reading = (id: number, title: string) =>
     book: makeBook({ id, title }),
   })
 
-async function mountView(items: UserBook[], daily: Quote | null | Error, documents: ReaderDocument[] | Error = []) {
+async function mountView(items: UserBook[], daily: Quote | null | Error) {
   const { plugins, router } = createTestEnvironment()
   vi.mocked(libraryApi.list).mockResolvedValue(items)
   if (daily instanceof Error) {
     vi.mocked(quotesApi.daily).mockRejectedValue(daily)
   } else {
     vi.mocked(quotesApi.daily).mockResolvedValue(daily)
-  }
-  if (documents instanceof Error) {
-    vi.mocked(readerApi.list).mockRejectedValue(documents)
-  } else {
-    vi.mocked(readerApi.list).mockResolvedValue(documents)
   }
   await router.push({ name: 'home' })
 
@@ -57,23 +45,6 @@ async function mountView(items: UserBook[], daily: Quote | null | Error, documen
 describe('HomeView', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-  })
-
-  it('links to the feed', async () => {
-    const { wrapper } = await mountView([reading(1, 'Дюна')], null)
-
-    expect(wrapper.get('a[href="/feed"]').text()).toContain('Стрічка друзів')
-    expect(wrapper.get('a[href="/feed"]').text()).toContain('Цитати людей, на яких ви підписані')
-  })
-
-  it('shows the feed and the reader as two matching cards', async () => {
-    const { wrapper } = await mountView([reading(1, 'Дюна')], null)
-
-    const feed = wrapper.get('a[href="/feed"]')
-    const reader = wrapper.get('a[href="/reader"]')
-    expect(reader.text()).toContain('Читалка EPUB')
-    expect(reader.text()).toContain('Читайте EPUB прямо в застосунку')
-    expect(reader.classes()).toEqual(feed.classes())
   })
 
   it('shows a card for each book being read', async () => {
@@ -95,7 +66,6 @@ describe('HomeView', () => {
     const { plugins, router } = createTestEnvironment()
     vi.mocked(libraryApi.list).mockRejectedValueOnce(new ApiError(500, null)).mockResolvedValueOnce([reading(1, 'First Book')])
     vi.mocked(quotesApi.daily).mockResolvedValue(null)
-    vi.mocked(readerApi.list).mockResolvedValue([])
     await router.push({ name: 'home' })
     const wrapper = mount(HomeView, { global: { plugins } })
     await flushPromises()
@@ -105,60 +75,6 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('First Book')
-  })
-
-  describe('continue reading', () => {
-    const read = makeReaderDoc({
-      id: 7,
-      title: 'Кобзар',
-      author: 'Тарас Шевченко',
-      chapters_count: 12,
-      position: { chapter: 3, fraction: 0.5 },
-      progress: 29.2,
-      last_read_at: '2026-11-20T10:00:00Z',
-    })
-
-    it('shows the last read book with its progress, above the feed and reader cards', async () => {
-      const { wrapper } = await mountView([reading(1, 'First Book')], null, [makeReaderDoc({ id: 8, title: 'Нова' }), read])
-
-      const card = wrapper.get('a[href="/reader/7"]')
-      expect(card.text()).toContain('Продовжити читання')
-      expect(card.text()).toContain('Кобзар')
-      expect(card.text()).toContain('Тарас Шевченко')
-      expect(card.text()).toContain('29%')
-      expect(card.text()).toContain('Розділ 4 з 12')
-      expect(card.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('29.2')
-      expect(wrapper.text()).not.toContain('Нова')
-      const html = wrapper.html()
-      expect(html.indexOf('Продовжити читання')).toBeLessThan(html.indexOf('Стрічка друзів'))
-    })
-
-    it('replaces the library nudge when no library book is being read', async () => {
-      const { wrapper } = await mountView([], null, [read])
-
-      expect(wrapper.text()).toContain('Продовжити читання')
-      expect(wrapper.text()).not.toContain('Зараз нічого не читаєте')
-    })
-
-    it('is hidden when no book has been read yet', async () => {
-      const { wrapper } = await mountView([reading(1, 'First Book')], null, [makeReaderDoc()])
-
-      expect(wrapper.text()).not.toContain('Продовжити читання')
-    })
-
-    it('is hidden when there are no books', async () => {
-      const { wrapper } = await mountView([reading(1, 'First Book')], null, [])
-
-      expect(wrapper.text()).not.toContain('Продовжити читання')
-    })
-
-    it('fails silently and leaves the rest of the screen alone', async () => {
-      const { wrapper } = await mountView([reading(1, 'First Book')], null, new ApiError(500, null))
-
-      expect(wrapper.text()).toContain('First Book')
-      expect(wrapper.text()).not.toContain('Продовжити читання')
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-    })
   })
 
   describe('the quote of the day', () => {

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeReaderBookmark, makeReaderChapter, makeReaderDoc } from '@/test/readerFixtures'
+import { makeBookText, makeChapter } from '@/test/readerFixtures'
 import { http } from './http'
 import { readerApi } from './reader'
 
 vi.mock('./http', () => ({
-  http: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  http: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), upload: vi.fn() },
 }))
 
 describe('readerApi', () => {
@@ -12,62 +12,63 @@ describe('readerApi', () => {
     vi.resetAllMocks()
   })
 
-  it('lists and unwraps documents', async () => {
-    vi.mocked(http.get).mockResolvedValue({ data: [makeReaderDoc({ id: 5 })] })
+  it('uploads a book as a form with the file in the field "file", and unwraps the answer', async () => {
+    vi.mocked(http.upload).mockResolvedValue({ data: makeBookText({ id: 5 }) })
+    const file = new File(['epub'], 'book.epub', { type: 'application/epub+zip' })
 
-    expect((await readerApi.list())[0].id).toBe(5)
-    expect(http.get).toHaveBeenCalledWith('/api/reader')
+    const text = await readerApi.upload(3, file)
+
+    expect(text.id).toBe(5)
+    const [path, form] = vi.mocked(http.upload).mock.calls[0]!
+    expect(path).toBe('/api/library/3/text')
+    expect(form).toBeInstanceOf(FormData)
+    expect((form as FormData).get('file')).toBe(file)
+    expect(vi.mocked(http.upload).mock.calls[0]![2]).toBeUndefined()
   })
 
-  it('uploads the file as multipart form data under "file"', async () => {
-    vi.mocked(http.post).mockResolvedValue({ data: makeReaderDoc({ id: 9 }) })
-    const file = new File(['x'], 'book.epub', { type: 'application/epub+zip' })
+  it('lets the caller choose how long to wait for an upload', async () => {
+    vi.mocked(http.upload).mockResolvedValue({ data: makeBookText() })
 
-    expect((await readerApi.upload(file)).id).toBe(9)
+    await readerApi.upload(3, new File(['epub'], 'book.epub'), 300_000)
 
-    const [path, body] = vi.mocked(http.post).mock.calls[0]
-    expect(path).toBe('/api/reader')
-    expect(body).toBeInstanceOf(FormData)
-    expect((body as FormData).get('file')).toBeInstanceOf(File)
+    expect(vi.mocked(http.upload).mock.calls[0]![2]).toBe(300_000)
   })
 
-  it('gets, removes, saves the position and loads a chapter', async () => {
-    vi.mocked(http.get).mockResolvedValueOnce({ data: makeReaderDoc() }).mockResolvedValueOnce({ data: makeReaderChapter({ index: 2 }) })
-    vi.mocked(http.put).mockResolvedValue({ data: makeReaderDoc() })
+  it('reads and removes the text of a library entry', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: makeBookText({ id: 8 }) })
     vi.mocked(http.delete).mockResolvedValue(null)
 
-    vi.mocked(http.patch).mockResolvedValue({ data: makeReaderDoc({ user_book_id: 7 }) })
+    expect((await readerApi.text(3)).id).toBe(8)
+    await readerApi.removeText(3)
 
-    await readerApi.get(3)
-    await readerApi.remove(3)
-    await readerApi.savePosition(3, { chapter: 2, fraction: 0 })
-    expect((await readerApi.chapter(3, 2)).index).toBe(2)
-    expect((await readerApi.link(3, 7)).user_book_id).toBe(7)
-    await readerApi.link(3, null)
-
-    expect(http.get).toHaveBeenNthCalledWith(1, '/api/reader/3')
-    expect(http.delete).toHaveBeenCalledWith('/api/reader/3')
-    expect(http.put).toHaveBeenCalledWith('/api/reader/3/position', { chapter: 2, fraction: 0 })
-    expect(http.patch).toHaveBeenNthCalledWith(1, '/api/reader/3', { user_book_id: 7 })
-    expect(http.patch).toHaveBeenNthCalledWith(2, '/api/reader/3', { user_book_id: null })
-    expect(http.get).toHaveBeenNthCalledWith(2, '/api/reader/3/chapters/2')
+    expect(http.get).toHaveBeenCalledWith('/api/library/3/text')
+    expect(http.delete).toHaveBeenCalledWith('/api/library/3/text')
   })
 
-  it('lists, saves and removes bookmarks', async () => {
-    vi.mocked(http.get).mockResolvedValue({ data: [makeReaderBookmark({ id: 8 })] })
-    vi.mocked(http.post).mockResolvedValue({ data: makeReaderBookmark({ id: 9, chapter: 2 }) })
-    vi.mocked(http.delete).mockResolvedValue(null)
+  it('reads a chapter and unwraps it', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: makeChapter({ position: 4, title: 'Four' }) })
 
-    expect((await readerApi.bookmarks(3))[0].id).toBe(8)
-    expect((await readerApi.saveBookmark(3, 2)).id).toBe(9)
-    await readerApi.saveBookmark(3, 2, 'note')
-    await readerApi.saveBookmark(3, 2, null)
-    await readerApi.removeBookmark(3, 9)
+    const chapter = await readerApi.chapter(8, 4)
 
-    expect(http.get).toHaveBeenCalledWith('/api/reader/3/bookmarks')
-    expect(http.post).toHaveBeenNthCalledWith(1, '/api/reader/3/bookmarks', { chapter: 2 })
-    expect(http.post).toHaveBeenNthCalledWith(2, '/api/reader/3/bookmarks', { chapter: 2, note: 'note' })
-    expect(http.post).toHaveBeenNthCalledWith(3, '/api/reader/3/bookmarks', { chapter: 2, note: null })
-    expect(http.delete).toHaveBeenCalledWith('/api/reader/3/bookmarks/9')
+    expect(http.get).toHaveBeenCalledWith('/api/book-texts/8/chapters/4')
+    expect(chapter.title).toBe('Four')
+  })
+
+  it('saves the position and gives the answer as it is, with the library entry in it', async () => {
+    const answer = { data: makeBookText(), meta: { user_book: {} } }
+    vi.mocked(http.put).mockResolvedValue(answer)
+
+    const result = await readerApi.savePosition(8, { chapter: 2, chapter_progress: 0.5 })
+
+    expect(http.put).toHaveBeenCalledWith('/api/book-texts/8/position', { chapter: 2, chapter_progress: 0.5 })
+    expect(result).toBe(answer)
+  })
+
+  it('saves the position with keepalive when the page is on its way out', async () => {
+    vi.mocked(http.put).mockResolvedValue({ data: makeBookText(), meta: { user_book: {} } })
+
+    await readerApi.savePosition(8, { chapter: 2, chapter_progress: 0.5 }, { keepalive: true })
+
+    expect(http.put).toHaveBeenCalledWith('/api/book-texts/8/position', { chapter: 2, chapter_progress: 0.5 }, { keepalive: true })
   })
 })

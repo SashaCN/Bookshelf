@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['name', 'email', 'password', 'timezone', 'username', 'is_public'])]
+#[Fillable(['name', 'email', 'handle', 'bio', 'password', 'timezone'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -21,17 +22,6 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     public const DEFAULT_TIMEZONE = 'Europe/Kyiv';
-
-    public const NEW_FOLLOWERS_CAP = 99;
-
-    /**
-     * Defaults of a freshly created reader, mirroring the column defaults.
-     *
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'is_public' => false,
-    ];
 
     /**
      * @return HasMany<UserBook, $this>
@@ -58,58 +48,116 @@ class User extends Authenticatable
     }
 
     /**
-     * @return HasMany<ReaderDocument, $this>
+     * @return HasMany<Post, $this>
      */
-    public function readerDocuments(): HasMany
+    public function posts(): HasMany
     {
-        return $this->hasMany(ReaderDocument::class);
+        return $this->hasMany(Post::class);
     }
 
     /**
+     * @return HasMany<Comment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    /**
+     * The readers this reader follows.
+     *
      * @return BelongsToMany<User, $this>
      */
     public function following(): BelongsToMany
     {
-        return $this->belongsToMany(self::class, 'follows', 'follower_id', 'followed_id')->withPivot('created_at');
+        return $this->belongsToMany(self::class, 'follows', 'follower_id', 'followed_id');
     }
 
     /**
+     * The readers who follow this reader.
+     *
      * @return BelongsToMany<User, $this>
      */
     public function followers(): BelongsToMany
     {
-        return $this->belongsToMany(self::class, 'follows', 'followed_id', 'follower_id')->withPivot('created_at');
+        return $this->belongsToMany(self::class, 'follows', 'followed_id', 'follower_id');
     }
 
     /**
-     * Leaves out everybody the viewer has blocked and everybody who has blocked the viewer:
-     * a block hides both sides from each other. A guest has no blocks, so nothing is left out.
+     * The readers this reader has blocked.
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function blockedReaders(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'blocks', 'user_id', 'blocked_id')->withPivot('created_at');
+    }
+
+    /**
+     * The readers who have blocked this reader.
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function blockers(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'blocks', 'blocked_id', 'user_id');
+    }
+
+    /**
+     * Whether one of the two has blocked the other. Blocking is mutual: neither sees what the other writes.
+     */
+    public function isBlockedWith(int $readerId): bool
+    {
+        return DB::table('blocks')
+            ->where(fn ($query) => $query->where('user_id', $this->id)->where('blocked_id', $readerId))
+            ->orWhere(fn ($query) => $query->where('user_id', $readerId)->where('blocked_id', $this->id))
+            ->exists();
+    }
+
+    /**
+     * Readers the viewer has no block with, in either direction. Others never turn up in search results or counts.
      *
      * @param  Builder<User>  $query
      */
-    public function scopeVisibleTo(Builder $query, ?User $viewer): void
+    public function scopeNotBlockedWith(Builder $query, User $viewer): void
     {
-        if ($viewer === null) {
-            return;
-        }
-
-        $query
-            ->whereNotIn('users.id', DB::table('user_blocks')->where('blocker_id', $viewer->id)->select('blocked_id'))
-            ->whereNotIn('users.id', DB::table('user_blocks')->where('blocked_id', $viewer->id)->select('blocker_id'));
+        self::excludeBlocked($query, $viewer, $query->qualifyColumn('id'));
     }
 
     /**
-     * Public followers who followed after the reader last looked at the list, capped at NEW_FOLLOWERS_CAP.
+     * What a profile page shows to the viewer: the number of posts, followers and followed readers, and how the viewer
+     * stands with the reader. Hidden posts and readers the viewer has a block with are left out of the numbers.
+     *
+     * @param  Builder<User>  $query
      */
-    public function newFollowersCount(): int
+    public function scopeWithProfileState(Builder $query, User $viewer): void
     {
-        $count = $this->followers()
-            ->where('users.is_public', true)
-            ->visibleTo($this)
-            ->when($this->followers_seen_at, fn ($query, $seenAt) => $query->where('follows.created_at', '>', $seenAt))
-            ->count();
+        $followers = DB::table('follows')->selectRaw('count(*)')->whereColumn('follows.followed_id', 'users.id');
+        self::excludeBlocked($followers, $viewer, 'follows.follower_id');
 
-        return min($count, self::NEW_FOLLOWERS_CAP);
+        $following = DB::table('follows')->selectRaw('count(*)')->whereColumn('follows.follower_id', 'users.id');
+        self::excludeBlocked($following, $viewer, 'follows.followed_id');
+
+        $query->addSelect([
+            'posts_count' => Post::query()->selectRaw('count(*)')->whereColumn('posts.user_id', 'users.id')->visibleTo($viewer),
+            'followers_count' => $followers,
+            'following_count' => $following,
+        ])->withExists([
+            'followers as is_following' => fn ($follows) => $follows->where('follows.follower_id', $viewer->id),
+            'blockers as is_blocked' => fn ($blocks) => $blocks->where('blocks.user_id', $viewer->id),
+        ]);
+    }
+
+    /**
+     * Narrow a query to rows whose reader (`$column`) has no block with the viewer, in either direction.
+     *
+     * @param  Builder<*>|\Illuminate\Database\Query\Builder  $query
+     */
+    public static function excludeBlocked(Builder|QueryBuilder $query, User $viewer, string $column): void
+    {
+        $query
+            ->whereNotIn($column, fn ($blocked) => $blocked->select('blocked_id')->from('blocks')->where('user_id', $viewer->id))
+            ->whereNotIn($column, fn ($blockers) => $blockers->select('user_id')->from('blocks')->where('blocked_id', $viewer->id));
     }
 
     /**
@@ -122,8 +170,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'is_public' => 'boolean',
-            'followers_seen_at' => 'datetime',
+            'is_admin' => 'boolean',
         ];
     }
 }
