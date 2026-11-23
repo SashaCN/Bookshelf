@@ -22,7 +22,7 @@ async function mountView() {
 }
 
 async function pick(wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'], file: File) {
-  const input = wrapper.get('#goodreads-file')
+  const input = wrapper.get('[data-testid="csv-input"]')
   Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
   await input.trigger('change')
 }
@@ -47,8 +47,12 @@ describe('LibraryImportView', () => {
 
     expect(wrapper.text()).toContain('Export Library')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="file-name"]').text()).toBe('Файл не вибрано')
+    expect(wrapper.get('label').text()).toBe('Обрати файл CSV')
 
     await pick(wrapper, csv())
+
+    expect(wrapper.get('[data-testid="file-name"]').text()).toBe('goodreads_library_export.csv')
 
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
   })

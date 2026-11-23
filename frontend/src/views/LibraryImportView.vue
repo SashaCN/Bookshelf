@@ -110,17 +110,23 @@ function reset() {
 
     <p class="text-sm text-ink-muted">{{ $t('libraryImport.rules') }}</p>
 
-    <div class="flex flex-col gap-1">
-      <label for="goodreads-file" class="text-sm font-medium">{{ $t('libraryImport.file') }}</label>
-      <input
-        id="goodreads-file"
-        ref="input"
-        type="file"
-        accept=".csv,text/csv"
-        :disabled="uploading"
-        class="min-h-11 rounded-lg border border-line bg-surface px-3 py-2 text-base"
-        @change="onFile"
+    <div class="flex flex-col gap-2">
+      <label
+        class="relative flex min-h-11 w-full cursor-pointer items-center justify-center rounded-2xl border border-dashed border-line bg-surface px-4 font-semibold text-accent focus-within:ring-2 focus-within:ring-accent/30"
+        :class="{ 'opacity-60': uploading }"
       >
+        <input
+          ref="input"
+          type="file"
+          accept=".csv,text/csv"
+          :disabled="uploading"
+          class="sr-only"
+          data-testid="csv-input"
+          @change="onFile"
+        >
+        {{ $t('libraryImport.choose') }}
+      </label>
+      <p class="text-sm text-ink-muted" data-testid="file-name">{{ file ? file.name : $t('libraryImport.noFile') }}</p>
     </div>
 
     <ErrorNotice v-if="error" :message="error" />
