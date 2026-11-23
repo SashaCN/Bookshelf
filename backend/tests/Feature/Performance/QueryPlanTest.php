@@ -224,6 +224,7 @@ function perfEndpoints(array $seed): array
         ['comments', "/api/quotes/{$seed['quote']}/comments", 200],
         ['stats summary', '/api/stats/summary', 200],
         ['stats daily', '/api/stats/daily?days=365', 200],
+        ['stats year', '/api/stats/year/'.now()->year, 200],
         ['library', '/api/library', 200],
         ['library status', '/api/library?status=reading', 200],
     ];
