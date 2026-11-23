@@ -196,14 +196,6 @@ function closeDelete() {
     {{ $t('profile.newFollowers', auth.user.new_followers_count) }}
   </RouterLink>
 
-  <RouterLink
-    :to="{ name: 'blocks' }"
-    data-test="blocked-link"
-    class="mb-4 flex min-h-11 items-center rounded-2xl border border-line bg-surface px-4 py-3 font-medium"
-  >
-    {{ $t('profile.blocked') }}
-  </RouterLink>
-
   <form class="flex flex-col gap-4" @submit.prevent="save" @input="saved = false" @change="saved = false">
     <ErrorNotice v-if="error" :message="error" />
 
@@ -277,6 +269,15 @@ function closeDelete() {
       class="text-sm font-medium text-accent underline-offset-2 hover:underline"
     >
       {{ $t('profile.publicLink') }}
+    </RouterLink>
+
+    <!-- Next to the privacy settings it belongs to, not above the whole form. -->
+    <RouterLink
+      :to="{ name: 'blocks' }"
+      data-test="blocked-link"
+      class="inline-flex min-h-11 items-center self-start text-sm font-medium text-accent underline-offset-2 hover:underline"
+    >
+      {{ $t('profile.blocked') }}
     </RouterLink>
 
     <button
