@@ -15,6 +15,7 @@ use App\Http\Controllers\ReaderBookmarkController;
 use App\Http\Controllers\ReaderDocumentController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\StatsController;
+use App\Http\Controllers\TagController;
 use App\Http\Controllers\UserBookController;
 use App\Http\Controllers\UserSearchController;
 use Illuminate\Support\Facades\Route;
@@ -53,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/quotes/export', [QuoteController::class, 'export'])->name('quotes.export');
     Route::get('/quotes/daily', [QuoteController::class, 'daily'])->name('quotes.daily');
     Route::apiResource('quotes', QuoteController::class)->except('store');
+    Route::get('/tags', TagController::class)->name('tags.index');
     Route::middleware('throttle:social')->group(function (): void {
         Route::post('/quotes/{quote}/like', [QuoteLikeController::class, 'store'])->where('quote', '[0-9]+')->name('quotes.like');
         Route::delete('/quotes/{quote}/like', [QuoteLikeController::class, 'destroy'])->where('quote', '[0-9]+')->name('quotes.unlike');

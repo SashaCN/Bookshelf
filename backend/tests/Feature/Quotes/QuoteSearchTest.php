@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Quote;
+use App\Models\Tag;
 use App\Models\User;
 use App\Models\UserBook;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,7 @@ function searchFixtures(): array
     };
 
     $f = [];
-    foreach (['cyrillic', 'partial', 'note', 'ranking', 'filters', 'pagination', 'plain', 'operators', 'own', 'export', 'validation'] as $name) {
+    foreach (['cyrillic', 'partial', 'note', 'ranking', 'filters', 'pagination', 'plain', 'operators', 'own', 'export', 'validation', 'tags'] as $name) {
         $f[$name] = $reader($name);
     }
 
@@ -79,6 +80,15 @@ function searchFixtures(): array
         $quote($f['export']['book'], 'Зірки далеко.'),
         $quote($f['export']['book'], 'Земля близько.'),
     ];
+
+    $tag = Tag::create(['user_id' => $f['tags']['user']->id, 'name' => 'космос']);
+    $f['tags']['quotes'] = [
+        'tagged' => $quote($f['tags']['book'], 'Мандрівка крізь простір.'),
+        'untagged' => $quote($f['tags']['book'], 'Мандрівка крізь час.'),
+        'otherBook' => $quote($f['tags']['other'], 'Мандрівка крізь простір і час.'),
+    ];
+    $f['tags']['quotes']['tagged']->tags()->attach($tag);
+    $f['tags']['quotes']['otherBook']->tags()->attach($tag);
 
     while (DB::transactionLevel() > 0) {
         DB::commit();
@@ -172,6 +182,16 @@ it('combines with the book, favorite and type filters', function () {
     expect($ids("book={$r['book']->id}"))->toBe([$inBook->id, $favorite->id, $insight->id])
         ->and($ids('favorite=1'))->toBe([$favorite->id])
         ->and($ids('type=insight'))->toBe([$insight->id]);
+});
+
+it('combines with the tag and book filters', function () {
+    $r = searchReader('tags');
+    ['tagged' => $tagged, 'untagged' => $untagged, 'otherBook' => $otherBook] = $r['quotes'];
+    $ids = fn (string $filters) => collect($this->actingAs($r['user'])->getJson("/api/quotes?$filters")->assertOk()->json('data'))->pluck('id')->sort()->values()->all();
+
+    expect($ids('q=мандрівка&tag='.urlencode(' Космос ')))->toBe([$tagged->id, $otherBook->id])
+        ->and($ids("q=мандрівка&tag=космос&book={$r['book']->id}"))->toBe([$tagged->id])
+        ->and($ids('q=мандрівка'))->toBe([$tagged->id, $untagged->id, $otherBook->id]);
 });
 
 it('paginates search results', function () {

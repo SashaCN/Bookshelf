@@ -94,6 +94,29 @@ class Quote extends Model
     }
 
     /**
+     * @return BelongsToMany<Tag, $this>
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'quote_tag')->orderBy('tags.name');
+    }
+
+    /**
+     * The reader's quotes carrying the tag of that name (tags are private, so the name only means something per reader).
+     *
+     * @param  Builder<Quote>  $query
+     */
+    #[Scope]
+    protected function taggedWith(Builder $query, User $owner, string $name): void
+    {
+        $query->whereIn('quotes.id', DB::table('quote_tag')
+            ->join('tags', 'tags.id', '=', 'quote_tag.tag_id')
+            ->where('tags.user_id', $owner->id)
+            ->where('tags.name', $name)
+            ->select('quote_tag.quote_id'));
+    }
+
+    /**
      * Quotes whose text or note contains every word of the search (FULLTEXT index with the ngram parser), most relevant
      * first. The input is reduced to letters, digits and spaces, so it can never carry boolean-mode operators; words of
      * one character cannot be found by the index, so a search made only of such words falls back to LIKE.

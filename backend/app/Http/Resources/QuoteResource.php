@@ -26,6 +26,8 @@ class QuoteResource extends JsonResource
                 'note' => $this->note,
                 'is_favorite' => $this->is_favorite,
             ]),
+            // Tags are private labels: only the owner gets them, and only where the relation was loaded.
+            'tags' => $this->when($this->exposesTags($request) && $this->resource->relationLoaded('tags'), fn () => $this->tags->pluck('name')->all()),
             'visibility' => $this->visibility,
             // Only where the likes were counted (the lists), never a misleading 0 elsewhere.
             'likes_count' => $this->when(array_key_exists('likes_count', $this->resource->getAttributes()), fn () => (int) $this->likes_count),
@@ -39,5 +41,13 @@ class QuoteResource extends JsonResource
                 'cover_url' => $this->userBook->book->cover_url,
             ]),
         ];
+    }
+
+    /**
+     * Whether this resource may show the quote's tags. Shared quotes (profiles, feed) never do.
+     */
+    protected function exposesTags(Request $request): bool
+    {
+        return $request->user('sanctum')?->id === $this->user_id;
     }
 }

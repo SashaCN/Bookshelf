@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\QuoteType;
 use App\Enums\QuoteVisibility;
+use App\Http\Requests\Concerns\NormalizesTags;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class StoreQuoteRequest extends FormRequest
 {
+    use NormalizesTags;
+
     /**
      * Checked before the body, so somebody else's library entry is "not found" whatever is sent to it.
      */
@@ -32,6 +35,7 @@ class StoreQuoteRequest extends FormRequest
             'page' => ['nullable', 'integer', 'min:1', 'max:20000'],
             'is_favorite' => ['sometimes', 'boolean'],
             'visibility' => ['sometimes', 'required', Rule::enum(QuoteVisibility::class)],
+            ...$this->tagRules(),
         ];
     }
 }

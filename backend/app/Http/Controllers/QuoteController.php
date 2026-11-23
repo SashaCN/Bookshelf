@@ -10,6 +10,7 @@ use App\Http\Requests\StoreQuoteRequest;
 use App\Http\Requests\UpdateQuoteRequest;
 use App\Http\Resources\QuoteResource;
 use App\Models\Quote;
+use App\Models\Tag;
 use App\Models\UserBook;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -23,13 +24,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class QuoteController extends Controller
 {
     /**
-     * The reader's quotes, newest first (best match first when searching), optionally only favorites, one type, one library entry, or a text.
+     * The reader's quotes, newest first (best match first when searching), optionally only favorites, one type, one library entry, one tag, or a text.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
         $quotes = $this->filteredQuotes($request)
             ->withCount('likeRows as likes_count')
-            ->with('userBook.book.authors')
+            ->with('userBook.book.authors', 'tags')
             ->latest('id')
             ->simplePaginate(20);
 
@@ -78,7 +79,7 @@ class QuoteController extends Controller
     {
         Gate::authorize('view', $quote);
 
-        return new QuoteResource($quote->load('userBook.book.authors'));
+        return new QuoteResource($quote->load('userBook.book.authors', 'tags'));
     }
 
     /**
@@ -89,17 +90,17 @@ class QuoteController extends Controller
         return new QuoteResource($saveQuote->update($quote, $request->validated()));
     }
 
-    public function destroy(Quote $quote): Response
+    public function destroy(Quote $quote, SaveQuote $saveQuote): Response
     {
         Gate::authorize('delete', $quote);
 
-        $quote->delete();
+        $saveQuote->delete($quote);
 
         return response()->noContent();
     }
 
     /**
-     * The reader's quotes narrowed by the favorite, book, type and text-search (q) filters of the request.
+     * The reader's quotes narrowed by the favorite, book, type, tag and text-search (q) filters of the request.
      *
      * @return Builder<Quote>
      */
@@ -110,12 +111,14 @@ class QuoteController extends Controller
             'book' => ['nullable', 'integer'],
             'type' => ['nullable', Rule::enum(QuoteType::class)],
             'q' => ['nullable', 'string', 'min:2', 'max:100'],
+            'tag' => ['nullable', 'string', 'max:'.Tag::MAX_LENGTH * 2],
         ]);
 
         return Quote::query()->whereBelongsTo($request->user())
             ->when($request->boolean('favorite'), fn ($query) => $query->where('is_favorite', true))
             ->when($filters['book'] ?? null, fn ($query, int $book) => $query->where('user_book_id', $book))
             ->when($filters['type'] ?? null, fn ($query, string $type) => $query->where('type', $type))
+            ->when($filters['tag'] ?? null, fn ($query, string $tag) => $query->taggedWith($request->user(), Tag::normalize($tag)))
             ->when($filters['q'] ?? null, fn ($query, string $search) => $query->search($search));
     }
 }

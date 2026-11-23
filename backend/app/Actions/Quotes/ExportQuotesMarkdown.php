@@ -49,7 +49,7 @@ class ExportQuotesMarkdown
                 yield "\n_{$this->escape($authors)}_\n";
             }
 
-            $bookQuotes = (clone $quotes)->reorder()->where('quotes.user_book_id', $entry->id)->lazyById(self::CHUNK_SIZE);
+            $bookQuotes = (clone $quotes)->reorder()->where('quotes.user_book_id', $entry->id)->with('tags')->lazyById(self::CHUNK_SIZE);
 
             foreach ($bookQuotes as $quote) {
                 yield "\n{$this->render($quote)}\n";
@@ -79,6 +79,10 @@ class ExportQuotesMarkdown
             $details[] = '★';
         }
 
+        if ($quote->tags->isNotEmpty()) {
+            $details[] = $quote->tags->map(fn ($tag) => '#'.$this->escapeInline($tag->name))->implode(' ');
+        }
+
         return $details === [] ? $body : $body."\n\n".implode("  \n", $details);
     }
 
@@ -88,6 +92,14 @@ class ExportQuotesMarkdown
     private function lines(string $text): array
     {
         return array_map($this->escape(...), preg_split('/\R/u', trim($text)) ?: ['']);
+    }
+
+    /**
+     * A tag inside a line: spaces become non-breaking so "#a b" stays one tag, and characters Markdown reads as markup are escaped.
+     */
+    private function escapeInline(string $name): string
+    {
+        return str_replace(' ', "\u{00A0}", (string) preg_replace('/([\\\\`*_{}\[\]<>()#+!|~])/u', '\\\\$1', $name));
     }
 
     /**

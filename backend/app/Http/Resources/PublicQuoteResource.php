@@ -19,4 +19,9 @@ class PublicQuoteResource extends QuoteResource
             'liked_by_me' => (bool) ($this->resource->getAttributes()['liked_by_me'] ?? false),
         ];
     }
+
+    protected function exposesTags(Request $request): bool
+    {
+        return false;
+    }
 }

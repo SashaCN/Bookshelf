@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
  * Set PERF_REPORT=1 to print the timings of each endpoint to stderr.
  */
 
-const PERF_BIG_TABLES = ['quotes', 'follows', 'quote_likes', 'quote_comments', 'reading_logs', 'user_books', 'reader_chapter_reads', 'reader_documents'];
+const PERF_BIG_TABLES = ['quotes', 'follows', 'quote_likes', 'quote_comments', 'quote_tag', 'tags', 'reading_logs', 'user_books', 'reader_chapter_reads', 'reader_documents'];
 
 /** @param  list<array<string, mixed>>  $rows */
 function perfInsert(string $table, array $rows): void
@@ -152,6 +152,26 @@ function perfSeed(): array
     }
     perfInsert('quote_comments', $comments);
 
+    // "me" has a tag on 600 of their quotes, and 5000 foreign tags are spread around.
+    $myQuotes = DB::table('quotes')->where('user_id', 1)->limit(600)->pluck('id');
+    $tags = [['user_id' => 1, 'name' => 'perf', 'created_at' => $now, 'updated_at' => $now]];
+    for ($i = 1; $i <= 5000; $i++) {
+        $tags[] = ['user_id' => mt_rand(2, $users), 'name' => 'tag'.$i, 'created_at' => $now, 'updated_at' => $now];
+    }
+    perfInsert('tags', $tags);
+    $perfTag = (int) DB::table('tags')->where('user_id', 1)->where('name', 'perf')->value('id');
+    $firstTag = (int) DB::table('tags')->min('id');
+    $links = [];
+    foreach ($myQuotes as $id) {
+        $links["$id-$perfTag"] = ['quote_id' => $id, 'tag_id' => $perfTag];
+    }
+    while (count($links) < 15000) {
+        $q = mt_rand($firstQuote, $lastQuote);
+        $t = mt_rand($firstTag, $firstTag + 5000);
+        $links["$q-$t"] = ['quote_id' => $q, 'tag_id' => $t];
+    }
+    perfInsert('quote_tag', array_values($links));
+
     $logs = [];
     for ($i = 0; $i < 10000; $i++) {
         $day = now('Europe/Kyiv')->subDays($i % 500)->toDateString();
@@ -196,6 +216,9 @@ function perfEndpoints(array $seed): array
         ['quotes list', '/api/quotes', 200],
         ['quotes filtered', '/api/quotes?favorite=1&type=quote', 200],
         // Rows inserted in the test transaction are invisible to the FULLTEXT index, but the plan must still use it.
+        ['quotes by tag', '/api/quotes?tag=perf', 200],
+        ['quotes by tag filtered', '/api/quotes?tag=perf&favorite=1', 200],
+        ['tags', '/api/tags', 200],
         ['quotes search', '/api/quotes?q=quote', 200],
         ['quotes search filtered', '/api/quotes?q=quote+text&favorite=1', 200],
         ['comments', "/api/quotes/{$seed['quote']}/comments", 200],
