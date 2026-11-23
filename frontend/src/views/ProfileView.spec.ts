@@ -171,7 +171,7 @@ describe('ProfileView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('вкажіть імʼя користувача')
+      expect(wrapper.text()).toContain('вкажіть ім’я користувача')
     })
 
     it('hints at the username format before anything is sent', async () => {
@@ -209,7 +209,7 @@ describe('ProfileView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.get('#profile-username-error').text()).toBe('Це імʼя вже зайняте. Оберіть інше.')
+      expect(wrapper.get('#profile-username-error').text()).toBe('Це ім’я вже зайняте. Оберіть інше.')
       expect(wrapper.find('[role="alert"]').exists()).toBe(false)
 
       await wrapper.get('#profile-username').setValue('olena2')
@@ -225,7 +225,7 @@ describe('ProfileView', () => {
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.get('#profile-username-error').text()).toContain('вкажіть імʼя користувача')
+      expect(wrapper.get('#profile-username-error').text()).toContain('вкажіть ім’я користувача')
     })
 
     it('blames the name being taken when the server rejects a well-formed username', async () => {

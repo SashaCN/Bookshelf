@@ -317,7 +317,7 @@ describe('BookView', () => {
     expect(libraryApi.remove).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Книга зникне з вашої бібліотеки')
 
-    await buttonWithText(wrapper, 'Видалити').trigger('click')
+    await buttonWithText(wrapper, 'Так, видалити').trigger('click')
     await flushPromises()
 
     expect(libraryApi.remove).toHaveBeenCalledWith(1)
@@ -329,7 +329,7 @@ describe('BookView', () => {
     vi.mocked(libraryApi.remove).mockRejectedValue(new ApiError(500, null))
 
     await buttonWithText(wrapper, 'Видалити з бібліотеки').trigger('click')
-    await buttonWithText(wrapper, 'Видалити').trigger('click')
+    await buttonWithText(wrapper, 'Так, видалити').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')

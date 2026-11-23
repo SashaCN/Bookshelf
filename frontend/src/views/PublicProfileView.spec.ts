@@ -124,7 +124,7 @@ describe('PublicProfileView', () => {
       const dialog = wrapper.get('[role="alertdialog"]')
       expect(dialog.text()).toContain('Заблокувати @olena?')
       expect(dialog.text()).toContain('підписки між вами буде скасовано')
-      expect(dialog.text()).toContain('лайки')
+      expect(dialog.text()).toContain('вподобання')
       expect(socialApi.block).not.toHaveBeenCalled()
 
       await dialog.findAll('button').find((b) => b.text() === 'Скасувати')!.trigger('click')

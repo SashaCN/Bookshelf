@@ -53,7 +53,7 @@ void load()
 <template>
   <PageHeader :title="$t('social.blocks.title')" :back-to="{ name: 'profile' }" />
 
-  <p v-if="justBlocked" role="status" class="mb-3 rounded-lg bg-surface px-3 py-2 text-sm">{{ $t('social.blocks.blocked') }}</p>
+  <p v-if="justBlocked" role="status" class="mb-3 rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted">{{ $t('social.blocks.blocked') }}</p>
 
   <ErrorNotice v-if="error" :message="error" retryable @retry="load" />
 
