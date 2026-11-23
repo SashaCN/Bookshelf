@@ -5,6 +5,7 @@ namespace App\Services\Stats;
 use App\Enums\BookStatus;
 use App\Models\ReadingLog;
 use App\Models\User;
+use App\Models\UserBookRead;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -130,20 +131,30 @@ final class ReadingStatistics
     }
 
     /**
-     * Books finished on the days of the range (inclusive), by the finish date the reader has.
+     * Books finished on the days of the range (inclusive), by the finish date the reader has. A book read again counts
+     * once per finished pass: the current one plus the archived ones.
      */
     public function booksFinished(CarbonInterface $from, CarbonInterface $to): int
     {
         $timezone = $this->user->timezone;
 
         // The dates are stored in UTC, while the range is in the reader's calendar.
-        return $this->user->userBooks()
+        $range = [
+            CarbonImmutable::parse($from->toDateString(), $timezone)->startOfDay()->utc(),
+            CarbonImmutable::parse($to->toDateString(), $timezone)->endOfDay()->utc(),
+        ];
+
+        $current = $this->user->userBooks()
             ->where('status', BookStatus::Finished)
-            ->whereBetween('finished_at', [
-                CarbonImmutable::parse($from->toDateString(), $timezone)->startOfDay()->utc(),
-                CarbonImmutable::parse($to->toDateString(), $timezone)->endOfDay()->utc(),
-            ])
+            ->whereBetween('finished_at', $range)
             ->count();
+
+        $archived = UserBookRead::query()
+            ->whereIn('user_book_id', $this->user->userBooks()->select('id'))
+            ->whereBetween('finished_at', $range)
+            ->count();
+
+        return $current + $archived;
     }
 
     /**

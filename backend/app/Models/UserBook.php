@@ -80,6 +80,16 @@ class UserBook extends Model
     }
 
     /**
+     * Archived finished passes, newest first.
+     *
+     * @return HasMany<UserBookRead, $this>
+     */
+    public function reads(): HasMany
+    {
+        return $this->hasMany(UserBookRead::class)->orderByDesc('finished_at')->orderByDesc('id');
+    }
+
+    /**
      * @return HasMany<Quote, $this>
      */
     public function quotes(): HasMany

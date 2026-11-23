@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::apiResource('library', UserBookController::class)->parameters(['library' => 'userBook']);
 
     Route::post('/library/{userBook}/progress', [ReadingProgressController::class, 'store'])->name('library.progress');
+    Route::post('/library/{userBook}/reread', [ReadingProgressController::class, 'reread'])->name('library.reread');
     Route::get('/library/{userBook}/logs', [ReadingProgressController::class, 'index'])->name('library.logs');
 
     Route::post('/library/{userBook}/quotes', [QuoteController::class, 'store'])->name('library.quotes.store');
