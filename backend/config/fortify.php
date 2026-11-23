@@ -40,5 +40,6 @@ return [
 
     'features' => [
         Features::registration(),
+        Features::updatePasswords(),
     ],
 ];
