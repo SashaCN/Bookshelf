@@ -248,13 +248,15 @@ describe('demo mock API', () => {
     expect((await socialApi.following('demo_reader')).data).toEqual([])
   })
 
-  it('takes a blocking reader out of the own followers and refuses to block oneself or a stranger', async () => {
+  it('takes a blocking reader out of the own followers and refuses to block oneself and ignores a stranger', async () => {
     await socialApi.block('taras_books')
     expect((await socialApi.followers('demo_reader')).data).toEqual([])
 
     await expect(socialApi.block('demo_reader')).rejects.toMatchObject({ status: 422 })
-    await expect(socialApi.block('nobody')).rejects.toMatchObject({ status: 404 })
-    await expect(socialApi.unblock('nobody')).rejects.toMatchObject({ status: 404 })
+    // The real API answers an unknown handle like a success, so it never tells a missing reader from a private one.
+    expect(await socialApi.block('nobody')).toBeNull()
+    expect(await socialApi.unblock('nobody')).toBeNull()
+    expect((await socialApi.blocked()).data.map((p) => p.username)).toEqual(['taras_books'])
   })
 
   it('shows profiles, follows and the feed of fake readers', async () => {

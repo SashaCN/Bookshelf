@@ -484,6 +484,10 @@ function findPerson(username: string): { key: string; name: string } {
   return { key: reader.username, name: reader.name }
 }
 
+function isKnown(username: string): boolean {
+  return state.user.username === username || fakeReaders.some((r) => r.username === username)
+}
+
 /** A blocked reader is hidden from the demo user, and so is everything that touches them. */
 function edges(): [string, string][] {
   const own = state.following.map((username): [string, string] => [ME, username])
@@ -1054,6 +1058,8 @@ route('GET', '/api/feed', (_p, query) => {
 
 route('POST', '/api/users/([^/]+)/block', ([username]) => {
   const name = decodeURIComponent(username)
+  // Like the real API, an unknown handle is answered as a success.
+  if (!isKnown(name)) return null
   if (findPerson(name).key === ME) invalid('username', 'block.self')
   if (state.blocked.includes(name)) return null
 
@@ -1071,7 +1077,7 @@ route('POST', '/api/users/([^/]+)/block', ([username]) => {
 })
 route('DELETE', '/api/users/([^/]+)/block', ([username]) => {
   const name = decodeURIComponent(username)
-  findPerson(name)
+  if (!isKnown(name)) return null
   state.blocked = state.blocked.filter((u) => u !== name)
   return null
 })
