@@ -6,6 +6,7 @@ import { socialApi } from '@/api/social'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLoadMore } from '@/composables/useLoadMore'
 import { useAuthStore } from '@/stores/auth'
+import { formatMoment } from '@/utils/format'
 import type { QuoteComment } from '@/types/api'
 import ErrorNotice from './ErrorNotice.vue'
 import LoadMore from './LoadMore.vue'
@@ -34,7 +35,10 @@ const confirmingId = ref<number | null>(null)
 const removingId = ref<number | null>(null)
 const removeError = ref('')
 
+const COUNTER_FROM = 800
+
 const canSend = computed(() => draft.value.trim() !== '' && draft.value.length <= MAX_LENGTH && !sending.value)
+const rows = computed(() => Math.min(6, Math.max(2, draft.value.split('\n').length, Math.ceil(draft.value.length / 45))))
 const loginTarget = computed(() => ({ name: 'login', query: { redirect: route.fullPath } }))
 
 async function load() {
@@ -114,48 +118,49 @@ onMounted(load)
 
       <ul v-else class="flex flex-col gap-3">
         <li v-for="comment in items" :key="comment.id" class="flex flex-col gap-1 rounded-lg bg-sunken px-3 py-2" data-test="comment">
-          <p class="text-sm font-medium">
-            <RouterLink
-              v-if="comment.author.username"
-              :to="{ name: 'public-profile', params: { username: comment.author.username } }"
-              class="underline-offset-2 hover:underline"
-            >
-              {{ comment.author.name }}
-            </RouterLink>
-            <span v-else>{{ $t('quotes.comments.anonymous') }}</span>
-          </p>
-          <p class="whitespace-pre-line break-words text-sm" data-test="comment-body">{{ comment.body }}</p>
-
-          <template v-if="comment.can_delete">
+          <div class="flex items-center justify-between gap-2">
+            <p class="min-w-0 text-sm">
+              <RouterLink
+                v-if="comment.author.username"
+                :to="{ name: 'public-profile', params: { username: comment.author.username } }"
+                class="font-medium underline-offset-2 hover:underline"
+              >
+                {{ comment.author.name }}
+              </RouterLink>
+              <span v-else class="font-medium">{{ $t('quotes.comments.anonymous') }}</span>
+              <span class="whitespace-nowrap text-ink-muted"> · {{ formatMoment(comment.created_at) }}</span>
+            </p>
             <button
-              v-if="confirmingId !== comment.id"
+              v-if="comment.can_delete && confirmingId !== comment.id"
               type="button"
-              class="min-h-11 self-start text-sm font-medium text-danger"
+              class="-my-2 -mr-2 min-h-11 shrink-0 rounded-lg px-2 text-sm text-ink-muted hover:text-danger focus-visible:text-danger"
               @click="confirmingId = comment.id"
             >
               {{ $t('quotes.comments.remove') }}
             </button>
-            <div v-else class="flex flex-col gap-2">
-              <p class="text-sm">{{ $t('quotes.comments.removeConfirm') }}</p>
-              <div class="flex gap-2">
-                <button
-                  type="button"
-                  :disabled="removingId === comment.id"
-                  class="min-h-11 flex-1 rounded-lg bg-danger px-4 font-semibold text-on-accent disabled:opacity-60"
-                  @click="remove(comment)"
-                >
-                  {{ $t('quotes.comments.removeYes') }}
-                </button>
-                <button
-                  type="button"
-                  class="min-h-11 flex-1 rounded-lg border border-line bg-surface px-4 font-medium"
-                  @click="confirmingId = null"
-                >
-                  {{ $t('common.cancel') }}
-                </button>
-              </div>
+          </div>
+          <p class="whitespace-pre-line break-words text-sm" data-test="comment-body">{{ comment.body }}</p>
+
+          <div v-if="comment.can_delete && confirmingId === comment.id" class="flex flex-col gap-2">
+            <p class="text-sm">{{ $t('quotes.comments.removeConfirm') }}</p>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                :disabled="removingId === comment.id"
+                class="min-h-11 flex-1 rounded-lg bg-danger px-4 font-semibold text-on-accent disabled:opacity-60"
+                @click="remove(comment)"
+              >
+                {{ $t('quotes.comments.removeYes') }}
+              </button>
+              <button
+                type="button"
+                class="min-h-11 flex-1 rounded-lg border border-line bg-surface px-4 font-medium"
+                @click="confirmingId = null"
+              >
+                {{ $t('common.cancel') }}
+              </button>
             </div>
-          </template>
+          </div>
         </li>
       </ul>
 
@@ -168,19 +173,19 @@ onMounted(load)
         <textarea
           :id="`comment-${quoteId}`"
           v-model="draft"
-          rows="3"
+          :rows="rows"
           :maxlength="MAX_LENGTH"
           :placeholder="$t('quotes.comments.placeholder')"
-          class="w-full rounded-lg border border-line bg-surface px-3 py-2"
+          class="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 [field-sizing:content]"
         />
         <div class="flex items-center justify-between gap-3">
-          <span class="text-xs text-ink-muted" data-test="comment-counter">
+          <span v-if="draft.length >= COUNTER_FROM" class="text-xs text-ink-muted" data-test="comment-counter">
             {{ t('quotes.comments.counter', { n: draft.length, max: MAX_LENGTH }) }}
           </span>
           <button
             type="submit"
             :disabled="!canSend"
-            class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+            class="ml-auto min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
           >
             {{ sending ? $t('quotes.comments.sending') : $t('quotes.comments.send') }}
           </button>

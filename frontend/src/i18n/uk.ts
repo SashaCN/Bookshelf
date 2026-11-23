@@ -194,7 +194,7 @@ export default {
     like: 'Вподобати. {count}',
     unlike: 'Прибрати вподобання. {count}',
     comments: {
-      toggle: 'Коментарі ({n})',
+      toggle: 'Коментарі, {count}',
       count: '{n} коментар | {n} коментарі | {n} коментарів',
       thread: 'Коментарі до цитати',
       empty: 'Коментарів поки немає.',

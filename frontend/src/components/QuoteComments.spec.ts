@@ -46,7 +46,8 @@ describe('quote comments', () => {
     const { wrapper } = mountCard()
     const toggle = wrapper.get('button[aria-expanded]')
 
-    expect(toggle.text()).toBe('Коментарі (2)')
+    expect(toggle.text()).toBe('2')
+    expect(toggle.attributes('aria-label')).toBe('Коментарі, 2 коментарі')
     expect(toggle.attributes('aria-expanded')).toBe('false')
     expect(socialApi.comments).not.toHaveBeenCalled()
   })
@@ -123,14 +124,26 @@ describe('quote comments', () => {
     expect(submit.attributes('disabled')).toBeDefined()
 
     await textarea.setValue('  Нове  ')
-    expect(wrapper.get('[data-test="comment-counter"]').text()).toBe('8 з 1000')
+    expect(wrapper.find('[data-test="comment-counter"]').exists()).toBe(false)
+    expect(submit.attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(socialApi.addComment).toHaveBeenCalledWith(7, 'Нове')
     expect(wrapper.findAll('[data-test="comment"]')).toHaveLength(1)
     expect((textarea.element as HTMLTextAreaElement).value).toBe('')
-    expect(wrapper.get('button[aria-expanded]').text()).toBe('Коментарі (3)')
+    expect(wrapper.get('button[aria-expanded]').text()).toBe('3')
+  })
+
+  it('shows the counter only close to the limit', async () => {
+    vi.mocked(socialApi.comments).mockResolvedValue({ data: [], links: { next: null } })
+    const { wrapper } = mountCard()
+    await open(wrapper)
+
+    await wrapper.get('textarea').setValue('а'.repeat(800))
+
+    expect(wrapper.get('[data-test="comment-counter"]').text()).toBe('800 з 1000')
+    expect(wrapper.get('textarea').attributes('rows')).toBe('6')
   })
 
   it('limits the field to 1000 characters', async () => {
@@ -153,7 +166,7 @@ describe('quote comments', () => {
 
     expect(wrapper.get('[role="alert"]').text()).toContain('Забагато запитів')
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('Привіт')
-    expect(wrapper.get('button[aria-expanded]').text()).toBe('Коментарі (2)')
+    expect(wrapper.get('button[aria-expanded]').text()).toBe('2')
   })
 
   it('disables the button while sending', async () => {
@@ -191,7 +204,7 @@ describe('quote comments', () => {
 
     expect(socialApi.deleteComment).toHaveBeenCalledWith(7, 1)
     expect(wrapper.findAll('[data-test="comment"]')).toHaveLength(1)
-    expect(wrapper.get('button[aria-expanded]').text()).toBe('Коментарі (1)')
+    expect(wrapper.get('button[aria-expanded]').text()).toBe('1')
   })
 
   it('shows a failed delete and keeps the comment', async () => {

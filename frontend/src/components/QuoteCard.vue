@@ -136,47 +136,63 @@ async function remove() {
 
     <QuoteSource :quote="quote" :plain="readonly" />
 
-    <div v-if="readonly && quote.likes_count !== undefined" class="flex items-center">
+    <div v-if="readonly && (quote.likes_count !== undefined || quote.comments_count !== undefined)" class="-mx-2 flex items-center gap-1">
+      <template v-if="quote.likes_count !== undefined">
+        <button
+          v-if="auth.isAuthenticated"
+          type="button"
+          :aria-pressed="quote.liked_by_me === true"
+          :aria-label="t(quote.liked_by_me ? 'quotes.unlike' : 'quotes.like', { count: likesText })"
+          class="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2 text-sm hover:bg-sunken"
+          :class="quote.liked_by_me ? 'text-accent' : 'text-ink-muted'"
+          @click="toggleLike"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            class="size-6"
+            :fill="quote.liked_by_me ? 'currentColor' : 'none'"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 20.5s-8.5-5.1-8.5-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8.5 2.5c0 5.9-8.5 11-8.5 11z" />
+          </svg>
+          <span v-if="likesCount > 0" aria-hidden="true">{{ likesCount }}</span>
+        </button>
+        <p v-else class="px-2 text-sm text-ink-muted" data-test="likes-count">{{ likesText }}</p>
+      </template>
+
       <button
-        v-if="auth.isAuthenticated"
+        v-if="quote.comments_count !== undefined"
         type="button"
-        :aria-pressed="quote.liked_by_me === true"
-        :aria-label="t(quote.liked_by_me ? 'quotes.unlike' : 'quotes.like', { count: likesText })"
-        class="-ml-2 inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-full px-2 text-sm hover:bg-sunken"
-        :class="quote.liked_by_me ? 'text-accent' : 'text-ink-muted'"
-        @click="toggleLike"
+        :aria-expanded="commentsOpen"
+        :aria-controls="`comments-${quote.id}`"
+        :aria-label="t('quotes.comments.toggle', { count: t('quotes.comments.count', commentsCount) })"
+        class="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2 text-sm hover:bg-sunken"
+        :class="commentsOpen ? 'text-ink' : 'text-ink-muted'"
+        @click="commentsOpen = !commentsOpen"
       >
         <svg
           viewBox="0 0 24 24"
           class="size-6"
-          :fill="quote.liked_by_me ? 'currentColor' : 'none'"
+          fill="none"
           stroke="currentColor"
           stroke-width="1.8"
+          stroke-linecap="round"
           stroke-linejoin="round"
           aria-hidden="true"
         >
-          <path d="M12 20.5s-8.5-5.1-8.5-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8.5 2.5c0 5.9-8.5 11-8.5 11z" />
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />
         </svg>
-        <span v-if="likesCount > 0" aria-hidden="true">{{ likesCount }}</span>
+        <span v-if="commentsCount > 0" aria-hidden="true">{{ commentsCount }}</span>
       </button>
-      <p v-else class="text-sm text-ink-muted" data-test="likes-count">{{ likesText }}</p>
     </div>
     <p v-else-if="!readonly && likesCount > 0" class="text-xs text-ink-muted" data-test="likes-count">{{ likesText }}</p>
 
-    <template v-if="readonly && quote.comments_count !== undefined">
-      <button
-        type="button"
-        :aria-expanded="commentsOpen"
-        :aria-controls="`comments-${quote.id}`"
-        class="-ml-2 inline-flex min-h-11 items-center self-start rounded-full px-2 text-sm text-ink-muted hover:bg-sunken"
-        @click="commentsOpen = !commentsOpen"
-      >
-        {{ t('quotes.comments.toggle', { n: commentsCount }) }}
-      </button>
-      <div v-if="commentsOpen" :id="`comments-${quote.id}`">
-        <QuoteComments :quote-id="quote.id" @added="commentsCount++" @removed="commentsCount = Math.max(0, commentsCount - 1)" />
-      </div>
-    </template>
+    <div v-if="readonly && commentsOpen && quote.comments_count !== undefined" :id="`comments-${quote.id}`">
+      <QuoteComments :quote-id="quote.id" @added="commentsCount++" @removed="commentsCount = Math.max(0, commentsCount - 1)" />
+    </div>
 
     <ErrorNotice v-if="error" :message="error" />
 
