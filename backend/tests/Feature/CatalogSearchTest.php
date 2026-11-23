@@ -76,3 +76,14 @@ it('throttles a reader who searches too often', function () {
 
     $this->getJson('/api/catalog/search?q=atomic')->assertTooManyRequests();
 });
+
+it('looks a typed ISBN up by the isbn field', function () {
+    fakeOpenLibrary([openLibraryDoc()]);
+
+    $this->actingAs(User::factory()->create())
+        ->getJson('/api/catalog/search?q='.urlencode('978-0-306-40615-7'))
+        ->assertOk()
+        ->assertJsonPath('data.0.title', 'Atomic Habits');
+
+    Http::assertSent(fn ($request) => $request['q'] === 'isbn:9780306406157');
+});

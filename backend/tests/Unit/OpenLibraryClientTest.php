@@ -147,3 +147,20 @@ it('does not retry a request the catalog rejected as wrong', function () {
 
     Http::assertSentCount(1);
 });
+
+it('searches by the ISBN-13 field when the query is a valid ISBN', function (string $query) {
+    fakeOpenLibrary([openLibraryDoc()]);
+
+    $entries = app(OpenLibraryClient::class)->search($query);
+
+    expect($entries)->toHaveCount(1);
+    Http::assertSent(fn (Request $request) => $request['q'] === 'isbn:9780306406157');
+})->with(['9780306406157', '978-0-306-40615-7', '0-306-40615-2', '0306406152']);
+
+it('treats a number with a wrong checksum as plain text', function () {
+    fakeOpenLibrary([openLibraryDoc()]);
+
+    app(OpenLibraryClient::class)->search('9780306406158');
+
+    Http::assertSent(fn (Request $request) => $request['q'] === '9780306406158');
+});

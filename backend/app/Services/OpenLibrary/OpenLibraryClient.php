@@ -36,7 +36,11 @@ class OpenLibraryClient
      */
     public function search(string $query, int $limit = 20): array
     {
-        return $this->entries($this->cachedSearch(Str::lower(Str::squish($query)), $limit));
+        // A valid ISBN (10 or 13, hyphens allowed) is looked up by that field instead of as free text.
+        $isbn = Isbn::normalize($query);
+        $q = $isbn !== null ? 'isbn:'.$isbn : Str::lower(Str::squish($query));
+
+        return $this->entries($this->cachedSearch($q, $limit));
     }
 
     /**
