@@ -80,6 +80,8 @@ a { color: inherit; }
 <body>${chapter.value.html}</body></html>`
 })
 
+/** Opening a book counts as reading it: the first chapter that loads is saved as the position. */
+let openSaved = false
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 function scheduleSave() {
@@ -99,6 +101,10 @@ async function openChapter(next: number) {
   try {
     chapter.value = await reader.chapter(props.id, next)
     index.value = next
+    if (!openSaved) {
+      openSaved = true
+      scheduleSave()
+    }
   } catch (e) {
     error.value = errorMessage(e)
   } finally {

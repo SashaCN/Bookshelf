@@ -75,6 +75,29 @@ describe('ReaderView', () => {
     expect(wrapper.get('iframe').attributes('srcdoc')).toContain('Розділ-3')
   })
 
+  it('counts opening the book as reading it: saves the opened chapter once', async () => {
+    await mountView(2)
+    expect(readerApi.savePosition).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(800)
+    expect(readerApi.savePosition).toHaveBeenCalledTimes(1)
+    expect(readerApi.savePosition).toHaveBeenCalledWith(4, { chapter: 2, fraction: 0 })
+
+    vi.advanceTimersByTime(5000)
+    expect(readerApi.savePosition).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not save twice when a chapter change follows the open quickly', async () => {
+    const wrapper = await mountView(2)
+    await buttonWithLabel(wrapper, 'Наступний розділ').trigger('click')
+    await flushPromises()
+
+    vi.advanceTimersByTime(800)
+
+    expect(readerApi.savePosition).toHaveBeenCalledTimes(1)
+    expect(readerApi.savePosition).toHaveBeenCalledWith(4, { chapter: 3, fraction: 0 })
+  })
+
   it('disables the buttons at both ends', async () => {
     const first = await mountView(0)
     expect(buttonWithLabel(first, 'Попередній розділ').attributes('disabled')).toBeDefined()
