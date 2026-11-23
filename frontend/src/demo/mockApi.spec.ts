@@ -81,6 +81,16 @@ describe('demo mock API', () => {
     expect(manual.status).toBe('want')
   })
 
+  it('finds a fixed book by its ISBN, with or without hyphens', async () => {
+    for (const isbn of ['9780306406157', '978-0-306-40615-7']) {
+      const found = await catalogApi.search(isbn)
+      expect(found).toHaveLength(1)
+      expect(found[0].title).toBe('Кобзар')
+      expect(found[0].isbn_13).toBe('9780306406157')
+    }
+    expect(await catalogApi.search('9780306406158')).toEqual([])
+  })
+
   it('filters and creates quotes, and picks one for the day', async () => {
     expect((await quotesApi.list({ favorite: true })).data.every((q) => q.is_favorite)).toBe(true)
     expect((await quotesApi.list({ book: 3 })).data).toHaveLength(2)

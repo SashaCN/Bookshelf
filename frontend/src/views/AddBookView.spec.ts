@@ -247,3 +247,162 @@ describe('AddBookView', () => {
     })
   })
 })
+
+describe('AddBookView ISBN scanner', () => {
+  const VALID = '9780306406157'
+  const track = { stop: vi.fn() }
+  const detect = vi.fn()
+  const getUserMedia = vi.fn()
+
+  function installCamera() {
+    vi.stubGlobal('BarcodeDetector', class { detect = detect })
+    Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia }, configurable: true })
+    // jsdom does not implement media playback.
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+  }
+
+  const scanButton = (wrapper: Awaited<ReturnType<typeof mountView>>['wrapper']) =>
+    wrapper.findAll('button').find((b) => b.text() === 'Сканувати ISBN')
+
+  async function openScanner() {
+    const mounted = await mountView()
+    await scanButton(mounted.wrapper)!.trigger('click')
+    await flushPromises()
+    return mounted
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.resetAllMocks()
+    getUserMedia.mockResolvedValue({ getTracks: () => [track] })
+    detect.mockResolvedValue([])
+    vi.mocked(catalogApi.search).mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    Reflect.deleteProperty(navigator, 'mediaDevices')
+    document.body.innerHTML = ''
+  })
+
+  it('hides the button where there is no BarcodeDetector', async () => {
+    Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia }, configurable: true })
+    const { wrapper } = await mountView()
+
+    expect(scanButton(wrapper)).toBeUndefined()
+    // Typing an ISBN still works.
+    await type(wrapper, '978-0-306-40615-7')
+    await settleSearch()
+    expect(catalogApi.search).toHaveBeenCalledWith('978-0-306-40615-7')
+  })
+
+  it('hides the button where there is no camera API', async () => {
+    vi.stubGlobal('BarcodeDetector', class {})
+    const { wrapper } = await mountView()
+
+    expect(scanButton(wrapper)).toBeUndefined()
+  })
+
+  it('shows the button when both are available', async () => {
+    installCamera()
+    const { wrapper } = await mountView()
+
+    expect(scanButton(wrapper)).toBeDefined()
+  })
+
+  it('opens the overlay with the camera and closes it with the button, Esc and the camera released', async () => {
+    installCamera()
+    const { wrapper } = await mountView()
+    await scanButton(wrapper)!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"] video').exists()).toBe(true)
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+
+    const close = wrapper.findAll('button').find((b) => b.text() === 'Закрити')!
+    await close.trigger('click')
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(track.stop).toHaveBeenCalledTimes(1)
+
+    await scanButton(wrapper)!.trigger('click')
+    await flushPromises()
+    await wrapper.get('[role="dialog"]').trigger('keydown', { key: 'Escape' })
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(track.stop).toHaveBeenCalledTimes(2)
+  })
+
+  it('searches the catalog with the scanned ISBN, announces it and releases the camera', async () => {
+    installCamera()
+    const { wrapper } = await openScanner()
+    detect.mockResolvedValue([{ rawValue: VALID }])
+
+    await vi.advanceTimersByTimeAsync(400)
+    await settleSearch()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(track.stop).toHaveBeenCalledTimes(1)
+    expect((wrapper.get('#catalog-search').element as HTMLInputElement).value).toBe(VALID)
+    expect(catalogApi.search).toHaveBeenCalledWith(VALID)
+    expect(catalogApi.search).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('p.sr-only[role="status"]').text()).toBe(`Знайдено ISBN ${VALID}`)
+  })
+
+  it('ignores a barcode that is not an ISBN', async () => {
+    installCamera()
+    const { wrapper } = await openScanner()
+    detect.mockResolvedValue([{ rawValue: '5901234123457' }])
+
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(catalogApi.search).not.toHaveBeenCalled()
+  })
+
+  it('explains a denied camera permission with a hint', async () => {
+    installCamera()
+    getUserMedia.mockRejectedValue(new DOMException('x', 'NotAllowedError'))
+    const { wrapper } = await openScanner()
+
+    const alert = wrapper.get('[role="dialog"] [role="alert"]')
+    expect(alert.text()).toContain('Немає доступу до камери')
+    expect(alert.text()).toContain('налаштуваннях браузера')
+    expect(wrapper.find('video').exists()).toBe(false)
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Закрити')).toBe(true)
+  })
+
+  it('says so when there is no camera', async () => {
+    installCamera()
+    getUserMedia.mockRejectedValue(new DOMException('x', 'NotFoundError'))
+    const { wrapper } = await openScanner()
+
+    expect(wrapper.get('[role="dialog"] [role="alert"]').text()).toContain('Камеру не знайдено')
+  })
+
+  it('can be opened again after an error', async () => {
+    installCamera()
+    getUserMedia.mockRejectedValueOnce(new DOMException('x', 'NotAllowedError'))
+    const { wrapper } = await openScanner()
+    await wrapper.findAll('button').find((b) => b.text() === 'Закрити')!.trigger('click')
+
+    await scanButton(wrapper)!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"] video').exists()).toBe(true)
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('releases the camera when the screen is left while scanning', async () => {
+    installCamera()
+    const { wrapper } = await openScanner()
+
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(track.stop).toHaveBeenCalledTimes(1)
+    expect(detect).not.toHaveBeenCalled()
+  })
+})

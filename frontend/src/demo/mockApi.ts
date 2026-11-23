@@ -944,9 +944,16 @@ route('GET', '/api/library/(\\d+)/logs', ([id], query) => {
   return { data: slice, links: { next: page * 20 < all.length ? `/api/library/${id}/logs?page=${page + 1}` : null } }
 })
 
+/** The one ISBN the demo knows, so that the scanner and typing an ISBN find something. */
+const DEMO_ISBN = '9780306406157'
+
 route('GET', '/api/catalog/search', (_p, query) => {
   const needle = (query.get('q') ?? '').trim().toLowerCase()
   const inLibrary = new Set(state.library.map((e) => e.book.title))
+  if (needle.replace(/[-\s]/g, '') === DEMO_ISBN) {
+    const book = catalog.find((c) => c.title === 'Кобзар')!
+    return ok([{ ...book, isbn_13: DEMO_ISBN, in_library: inLibrary.has(book.title) }])
+  }
   return ok(
     catalog
       .filter((c) => c.title.toLowerCase().includes(needle) || c.authors.some((a) => a.toLowerCase().includes(needle)))

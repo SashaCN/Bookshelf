@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { apiErrorCode } from '@/api/errors'
 import { ApiError } from '@/api/http'
 import { catalogApi } from '@/api/library'
+import BaseDialog from '@/components/BaseDialog.vue'
 import BookCover from '@/components/BookCover.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { isIsbnScanningSupported, useIsbnScanner } from '@/composables/useIsbnScanner'
 import { useLibraryStore } from '@/stores/library'
 import type { AddBookPayload, CatalogEntry } from '@/types/api'
 
@@ -85,6 +87,47 @@ async function addFromCatalog(entry: CatalogEntry) {
   addingKey.value = null
 }
 
+// --- ISBN scanner -----------------------------------------------------------------------------------------------
+
+const scanSupported = isIsbnScanningSupported()
+const scanOpen = ref(false)
+const scanVideo = ref<HTMLVideoElement | null>(null)
+/** Read out by screen readers; lives outside the overlay, which closes the moment an ISBN is found. */
+const announcement = ref('')
+
+const scanner = useIsbnScanner((isbn) => {
+  announcement.value = t('add.scan.found', { isbn })
+  scanOpen.value = false
+  // The search watcher debounces and runs the existing catalog search with this ISBN.
+  query.value = isbn
+})
+
+async function openScanner() {
+  announcement.value = ''
+  scanner.stop() // clears the error of an earlier attempt, so the video is rendered again
+  scanOpen.value = true
+  await nextTick()
+  if (scanVideo.value) await scanner.start(scanVideo.value)
+}
+
+function closeScanner() {
+  scanner.stop()
+  scanOpen.value = false
+}
+
+const scanProblem = computed(() => {
+  switch (scanner.status.value) {
+    case 'denied':
+      return 'denied'
+    case 'no-camera':
+      return 'noCamera'
+    case 'failed':
+      return 'failed'
+    default:
+      return null
+  }
+})
+
 // --- manual entry -----------------------------------------------------------------------------------------------
 
 const form = reactive({ title: '', authors: '', pages: '', year: '' })
@@ -148,6 +191,32 @@ function showManual() {
 
   <ErrorNotice v-if="error" :message="error" class="mb-4" />
 
+  <p class="sr-only" role="status" aria-live="polite">{{ announcement }}</p>
+
+  <BaseDialog v-if="scanOpen" :title="$t('add.scan.title')" initial-focus="button" @cancel="closeScanner">
+    <template #default="{ descriptionId }">
+      <div v-if="scanProblem" :id="descriptionId" role="alert" class="flex flex-col gap-1">
+        <p class="font-semibold">{{ $t(`add.scan.${scanProblem}.title`) }}</p>
+        <p class="text-sm text-ink-muted">{{ $t(`add.scan.${scanProblem}.hint`) }}</p>
+      </div>
+      <template v-else>
+        <p :id="descriptionId" class="text-sm text-ink-muted">
+          {{ scanner.status.value === 'starting' ? $t('add.scan.starting') : $t('add.scan.hint') }}
+        </p>
+        <video
+          ref="scanVideo"
+          muted
+          playsinline
+          :aria-label="$t('add.scan.video')"
+          class="aspect-[4/3] w-full rounded-lg bg-black object-cover"
+        />
+      </template>
+      <button type="button" class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent" @click="closeScanner">
+        {{ $t('add.scan.close') }}
+      </button>
+    </template>
+  </BaseDialog>
+
   <!-- Search the Open Library catalog -->
   <section v-if="mode === 'search'" class="flex flex-col gap-4">
     <div class="flex flex-col gap-1.5">
@@ -161,6 +230,14 @@ function showManual() {
         :placeholder="$t('add.searchPlaceholder')"
         class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       >
+      <button
+        v-if="scanSupported"
+        type="button"
+        class="min-h-11 self-start rounded-lg border border-line bg-surface px-3 text-sm font-medium"
+        @click="openScanner"
+      >
+        {{ $t('add.scan.button') }}
+      </button>
     </div>
 
     <p v-if="searchState === 'loading'" class="text-ink-muted" role="status">{{ $t('add.searching') }}</p>
