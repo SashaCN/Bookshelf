@@ -132,6 +132,13 @@ describe('HomeView', () => {
       expect(html.indexOf('Продовжити читання')).toBeLessThan(html.indexOf('Стрічка друзів'))
     })
 
+    it('replaces the library nudge when no library book is being read', async () => {
+      const { wrapper } = await mountView([], null, [read])
+
+      expect(wrapper.text()).toContain('Продовжити читання')
+      expect(wrapper.text()).not.toContain('Зараз нічого не читаєте')
+    })
+
     it('is hidden when no book has been read yet', async () => {
       const { wrapper } = await mountView([reading(1, 'First Book')], null, [makeReaderDoc()])
 

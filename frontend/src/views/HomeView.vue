@@ -58,7 +58,8 @@ onMounted(() => {
     </li>
   </ul>
 
-  <EmptyState v-else :title="$t('home.emptyTitle')" :text="$t('home.emptyText')">
+  <!-- An EPUB in progress already answers "what am I reading", so the library nudge would contradict it. -->
+  <EmptyState v-else-if="!continuing" :title="$t('home.emptyTitle')" :text="$t('home.emptyText')">
     <RouterLink
       :to="{ name: 'library' }"
       class="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 font-semibold text-on-accent"
