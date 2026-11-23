@@ -236,11 +236,15 @@ export interface StatsSummary {
   month: { pages: number; books_finished: number }
   year: { pages: number; books_finished: number }
   forecasts: BookForecast[]
+  /** Activity in the built-in EPUB reader, in the reader's time zone. */
+  reader: { chapters_this_month: number; chapters_this_year: number; documents_in_progress: number }
 }
 
 export interface DailyPages {
   date: string
   pages: number
+  /** EPUB chapters read that day (the server always sends it; the pages chart does not use it). */
+  chapters?: number
 }
 
 export interface DailyStats {

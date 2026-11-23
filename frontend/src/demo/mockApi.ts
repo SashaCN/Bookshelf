@@ -59,6 +59,8 @@ interface State {
   documents: StoredDocument[]
   /** Bookmarks of the sample document, by document id. */
   bookmarks: Record<number, ReaderBookmark[]>
+  /** Day (YYYY-MM-DD) each chapter of a document was first left forward, by document id and chapter. */
+  chapterReads: Record<number, Record<number, string>>
 }
 
 interface StoredComment {
@@ -258,6 +260,7 @@ function seed(): State {
       },
     ],
     bookmarks: {},
+    chapterReads: {},
   }
 }
 
@@ -635,6 +638,18 @@ function finishedIn(prefix: string): number {
   return archived + state.library.filter((e) => e.finished_at?.startsWith(prefix) || (e.finished_at && isoDay(new Date(e.finished_at)).startsWith(prefix))).length
 }
 
+/** Mirrors the server: a chapter counts once, on the day it was first left forward; a jump of over 50 chapters counts only the one left. */
+function recordChapterReads(documentId: number, from: number, to: number) {
+  if (to <= from) return
+  const reads = (state.chapterReads[documentId] ??= {})
+  const last = to - from > 50 ? from : to - 1
+  for (let chapter = from; chapter <= last; chapter++) reads[chapter] ??= today()
+}
+
+function chapterDays(): string[] {
+  return Object.values(state.chapterReads).flatMap((reads) => Object.values(reads))
+}
+
 function summary() {
   const days = pagesByDay()
   const t = today()
@@ -667,6 +682,13 @@ function summary() {
     month: { pages: sumPages(days, `${monthPrefix}-01`, t), books_finished: finishedIn(monthPrefix) },
     year: { pages: sumPages(days, `${yearPrefix}-01-01`, t), books_finished: finishedIn(yearPrefix) },
     forecasts,
+    reader: {
+      chapters_this_month: chapterDays().filter((d) => d >= `${monthPrefix}-01` && d <= t).length,
+      chapters_this_year: chapterDays().filter((d) => d >= `${yearPrefix}-01-01` && d <= t).length,
+      documents_in_progress: state.documents.filter(
+        (d) => (d.position.chapter > 0 || d.position.fraction > 0) && d.position.chapter < d.chapters_count - 1,
+      ).length,
+    },
   }
 }
 
@@ -1132,6 +1154,7 @@ route('DELETE', '/api/reader/(\\d+)', ([id]) => {
   const doc = findDocument(id)
   state.documents = state.documents.filter((d) => d.id !== doc.id)
   delete state.bookmarks[doc.id]
+  delete state.chapterReads[doc.id]
   return null
 })
 route('PUT', '/api/reader/(\\d+)/position', ([id], _q, body) => {
@@ -1140,6 +1163,7 @@ route('PUT', '/api/reader/(\\d+)/position', ([id], _q, body) => {
   const fraction = Number(body.fraction)
   if (!Number.isInteger(chapter) || chapter < 0 || chapter >= doc.chapters_count) invalid('chapter', 'validation.invalid')
   if (!(fraction >= 0 && fraction <= 1)) invalid('fraction', 'validation.invalid')
+  recordChapterReads(doc.id, doc.position.chapter, chapter)
   doc.position = { chapter, fraction }
   doc.last_read_at = new Date().toISOString()
   doc.progress = Math.round(((chapter + fraction) / doc.chapters_count) * 1000) / 10
@@ -1193,9 +1217,10 @@ route('GET', '/api/stats/daily', (_p, query) => {
   const days = pagesByDay()
   const to = today()
   const from = addDays(to, -(count - 1))
+  const chapters = chapterDays()
   const data = Array.from({ length: count }, (_, i) => {
     const date = addDays(from, i)
-    return { date, pages: Math.max(days.get(date) ?? 0, 0) }
+    return { date, pages: Math.max(days.get(date) ?? 0, 0), chapters: chapters.filter((d) => d === date).length }
   })
   return { data, meta: { from, to, total_pages: data.reduce((sum, d) => sum + d.pages, 0) } }
 })

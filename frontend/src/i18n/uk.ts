@@ -284,6 +284,7 @@ export default {
     days: '{n} день | {n} дні | {n} днів',
     books: '{n} книга | {n} книги | {n} книг',
     pages: '{n} стор.',
+    chapters: '{n} розділ | {n} розділи | {n} розділів',
     perDay: '{n} стор./день',
     perDayUnit: 'стор./день',
     tiles: {
@@ -294,6 +295,12 @@ export default {
       paceHint: 'за останні 14 днів',
       month: 'Цей місяць',
       year: 'Цей рік',
+    },
+    reader: {
+      title: 'Читанка',
+      month: 'Розділів за місяць',
+      year: 'Розділів за рік',
+      inProgress: 'Книг відкрито за 30 днів',
     },
     goal: {
       title: 'Ціль на {year} рік',

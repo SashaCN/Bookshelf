@@ -105,6 +105,21 @@ describe('demo mock API', () => {
     expect(daily.meta.total_pages).toBe(daily.data.reduce((sum, d) => sum + d.pages, 0))
   })
 
+  it('counts the chapters of the reader in the statistics', async () => {
+    const [doc] = await readerApi.list()
+    expect((await statsApi.summary()).reader).toEqual({ chapters_this_month: 0, chapters_this_year: 0, documents_in_progress: 0 })
+
+    await readerApi.savePosition(doc.id, { chapter: 2, fraction: 0.5 })
+    await readerApi.savePosition(doc.id, { chapter: 0, fraction: 0 })
+    await readerApi.savePosition(doc.id, { chapter: 1, fraction: 0.2 })
+
+    const summary = await statsApi.summary()
+    expect(summary.reader.chapters_this_year).toBe(2)
+    expect(summary.reader.chapters_this_month).toBe(2)
+    expect(summary.reader.documents_in_progress).toBe(1)
+    expect((await statsApi.daily(3)).data.at(-1)?.chapters).toBe(2)
+  })
+
   it('sets and removes the yearly goal', async () => {
     const year = new Date().getFullYear()
     expect((await statsApi.goal(year)).target_books).toBe(12)
