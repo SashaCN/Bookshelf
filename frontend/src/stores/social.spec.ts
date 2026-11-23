@@ -2,11 +2,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { socialApi } from '@/api/social'
-import { makeFeedQuote, makeProfile, makeQuote } from '@/test/fixtures'
+import { makeFeedQuote, makeProfile, makePublicReview, makeQuote } from '@/test/fixtures'
 import { useSocialStore } from './social'
 
 vi.mock('@/api/social', () => ({
-  socialApi: { profile: vi.fn(), quotes: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
+  socialApi: { profile: vi.fn(), quotes: vi.fn(), reviews: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
 }))
 
 describe('social store', () => {
@@ -25,6 +25,23 @@ describe('social store', () => {
     expect(social.profile?.username).toBe('olena')
     expect(social.profileQuotes.items.map((q) => q.id)).toEqual([2])
     expect(social.profileQuotes.hasMore).toBe(true)
+  })
+
+  it('loads the reviews of the shown profile only when asked, and drops them with the profile', async () => {
+    vi.mocked(socialApi.profile).mockResolvedValue(makeProfile())
+    vi.mocked(socialApi.quotes).mockResolvedValue({ data: [], links: { next: null } })
+    vi.mocked(socialApi.reviews).mockResolvedValue({ data: [makePublicReview({ id: 7 })], links: { next: null } })
+    const social = useSocialStore()
+
+    await social.loadProfile('olena')
+    expect(socialApi.reviews).not.toHaveBeenCalled()
+
+    await social.loadProfileReviews()
+    expect(socialApi.reviews).toHaveBeenCalledWith('olena', 1)
+    expect(social.profileReviews.items.map((r) => r.id)).toEqual([7])
+
+    await social.loadProfile('olena')
+    expect(social.profileReviews.loaded).toBe(false)
   })
 
   it('leaves no profile behind when it is not found', async () => {

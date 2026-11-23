@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { reactive, ref, type Ref } from 'vue'
 import { socialApi } from '@/api/social'
-import type { FeedQuote, PersonSummary, PublicProfile, Quote } from '@/types/api'
+import type { FeedQuote, PersonSummary, PublicProfile, PublicReview, Quote } from '@/types/api'
 
 interface Pager<T> {
   items: Ref<T[]>
@@ -71,6 +71,7 @@ function createPager<T>(key: (item: T) => string | number): Pager<T> {
 export const useSocialStore = defineStore('social', () => {
   const profile = ref<PublicProfile | null>(null)
   const profileQuotes = reactive(createPager<Quote>((quote) => quote.id))
+  const profileReviews = reactive(createPager<PublicReview>((review) => review.id))
   const feed = reactive(createPager<FeedQuote>((quote) => quote.id))
   const people = reactive(createPager<PersonSummary>((person) => person.username))
 
@@ -81,11 +82,20 @@ export const useSocialStore = defineStore('social', () => {
     const current = ++profileGeneration
     profile.value = null
     profileQuotes.reset()
+    profileReviews.reset()
 
     const loaded = await socialApi.profile(username)
     if (current !== profileGeneration) return
     profile.value = loaded
     await profileQuotes.load((page) => socialApi.quotes(username, page))
+  }
+
+  /** The first page of the shown profile's public reviews; read only when the reader opens that tab. */
+  function loadProfileReviews(): Promise<void> {
+    const username = profile.value?.username
+    if (!username) return Promise.resolve()
+
+    return profileReviews.load((page) => socialApi.reviews(username, page))
   }
 
   /** The button changes at once and the request follows; if the server turns it down everything goes back. */
@@ -132,9 +142,10 @@ export const useSocialStore = defineStore('social', () => {
     profileGeneration++
     profile.value = null
     profileQuotes.reset()
+    profileReviews.reset()
     feed.reset()
     people.reset()
   }
 
-  return { profile, profileQuotes, feed, people, loadProfile, setFollowing, toggleLike, loadFeed, loadPeople, reset }
+  return { profile, profileQuotes, profileReviews, feed, people, loadProfile, loadProfileReviews, setFollowing, toggleLike, loadFeed, loadPeople, reset }
 })

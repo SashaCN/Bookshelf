@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import LoadMore from '@/components/LoadMore.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import QuoteCard from '@/components/QuoteCard.vue'
+import RatingStars from '@/components/RatingStars.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLoadMore } from '@/composables/useLoadMore'
+import { formatDay } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import { useSocialStore } from '@/stores/social'
 
 const props = defineProps<{ username: string }>()
 
+const { t } = useI18n()
 const social = useSocialStore()
 const auth = useAuthStore()
 const errorMessage = useApiErrorMessage()
@@ -21,6 +26,32 @@ const loginTarget = computed(() => ({ name: 'login', query: { redirect: `/u/${en
 
 const notFound = ref(false)
 const { moreError, loadMore } = useLoadMore(() => social.profileQuotes.loadMore())
+const { moreError: moreReviewsError, loadMore: loadMoreReviews } = useLoadMore(() => social.profileReviews.loadMore())
+
+const tab = ref<'quotes' | 'reviews'>('quotes')
+const reviewsError = ref('')
+const tabOptions = computed(() => [
+  { value: 'quotes' as const, label: t('social.profile.tabQuotes') },
+  { value: 'reviews' as const, label: t('social.profile.tabReviews') },
+])
+
+/** Reviews are read when the tab is first opened, so a profile that is only skimmed costs one request less. */
+async function loadReviews() {
+  reviewsError.value = ''
+
+  try {
+    await social.loadProfileReviews()
+  } catch (e) {
+    reviewsError.value = errorMessage(e)
+  }
+}
+
+watch(tab, (value) => {
+  if (value === 'reviews' && !social.profileReviews.loaded) void loadReviews()
+})
+
+/** An ISO timestamp as a day; the date is shown in the reader's own calendar. */
+const reviewDay = (iso: string) => formatDay(iso.slice(0, 10))
 
 const error = ref('')
 const followError = ref('')
@@ -30,6 +61,9 @@ async function load() {
   notFound.value = false
   error.value = ''
   moreError.value = ''
+  moreReviewsError.value = ''
+  reviewsError.value = ''
+  tab.value = 'quotes'
   followError.value = ''
 
   try {
@@ -176,16 +210,53 @@ watch(() => props.username, load, { immediate: true })
       >
     </div>
 
-    <h2 class="mb-3 font-display text-xl font-semibold">{{ $t('social.profile.quotes') }}</h2>
+    <p class="mb-4 text-center text-sm text-ink-muted">{{ $t('social.profile.reviewsCount', social.profile.reviews_count) }}</p>
 
-    <ul v-if="social.profileQuotes.items.length" class="flex flex-col gap-3">
-      <li v-for="quote in social.profileQuotes.items" :key="quote.id">
-        <QuoteCard :quote="quote" readonly />
-      </li>
-    </ul>
+    <SegmentedControl v-model="tab" :label="$t('social.profile.tabsLabel')" :options="tabOptions" hide-label class="mb-4" />
 
-    <p v-else-if="social.profileQuotes.loaded" class="text-ink-muted">{{ $t('social.profile.noQuotes') }}</p>
+    <section v-if="tab === 'quotes'" :aria-label="$t('social.profile.tabQuotes')">
+      <ul v-if="social.profileQuotes.items.length" class="flex flex-col gap-3">
+        <li v-for="quote in social.profileQuotes.items" :key="quote.id">
+          <QuoteCard :quote="quote" readonly />
+        </li>
+      </ul>
 
-    <LoadMore :has-more="social.profileQuotes.hasMore" :loading="social.profileQuotes.loadingMore" :error="moreError" @more="loadMore" />
+      <p v-else-if="social.profileQuotes.loaded" class="text-ink-muted">{{ $t('social.profile.noQuotes') }}</p>
+
+      <LoadMore :has-more="social.profileQuotes.hasMore" :loading="social.profileQuotes.loadingMore" :error="moreError" @more="loadMore" />
+    </section>
+
+    <section v-else :aria-label="$t('social.profile.tabReviews')">
+      <ErrorNotice v-if="reviewsError" :message="reviewsError" retryable @retry="loadReviews" />
+
+      <p v-else-if="!social.profileReviews.loaded" class="text-ink-muted">{{ $t('common.loading') }}</p>
+
+      <ul v-else-if="social.profileReviews.items.length" class="flex flex-col gap-3">
+        <li v-for="review in social.profileReviews.items" :key="review.id" class="rounded-2xl border border-line bg-surface p-4">
+          <p class="font-medium">{{ review.book.title }}</p>
+          <p v-if="review.book.authors.length" class="text-sm text-ink-muted">{{ review.book.authors.join(', ') }}</p>
+          <div class="mt-2 flex items-center gap-3">
+            <RatingStars
+              v-if="review.rating !== null"
+              :model-value="review.rating"
+              readonly
+              :label="$t('social.profile.reviewRating', { rating: review.rating })"
+            />
+            <time :datetime="review.reviewed_at" class="text-sm text-ink-muted">{{ reviewDay(review.reviewed_at) }}</time>
+          </div>
+          <p class="mt-2 whitespace-pre-line break-words">{{ review.review }}</p>
+        </li>
+      </ul>
+
+      <p v-else class="text-ink-muted">{{ $t('social.profile.noReviews') }}</p>
+
+      <LoadMore
+        v-if="!reviewsError"
+        :has-more="social.profileReviews.hasMore"
+        :loading="social.profileReviews.loadingMore"
+        :error="moreReviewsError"
+        @more="loadMoreReviews"
+      />
+    </section>
   </template>
 </template>

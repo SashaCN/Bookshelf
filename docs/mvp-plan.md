@@ -139,6 +139,9 @@ erDiagram
         int current_page
         int total_pages "копія page_count, можна змінити"
         int rating "nullable, 1–5"
+        text review "nullable, до 5000 символів"
+        string review_visibility "private / public"
+        timestamp reviewed_at "nullable"
         timestamp started_at "nullable"
         timestamp finished_at "nullable"
     }
@@ -232,7 +235,7 @@ erDiagram
 | GET | `/api/catalog/search?q=` | пошук в Open Library через наш бекенд |
 | GET | `/api/library?status=` | моя бібліотека |
 | POST | `/api/library` | додати книгу: `{openlibrary_work_key}` або ручні дані |
-| GET / PATCH / DELETE | `/api/library/{userBook}` | деталі; зміна статусу, оцінки, `total_pages`; видалення |
+| GET / PATCH / DELETE | `/api/library/{userBook}` | деталі; зміна статусу, оцінки, відгуку (`review`, `review_visibility`), `total_pages`; видалення. Відгук лише для прочитаної чи кинутої книги, інакше 422 `library.review_not_finished` |
 | POST | `/api/library/{userBook}/progress` | `{page}`: оновити прогрес |
 | GET | `/api/library/{userBook}/logs` | журнал читання книги |
 | GET | `/api/quotes?favorite=&book=&type=` | мої цитати, нові першими, по 20 (з `likes_count`) |
@@ -245,6 +248,7 @@ erDiagram
 | GET / PUT / DELETE | `/api/goals/{year}` | річна ціль і стан щодо неї; ціль можна ставити на цей або наступний рік |
 | GET | `/api/users?q=` | пошук публічних профілів за username або ім'ям, до 20 |
 | GET | `/api/users/{username}` | публічний профіль і лічильники; 404, якщо профіль приватний; працює без входу |
+| GET | `/api/users/{username}/reviews` | публічні відгуки (`book`, `rating`, `review`, `reviewed_at`), по 20, найновіші першими; працює без входу, як і цитати |
 | GET | `/api/users/{username}/quotes` | публічні цитати, по 20 (без приміток і «улюбленого», з `likes_count` і `liked_by_me`); працює без входу |
 | POST / DELETE | `/api/users/{username}/follow` | підписатися / відписатися |
 | GET | `/api/users/{username}/followers`, `/following` | підписники й підписки, по 20 |
@@ -373,7 +377,9 @@ bookshelf/
 
 Лайки публічних цитат (серце у стрічці й на публічній сторінці, лічильник у власному списку): зроблено, див. API.
 
-Не робили (наступні кроки): відгуки на книги, коментарі, сповіщення, блокування й скарги.
+Відгуки на книги: зроблено (текст до 5000 символів у записі бібліотеки, видимість як у цитат, вкладка «Відгуки» на публічній сторінці, `reviews_count` лише публічних), див. API.
+
+Не робили (наступні кроки): коментарі, сповіщення, блокування й скарги.
 
 ### Статус етапу 4 (статистика і ціль): виконано
 

@@ -49,6 +49,10 @@ export interface UserBook {
   total_pages: number | null
   progress_percent: number | null
   rating: number | null
+  /** The reader's text about the book; only written for a finished or abandoned one. */
+  review: string | null
+  review_visibility: QuoteVisibility
+  reviewed_at: string | null
   started_at: string | null
   finished_at: string | null
   created_at: string | null
@@ -114,6 +118,9 @@ export interface AddBookPayload {
 export interface UpdateBookPayload {
   status?: BookStatus
   rating?: number | null
+  /** An empty string or null clears the review. */
+  review?: string | null
+  review_visibility?: QuoteVisibility
   total_pages?: number
 }
 
@@ -154,6 +161,20 @@ export interface QuoteFilters {
   /** The id of a library entry (user book). */
   book?: number
   type?: QuoteType
+}
+
+/** A public review of a book, as other readers see it. */
+export interface PublicReview {
+  id: number
+  book: { title: string; authors: string[]; cover_url: string | null }
+  rating: number | null
+  review: string
+  reviewed_at: string
+}
+
+export interface ReviewsPage {
+  data: PublicReview[]
+  links: { next: string | null }
 }
 
 export interface QuotesPage {
@@ -218,6 +239,8 @@ export interface PublicProfile {
   books_finished_this_year: number
   followers_count: number
   following_count: number
+  /** Public reviews only. */
+  reviews_count: number
   is_following: boolean
   is_me: boolean
 }

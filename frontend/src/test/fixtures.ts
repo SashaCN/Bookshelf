@@ -1,4 +1,4 @@
-import type { Book, CatalogEntry, FeedQuote, PublicProfile, Quote, UserBook } from '@/types/api'
+import type { Book, CatalogEntry, FeedQuote, PublicProfile, PublicReview, Quote, UserBook } from '@/types/api'
 
 export function makeBook(overrides: Partial<Book> = {}): Book {
   return {
@@ -25,6 +25,9 @@ export function makeUserBook(overrides: Partial<UserBook> = {}): UserBook {
     total_pages: 320,
     progress_percent: 0,
     rating: null,
+    review: null,
+    review_visibility: 'private',
+    reviewed_at: null,
     started_at: null,
     finished_at: null,
     created_at: '2026-10-05T10:00:00+00:00',
@@ -76,8 +79,20 @@ export function makeProfile(overrides: Partial<PublicProfile> = {}): PublicProfi
     books_finished_this_year: 5,
     followers_count: 3,
     following_count: 2,
+    reviews_count: 0,
     is_following: false,
     is_me: false,
+    ...overrides,
+  }
+}
+
+export function makePublicReview(overrides: Partial<PublicReview> = {}): PublicReview {
+  return {
+    id: 1,
+    book: { title: 'Маленький принц', authors: ['Антуан де Сент-Екзюпері'], cover_url: null },
+    rating: 5,
+    review: 'Проста книга про складні речі.',
+    reviewed_at: '2026-10-05T10:00:00+00:00',
     ...overrides,
   }
 }

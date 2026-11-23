@@ -2,14 +2,14 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { socialApi } from '@/api/social'
-import { makeProfile, makeQuote } from '@/test/fixtures'
+import { makeProfile, makePublicReview, makeQuote } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
 import { useAuthStore } from '@/stores/auth'
 import type { PublicProfile } from '@/types/api'
 import PublicProfileView from './PublicProfileView.vue'
 
 vi.mock('@/api/social', () => ({
-  socialApi: { profile: vi.fn(), quotes: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
+  socialApi: { profile: vi.fn(), quotes: vi.fn(), reviews: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
 }))
 
 const reader = { id: 1, name: 'Іван', email: 'ivan@example.com', timezone: 'Europe/Kyiv', username: 'ivan', is_public: true }
@@ -295,5 +295,84 @@ describe('PublicProfileView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Публічних цитат поки немає.')
+  })
+
+  describe('reviews tab', () => {
+    const review = makePublicReview({ id: 1, review: 'Перший рядок\nДругий <i>рядок</i>', rating: 4 })
+
+    it('lists the reviews of the book only when the tab is opened', async () => {
+      vi.mocked(socialApi.reviews).mockResolvedValue({ data: [review], links: { next: null } })
+      const { wrapper } = await mountView(makeProfile({ reviews_count: 1 }))
+
+      expect(socialApi.reviews).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('1 відгук')
+
+      await buttonWithText(wrapper, 'Відгуки')!.trigger('click')
+      await flushPromises()
+
+      expect(socialApi.reviews).toHaveBeenCalledWith('olena', 1)
+      expect(buttonWithText(wrapper, 'Відгуки')!.attributes('aria-pressed')).toBe('true')
+      expect(wrapper.text()).toContain('Маленький принц')
+      expect(wrapper.text()).toContain('5 жовтня')
+      expect(wrapper.find('[aria-label="Оцінка: 4 з 5"]').exists()).toBe(true)
+      expect(wrapper.text()).not.toContain('Public words')
+      expect(wrapper.get('p.whitespace-pre-line').text()).toBe('Перший рядок\nДругий <i>рядок</i>')
+      expect(wrapper.find('i').exists()).toBe(false)
+
+      await buttonWithText(wrapper, 'Цитати')!.trigger('click')
+      expect(wrapper.text()).toContain('Public words')
+    })
+
+    it('declines the number of reviews', async () => {
+      expect((await mountView(makeProfile({ reviews_count: 3 }))).wrapper.text()).toContain('3 відгуки')
+      expect((await mountView(makeProfile({ reviews_count: 5 }))).wrapper.text()).toContain('5 відгуків')
+    })
+
+    it('says so when there are no public reviews', async () => {
+      vi.mocked(socialApi.reviews).mockResolvedValue({ data: [], links: { next: null } })
+      const { wrapper } = await mountView(makeProfile())
+
+      await buttonWithText(wrapper, 'Відгуки')!.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Публічних відгуків поки немає.')
+    })
+
+    it('loads more reviews', async () => {
+      vi.mocked(socialApi.reviews)
+        .mockResolvedValueOnce({ data: [review], links: { next: '/n' } })
+        .mockResolvedValueOnce({ data: [makePublicReview({ id: 2, book: { title: 'Друга книга', authors: [], cover_url: null } })], links: { next: null } })
+      const { wrapper } = await mountView(makeProfile({ reviews_count: 2 }))
+
+      await buttonWithText(wrapper, 'Відгуки')!.trigger('click')
+      await flushPromises()
+      await buttonWithText(wrapper, 'Показати ще')!.trigger('click')
+      await flushPromises()
+
+      expect(socialApi.reviews).toHaveBeenLastCalledWith('olena', 2)
+      expect(wrapper.text()).toContain('Друга книга')
+    })
+
+    it('offers a retry when the reviews cannot be loaded', async () => {
+      vi.mocked(socialApi.reviews).mockRejectedValueOnce(new ApiError(500, null)).mockResolvedValueOnce({ data: [review], links: { next: null } })
+      const { wrapper } = await mountView(makeProfile())
+
+      await buttonWithText(wrapper, 'Відгуки')!.trigger('click')
+      await flushPromises()
+      await wrapper.get('[role="alert"] button').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Маленький принц')
+    })
+
+    it('works for a guest', async () => {
+      vi.mocked(socialApi.reviews).mockResolvedValue({ data: [review], links: { next: null } })
+      const { wrapper } = await mountView(makeProfile({ reviews_count: 1 }), null, true)
+
+      await buttonWithText(wrapper, 'Відгуки')!.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Маленький принц')
+    })
   })
 })

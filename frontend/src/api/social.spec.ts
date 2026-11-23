@@ -25,14 +25,16 @@ describe('socialApi', () => {
     vi.mocked(http.get).mockResolvedValue({ data: [], links: { next: null } })
 
     await socialApi.quotes('olena', 2)
+    await socialApi.reviews('olena', 5)
     await socialApi.followers('olena')
     await socialApi.following('olena', 3)
     await socialApi.feed(4)
 
     expect(http.get).toHaveBeenNthCalledWith(1, '/api/users/olena/quotes?page=2')
-    expect(http.get).toHaveBeenNthCalledWith(2, '/api/users/olena/followers?page=1')
-    expect(http.get).toHaveBeenNthCalledWith(3, '/api/users/olena/following?page=3')
-    expect(http.get).toHaveBeenNthCalledWith(4, '/api/feed?page=4')
+    expect(http.get).toHaveBeenNthCalledWith(2, '/api/users/olena/reviews?page=5')
+    expect(http.get).toHaveBeenNthCalledWith(3, '/api/users/olena/followers?page=1')
+    expect(http.get).toHaveBeenNthCalledWith(4, '/api/users/olena/following?page=3')
+    expect(http.get).toHaveBeenNthCalledWith(5, '/api/feed?page=4')
   })
 
   it('likes and unlikes a quote', async () => {

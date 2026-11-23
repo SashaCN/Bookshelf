@@ -17,13 +17,14 @@ import type {
   QuoteVisibility,
   ReaderBookmark,
   ReaderChapter,
+  PublicReview,
   ReaderDocument,
   ReadingLog,
   User,
   UserBook,
 } from '@/types/api'
 
-const STORAGE_KEY = 'bookshelf-demo-state-v2'
+const STORAGE_KEY = 'bookshelf-demo-state-v3'
 const PAGE_SIZE = 15
 const DAY_MS = 86_400_000
 
@@ -106,6 +107,9 @@ function seed(): State {
     current_page: current,
     total_pages: b.page_count,
     rating: null,
+    review: null,
+    review_visibility: 'private',
+    reviewed_at: null,
     started_at: null,
     finished_at: null,
     created_at: now,
@@ -124,6 +128,9 @@ function seed(): State {
       current_page: 96,
       total_pages: 96,
       rating: 5,
+      review: 'Проста казка, після якої хочеться жити уважніше. Перечитую щоразу, коли поспішаю.\n\nЛисиця — мій улюблений персонаж.',
+      review_visibility: 'public',
+      reviewed_at: daysAgo(34).toISOString(),
       started_at: daysAgo(40).toISOString(),
       finished_at: daysAgo(35).toISOString(),
     }),
@@ -238,6 +245,7 @@ interface FakeReader {
   name: string
   books_finished_this_year: number
   quotes: { content: string; note: string | null; page: number | null; type: QuoteType; ago: number; book: Quote['book'] }[]
+  reviews: { book: Quote['book']; rating: number | null; review: string; ago: number }[]
 }
 
 const fakeReaders: FakeReader[] = [
@@ -250,6 +258,10 @@ const fakeReaders: FakeReader[] = [
       { content: 'Читати повільно — теж спосіб жити повільно.', note: 'Записала після довгої дороги потягом.', page: null, type: 'insight', ago: 4, book: { title: 'Тіні забутих предків', authors: ['Михайло Коцюбинський'], cover_url: null } },
       { content: 'Найтемніша ніч закінчується світанком.', note: null, page: 201, type: 'quote', ago: 11, book: { title: 'Зів\'яле листя', authors: ['Іван Франко'], cover_url: null } },
     ],
+    reviews: [
+      { book: { title: 'Лісова пісня', authors: ['Леся Українка'], cover_url: null }, rating: 5, review: 'Читається як музика.\nМавка назавжди залишилася зі мною.', ago: 8 },
+      { book: { title: 'Тіні забутих предків', authors: ['Михайло Коцюбинський'], cover_url: null }, rating: 4, review: 'Гори, говірка, кохання. Місцями важко, але варто.', ago: 20 },
+    ],
   },
   {
     username: 'taras_books',
@@ -259,6 +271,7 @@ const fakeReaders: FakeReader[] = [
       { content: 'Свобода починається там, де закінчується страх.', note: 'До цього місця завжди повертаюся.', page: 88, type: 'quote', ago: 2, book: { title: '1984', authors: ['Джордж Орвелл'], cover_url: null } },
       { content: 'Хороший код читається як проза.', note: null, page: 31, type: 'quote', ago: 7, book: { title: 'Чистий код', authors: ['Роберт Мартін'], cover_url: null } },
     ],
+    reviews: [{ book: { title: '1984', authors: ['Джордж Орвелл'], cover_url: null }, rating: 5, review: 'Страшно актуально. Читати повільно.', ago: 15 }],
   },
   {
     username: 'iryna_p',
@@ -267,6 +280,7 @@ const fakeReaders: FakeReader[] = [
     quotes: [
       { content: 'Дім там, де на тебе чекає розгорнута книга.', note: null, page: 5, type: 'quote', ago: 3, book: { title: 'Маленький принц', authors: ['Антуан де Сент-Екзюпері'], cover_url: null } },
     ],
+    reviews: [],
   },
 ]
 
@@ -441,6 +455,32 @@ function fakeQuotes(reader: FakeReader): Quote[] {
   }))
 }
 
+/** The public reviews of the demo user or of a fake reader, most recent first. */
+function publicReviews(name: string): PublicReview[] {
+  const person = findPerson(name)
+  if (person.key === ME) {
+    return state.library
+      .filter((e) => e.review !== null && e.review_visibility === 'public')
+      .sort((a, b) => (b.reviewed_at ?? '').localeCompare(a.reviewed_at ?? '') || b.id - a.id)
+      .map((e) => ({
+        id: e.id,
+        book: { title: e.book.title, authors: e.book.authors, cover_url: e.book.cover_url },
+        rating: e.rating,
+        review: e.review as string,
+        reviewed_at: e.reviewed_at as string,
+      }))
+  }
+
+  const reader = fakeReaders.find((r) => r.username === name) as FakeReader
+  return reader.reviews.map((r, i) => ({
+    id: 2000 + fakeReaders.indexOf(reader) * 10 + i,
+    book: r.book,
+    rating: r.rating,
+    review: r.review,
+    reviewed_at: daysAgo(r.ago).toISOString(),
+  }))
+}
+
 function profile(username: string): PublicProfile {
   const person = findPerson(username)
   const all = edges()
@@ -450,6 +490,7 @@ function profile(username: string): PublicProfile {
     books_finished_this_year: person.key === ME ? finishedIn(today().slice(0, 4)) : (fakeReaders.find((r) => r.username === username) as FakeReader).books_finished_this_year,
     followers_count: all.filter(([, to]) => to === person.key).length,
     following_count: all.filter(([from]) => from === person.key).length,
+    reviews_count: publicReviews(username).length,
     is_following: state.following.includes(username),
     is_me: person.key === ME,
   }
@@ -457,6 +498,16 @@ function profile(username: string): PublicProfile {
 
 function invalid(field: string, code: string): never {
   throw new HttpError(422, { message: code, errors: { [field]: [code] } })
+}
+
+/** Writes or clears the review the way the real API does: only a finished or abandoned book can get one. */
+function setReview(e: Entry, value: string | null): void {
+  const review = value?.trim() ? value.trim() : null
+  if (review === e.review) return
+  if (review !== null && review.length > 5000) invalid('review', 'validation.max')
+  if (review !== null && e.status !== 'finished' && e.status !== 'abandoned') invalid('review', 'library.review_not_finished')
+  e.review = review
+  e.reviewed_at = review === null ? null : new Date().toISOString()
 }
 
 /** Moves a library entry to another status the way the real API does. */
@@ -664,6 +715,9 @@ route('POST', '/api/library', (_p, _q, body) => {
     current_page: 0,
     total_pages: newBook.page_count,
     rating: null,
+    review: null,
+    review_visibility: 'private',
+    reviewed_at: null,
     started_at: null,
     finished_at: null,
     created_at: new Date().toISOString(),
@@ -690,6 +744,11 @@ route('PATCH', '/api/library/(\\d+)', ([id], _q, body) => {
   }
   if ('rating' in body) e.rating = body.rating as number | null
   if (body.status) changeStatus(e, body.status as BookStatus)
+  if (body.review_visibility !== undefined) {
+    if (body.review_visibility !== 'private' && body.review_visibility !== 'public') invalid('review_visibility', 'validation.invalid')
+    e.review_visibility = body.review_visibility
+  }
+  if ('review' in body) setReview(e, body.review as string | null)
 
   state.library = [e, ...state.library.filter((x) => x.id !== e.id)]
   return ok(presentEntry(e))
@@ -837,6 +896,9 @@ route('GET', '/api/users/([^/]+)/quotes', ([username], query) => {
       ? state.quotes.filter((q) => q.visibility === 'public').sort(newestFirst).map(presentQuote)
       : fakeQuotes(fakeReaders.find((r) => r.username === name) as FakeReader)
   return paginate(all.map(withLikes), Number(query.get('page') ?? 1), `/api/users/${username}/quotes`)
+})
+route('GET', '/api/users/([^/]+)/reviews', ([username], query) => {
+  return paginate(publicReviews(decodeURIComponent(username)), Number(query.get('page') ?? 1), `/api/users/${username}/reviews`)
 })
 route('POST', '/api/users/([^/]+)/follow', ([username]) => {
   const name = decodeURIComponent(username)

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
+import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
 import { makeBook, makeQuote, makeUserBook } from '@/test/fixtures'
 import { createTestEnvironment } from '@/test/utils'
@@ -316,7 +317,7 @@ describe('BookView', () => {
     })
 
     it('offers adding a quote for this book, whatever its status', async () => {
-      const { wrapper } = await mountView(makeUserBook({ status: 'want' }))
+      const { wrapper } = await mountView(makeUserBook({ status: 'want', allowed_statuses: [] }))
 
       const add = wrapper.findAll('a').find((link) => link.text() === 'Додати цитату')
 
@@ -403,5 +404,75 @@ describe('BookView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Deep Work')
+  })
+
+  describe('review', () => {
+    const finished = (overrides: Partial<UserBook> = {}) =>
+      makeUserBook({ id: 1, status: 'finished', allowed_statuses: ['reading'], ...overrides })
+
+    it('is offered only for a finished or abandoned book', async () => {
+      expect((await mountView(makeUserBook({ status: 'reading', allowed_statuses: [] }))).wrapper.find('#book-review').exists()).toBe(false)
+      expect((await mountView(makeUserBook({ status: 'want', allowed_statuses: [] }))).wrapper.find('#book-review').exists()).toBe(false)
+      expect((await mountView(finished())).wrapper.find('#book-review').exists()).toBe(true)
+      expect((await mountView(makeUserBook({ status: 'abandoned', allowed_statuses: [] }))).wrapper.find('#book-review').exists()).toBe(true)
+    })
+
+    it('counts characters, saves with the visibility and then shows the text read-only', async () => {
+      const entry = finished()
+      const { wrapper } = await mountView(entry)
+      let finish: (book: UserBook) => void = () => undefined
+      vi.mocked(libraryApi.update).mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+
+      await wrapper.get('#book-review').setValue('Чудова\nкнига')
+      expect(wrapper.get('#book-review-counter').text()).toBe('12 з 5000')
+      expect(wrapper.get('#book-review').attributes('maxlength')).toBe('5000')
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      await wrapper.get('form[class*="gap-3"]').trigger('submit')
+      expect(buttonWithText(wrapper, 'Зберігаємо…').attributes('disabled')).toBeDefined()
+      expect(libraryApi.update).toHaveBeenCalledWith(1, { review: 'Чудова\nкнига', review_visibility: 'public' })
+
+      finish({ ...entry, review: 'Чудова\nкнига', review_visibility: 'public', reviewed_at: '2026-10-05T10:00:00+00:00' })
+      await flushPromises()
+
+      expect(wrapper.find('#book-review').exists()).toBe(false)
+      expect(wrapper.get('p.whitespace-pre-line').text()).toBe('Чудова\nкнига')
+      expect(buttonWithText(wrapper, 'Редагувати')).toBeDefined()
+    })
+
+    it('shows a saved review read-only and edits it on request', async () => {
+      const { wrapper } = await mountView(finished({ review: 'Було <b>добре</b>', review_visibility: 'private' }))
+
+      expect(wrapper.text()).toContain('Було <b>добре</b>')
+      expect(wrapper.find('b').exists()).toBe(false)
+      expect(wrapper.find('#book-review').exists()).toBe(false)
+
+      await buttonWithText(wrapper, 'Редагувати').trigger('click')
+      expect((wrapper.get('#book-review').element as HTMLTextAreaElement).value).toBe('Було <b>добре</b>')
+
+      await buttonWithText(wrapper, 'Скасувати').trigger('click')
+      expect(wrapper.find('#book-review').exists()).toBe(false)
+    })
+
+    it('keeps the form and explains when the server turns the review down', async () => {
+      const { wrapper } = await mountView(finished())
+      vi.mocked(libraryApi.update).mockRejectedValue(new ApiError(422, { errors: { review: ['library.review_not_finished'] } }))
+
+      await wrapper.get('#book-review').setValue('Рано')
+      await wrapper.get('form[class*="gap-3"]').trigger('submit')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('Відгук можна написати, коли книгу прочитано або кинуто.')
+      expect((wrapper.get('#book-review').element as HTMLTextAreaElement).value).toBe('Рано')
+    })
+
+    it('warns that a public review of a private profile will not be seen', async () => {
+      const { wrapper } = await mountView(finished())
+      useAuthStore().user = { id: 1, name: 'Іван', email: 'i@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false }
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+
+      expect(wrapper.text()).toContain('Ваш профіль приватний')
+    })
   })
 })

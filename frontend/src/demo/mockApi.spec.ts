@@ -227,4 +227,26 @@ describe('demo mock API', () => {
     expect(await readerApi.list()).toHaveLength(0)
     await expect(readerApi.get(doc.id)).rejects.toMatchObject({ status: 404 })
   })
+
+  it('writes, publishes and clears a review, and lists public reviews of readers', async () => {
+    await expect(libraryApi.update(1, { review: 'Too early' })).rejects.toMatchObject({ status: 422 })
+
+    const written = await libraryApi.update(4, { review: '  Сильна книга.  ', review_visibility: 'public' })
+    expect(written).toMatchObject({ review: 'Сильна книга.', review_visibility: 'public' })
+    expect(written.reviewed_at).not.toBeNull()
+
+    const before = await socialApi.profile('demo_reader')
+    const mine = await socialApi.reviews('demo_reader')
+    expect(mine.data.map((r) => r.book.title)).toContain('1984')
+    expect(mine.data).toHaveLength(before.reviews_count)
+
+    const cleared = await libraryApi.update(4, { review: '' })
+    expect(cleared).toMatchObject({ review: null, reviewed_at: null })
+    expect((await socialApi.profile('demo_reader')).reviews_count).toBe(before.reviews_count - 1)
+
+    const olena = await socialApi.reviews('olena_reads')
+    expect(olena.data).toHaveLength(2)
+    expect((await socialApi.profile('olena_reads')).reviews_count).toBe(2)
+    await expect(socialApi.reviews('nobody')).rejects.toMatchObject({ status: 404 })
+  })
 })

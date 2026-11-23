@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import BookCover from '@/components/BookCover.vue'
+import BookReview from '@/components/BookReview.vue'
 import BookQuotes from '@/components/BookQuotes.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -271,6 +272,8 @@ function isDisabled(target: BookStatus): boolean {
         @update:model-value="save({ rating: $event })"
       />
     </section>
+
+    <BookReview v-if="userBook.status === 'finished' || userBook.status === 'abandoned'" :key="userBook.id" :user-book="userBook" />
 
     <BookQuotes :book-id="userBook.id" />
 
