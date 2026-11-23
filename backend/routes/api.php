@@ -7,6 +7,7 @@ use App\Http\Controllers\GoalController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\QuoteLikeController;
 use App\Http\Controllers\ReaderDocumentController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\StatsController;
@@ -39,6 +40,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/quotes/export', [QuoteController::class, 'export'])->name('quotes.export');
     Route::get('/quotes/daily', [QuoteController::class, 'daily'])->name('quotes.daily');
     Route::apiResource('quotes', QuoteController::class)->except('store');
+    Route::post('/quotes/{quote}/like', [QuoteLikeController::class, 'store'])->where('quote', '[0-9]+')->name('quotes.like');
+    Route::delete('/quotes/{quote}/like', [QuoteLikeController::class, 'destroy'])->where('quote', '[0-9]+')->name('quotes.unlike');
 
     Route::post('/reader', [ReaderDocumentController::class, 'store'])
         ->middleware('throttle:uploads')

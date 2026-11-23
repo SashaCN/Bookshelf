@@ -17,10 +17,11 @@ class ProfileQuery
      *
      * @return Paginator<int, Quote>
      */
-    public function quotes(User $profile): Paginator
+    public function quotes(User $profile, ?User $viewer = null): Paginator
     {
         return $profile->quotes()
             ->where('visibility', QuoteVisibility::Public)
+            ->withLikes($viewer)
             ->with('userBook.book.authors')
             ->latest('id')
             ->simplePaginate(self::PER_PAGE);
@@ -36,6 +37,7 @@ class ProfileQuery
         return Quote::query()
             ->where('visibility', QuoteVisibility::Public)
             ->whereIn('user_id', $viewer->following()->where('users.is_public', true)->select('users.id'))
+            ->withLikes($viewer)
             ->with(['user', 'userBook.book.authors'])
             ->latest('id')
             ->simplePaginate(self::PER_PAGE);

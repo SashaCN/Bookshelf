@@ -28,6 +28,7 @@ class QuoteController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $quotes = $this->filteredQuotes($request)
+            ->withCount('likes')
             ->with('userBook.book.authors')
             ->latest('id')
             ->simplePaginate(20);

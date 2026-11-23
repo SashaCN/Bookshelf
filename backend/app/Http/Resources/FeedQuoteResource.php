@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 /**
  * A quote of the feed: the quote itself and the reader who shared it.
  */
-class FeedQuoteResource extends QuoteResource
+class FeedQuoteResource extends PublicQuoteResource
 {
     /**
      * @return array<string, mixed>

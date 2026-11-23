@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Social\FollowUser;
+use App\Actions\Social\LikeQuote;
 use App\Models\Quote;
 use App\Models\User;
 use App\Models\UserBook;
@@ -29,6 +30,8 @@ it('requires authentication for every endpoint', function (string $method, strin
     ['GET', '/api/users/alice/following'],
     ['POST', '/api/users/alice/follow'],
     ['DELETE', '/api/users/alice/follow'],
+    ['POST', '/api/quotes/1/like'],
+    ['DELETE', '/api/quotes/1/like'],
 ]);
 
 describe('profile settings', function () {
@@ -471,5 +474,129 @@ describe('people search', function () {
                 ['username' => 'alan', 'name' => 'Alan', 'is_following' => true],
                 ['username' => 'alice', 'name' => 'Alice', 'is_following' => false],
             ]]);
+    });
+});
+
+describe('quote likes', function () {
+    function likeCount(Quote $quote): int
+    {
+        return DB::table('quote_likes')->where('quote_id', $quote->id)->count();
+    }
+
+    it('likes and unlikes idempotently', function () {
+        $quote = quoteOf($this->alice);
+
+        $this->actingAs($this->me)->postJson("/api/quotes/{$quote->id}/like")->assertNoContent();
+        $this->postJson("/api/quotes/{$quote->id}/like")->assertNoContent();
+        expect(likeCount($quote))->toBe(1);
+
+        $this->deleteJson("/api/quotes/{$quote->id}/like")->assertNoContent();
+        $this->deleteJson("/api/quotes/{$quote->id}/like")->assertNoContent();
+        expect(likeCount($quote))->toBe(0);
+    });
+
+    it('lets the owner like their own public quote', function () {
+        $quote = quoteOf($this->alice);
+
+        $this->actingAs($this->alice)->postJson("/api/quotes/{$quote->id}/like")->assertNoContent();
+        expect(likeCount($quote))->toBe(1);
+    });
+
+    it('does not fail when the like is made at the same moment from two requests', function () {
+        $quote = quoteOf($this->alice);
+        $action = app(LikeQuote::class);
+
+        $action->like(User::query()->findOrFail($this->me->id), $quote->id);
+        $action->like(User::query()->findOrFail($this->me->id), $quote->id);
+
+        expect(likeCount($quote))->toBe(1);
+    });
+
+    it('answers 404 for a private quote, a private profile and a missing quote', function (string $method) {
+        $privateQuote = quoteOf($this->alice, false);
+        $hiddenQuote = quoteOf($this->hidden);
+
+        $this->actingAs($this->me);
+        $this->json($method, "/api/quotes/{$privateQuote->id}/like")->assertNotFound();
+        $this->json($method, "/api/quotes/{$hiddenQuote->id}/like")->assertNotFound();
+        $this->json($method, '/api/quotes/999999/like')->assertNotFound();
+        expect(DB::table('quote_likes')->count())->toBe(0);
+    })->with(['POST', 'DELETE']);
+
+    it('can take a like back after the quote went private or the owner went private', function () {
+        $quote = quoteOf($this->alice);
+        $other = quoteOf($this->alice);
+        $this->actingAs($this->me)->postJson("/api/quotes/{$quote->id}/like")->assertNoContent();
+        $this->postJson("/api/quotes/{$other->id}/like")->assertNoContent();
+
+        $quote->update(['visibility' => 'private']);
+        $this->alice->update(['is_public' => false]);
+
+        $this->deleteJson("/api/quotes/{$quote->id}/like")->assertNoContent();
+        $this->deleteJson("/api/quotes/{$other->id}/like")->assertNoContent();
+        expect(DB::table('quote_likes')->count())->toBe(0);
+    });
+
+    it('is removed with the quote and with the reader', function () {
+        $quote = quoteOf($this->alice);
+        $this->actingAs($this->me)->postJson("/api/quotes/{$quote->id}/like")->assertNoContent();
+
+        $this->me->delete();
+        expect(likeCount($quote))->toBe(0);
+    });
+
+    it('counts likes in the feed and on the profile, flagging the own ones', function () {
+        $this->me->following()->attach($this->alice->id);
+        $liked = quoteOf($this->alice);
+        $plain = quoteOf($this->alice);
+        $this->actingAs($this->me)->postJson("/api/quotes/{$liked->id}/like");
+        $this->actingAs($this->alice)->postJson("/api/quotes/{$liked->id}/like");
+
+        foreach (['/api/feed', '/api/users/alice/quotes'] as $uri) {
+            $data = collect($this->actingAs($this->me)->getJson($uri)->assertOk()->json('data'))->keyBy('id');
+            expect($data[$liked->id]['likes_count'])->toBe(2)
+                ->and($data[$liked->id]['liked_by_me'])->toBeTrue()
+                ->and($data[$plain->id]['likes_count'])->toBe(0)
+                ->and($data[$plain->id]['liked_by_me'])->toBeFalse();
+        }
+
+        $this->actingAs($this->alice)->getJson('/api/users/alice/quotes')->assertJsonPath('data.1.liked_by_me', true);
+    });
+
+    it('shows counts to a guest, who has liked nothing', function () {
+        $quote = quoteOf($this->alice);
+        $this->actingAs($this->me)->postJson("/api/quotes/{$quote->id}/like");
+        app('auth')->forgetGuards();
+
+        $this->getJson('/api/users/alice/quotes')->assertOk()
+            ->assertJsonPath('data.0.likes_count', 1)
+            ->assertJsonPath('data.0.liked_by_me', false);
+    });
+
+    it('counts likes in the own quote list', function () {
+        $quote = quoteOf($this->alice);
+        quoteOf($this->alice, false);
+        $this->actingAs($this->me)->postJson("/api/quotes/{$quote->id}/like");
+
+        $data = collect($this->actingAs($this->alice)->getJson('/api/quotes')->assertOk()->json('data'))->keyBy('id');
+        expect($data[$quote->id]['likes_count'])->toBe(1)
+            ->and($data->except($quote->id)->first()['likes_count'])->toBe(0);
+    });
+
+    it('does not run a query per quote', function () {
+        $this->me->following()->attach($this->alice->id);
+        foreach (range(1, 10) as $i) {
+            $quote = quoteOf($this->alice);
+            DB::table('quote_likes')->insert(['user_id' => $this->me->id, 'quote_id' => $quote->id]);
+        }
+
+        $this->actingAs($this->me);
+        foreach (['/api/feed', '/api/users/alice/quotes'] as $uri) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->getJson($uri)->assertOk();
+
+            expect(count(DB::getQueryLog()))->toBeLessThan(12);
+        }
     });
 });

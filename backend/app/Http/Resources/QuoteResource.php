@@ -27,6 +27,8 @@ class QuoteResource extends JsonResource
                 'is_favorite' => $this->is_favorite,
             ]),
             'visibility' => $this->visibility,
+            // Only where the likes were counted (the lists), never a misleading 0 elsewhere.
+            'likes_count' => $this->when(array_key_exists('likes_count', $this->resource->getAttributes()), fn () => (int) $this->likes_count),
             'created_at' => $this->created_at?->toIso8601String(),
             // The library entry the quote belongs to, and enough of its book to show where the quote comes from.
             'user_book_id' => $this->user_book_id,
