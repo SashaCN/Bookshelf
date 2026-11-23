@@ -791,8 +791,15 @@ route('DELETE', '/api/quotes/(\\d+)', ([id]) => {
 route('GET', '/api/users', (_p, query) => {
   const q = (query.get('q') ?? '').trim().toLowerCase()
   if (q.length < 2 || q.length > 50) invalid('q', 'search.length')
+  const handle = q.startsWith('@') && q.length > 1 ? q.slice(1) : q
+  const rank = (r: FakeReader) => {
+    const username = r.username.toLowerCase()
+    return username === handle ? 0 : username.startsWith(handle) ? 1 : 2
+  }
   const found = fakeReaders
-    .filter((r) => r.username.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))
+    .filter((r) => r.username !== state.user.username)
+    .filter((r) => r.username.toLowerCase().startsWith(handle) || r.name.toLowerCase().includes(q))
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
     .slice(0, 20)
     .map((r) => ({ username: r.username, name: r.name, is_following: state.following.includes(r.username) }))
   return ok(found)
@@ -866,7 +873,7 @@ route('PUT', '/api/reader/(\\d+)/position', ([id], _q, body) => {
   if (!(fraction >= 0 && fraction <= 1)) invalid('fraction', 'validation.invalid')
   doc.position = { chapter, fraction }
   doc.last_read_at = new Date().toISOString()
-  doc.progress = Math.round(((chapter + fraction) / doc.chapters_count) * 100)
+  doc.progress = Math.round(((chapter + fraction) / doc.chapters_count) * 1000) / 10
   return ok(doc)
 })
 route('GET', '/api/reader/(\\d+)/chapters/(\\d+)', ([id, n]) => {

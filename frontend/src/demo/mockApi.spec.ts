@@ -117,6 +117,8 @@ describe('demo mock API', () => {
   it('searches fake readers by name or username', async () => {
     expect((await socialApi.search('олен')).map((p) => p.username)).toEqual(['olena_reads'])
     expect(await socialApi.search('OLENA')).toEqual([{ username: 'olena_reads', name: 'Олена Коваль', is_following: true }])
+    expect((await socialApi.search('@OLENA')).map((p) => p.username)).toEqual(['olena_reads'])
+    expect((await socialApi.search('reads')).length).toBe(0)
     expect((await socialApi.search('zzz')).length).toBe(0)
     await expect(socialApi.search('a')).rejects.toMatchObject({ status: 422 })
   })
@@ -159,6 +161,7 @@ describe('demo mock API', () => {
     expect(saved.progress).toBe(50)
     expect(Date.parse(saved.last_read_at as string)).toBeGreaterThan(Date.parse(doc.last_read_at as string))
     expect((await readerApi.get(doc.id)).position).toEqual({ chapter: 1, fraction: 0.5 })
+    expect((await readerApi.savePosition(doc.id, { chapter: 0, fraction: 0.5 })).progress).toBe(16.7)
 
     await expect(readerApi.upload(new File(['x'], 'a.epub'))).rejects.toMatchObject({ status: 422 })
 
