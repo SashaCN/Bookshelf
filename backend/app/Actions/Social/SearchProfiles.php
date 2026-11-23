@@ -11,6 +11,8 @@ class SearchProfiles
 
     /**
      * Public readers whose handle starts with the text or whose name contains it, best match first.
+     * The name match is `LIKE '%text%'`, which no B-tree index can serve, so the OR with the handle prefix scans the public
+     * readers; this is accepted (bounded by LIMIT, and the table holds readers, not events). The handle prefix alone is sargable.
      * Each one carries an `is_following` flag, computed with a single extra query.
      *
      * @return Collection<int, User>
