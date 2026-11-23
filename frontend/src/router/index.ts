@@ -2,23 +2,8 @@ import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router
 import AppLayout from '@/components/AppLayout.vue'
 import { useAuthStore } from '@/stores/auth'
 import { safeRedirect } from './redirect'
-import AddBookView from '@/views/AddBookView.vue'
-import BookView from '@/views/BookView.vue'
-import FeedView from '@/views/FeedView.vue'
 import HomeView from '@/views/HomeView.vue'
-import LibraryView from '@/views/LibraryView.vue'
 import LoginView from '@/views/LoginView.vue'
-import ProfileView from '@/views/ProfileView.vue'
-import PeopleSearchView from '@/views/PeopleSearchView.vue'
-import PeopleListView from '@/views/PeopleListView.vue'
-import PublicProfileView from '@/views/PublicProfileView.vue'
-import QuoteFormView from '@/views/QuoteFormView.vue'
-import QuoteShareView from '@/views/QuoteShareView.vue'
-import QuotesView from '@/views/QuotesView.vue'
-import ReaderListView from '@/views/ReaderListView.vue'
-import ReaderView from '@/views/ReaderView.vue'
-import RegisterView from '@/views/RegisterView.vue'
-import StatsView from '@/views/StatsView.vue'
 
 export const router = createRouter({
   // The standalone demo is opened from a file, where there is no server to answer deep links.
@@ -30,37 +15,37 @@ export const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         { path: '', name: 'home', component: HomeView, meta: { tab: 'home' } },
-        { path: 'library', name: 'library', component: LibraryView, meta: { tab: 'library' } },
-        { path: 'library/add', name: 'library-add', component: AddBookView, meta: { tab: 'library' } },
+        { path: 'library', name: 'library', component: () => import('@/views/LibraryView.vue'), meta: { tab: 'library' } },
+        { path: 'library/add', name: 'library-add', component: () => import('@/views/AddBookView.vue'), meta: { tab: 'library' } },
         {
           path: 'library/:id(\\d+)',
           name: 'book',
-          component: BookView,
+          component: () => import('@/views/BookView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'library' },
         },
-        { path: 'quotes', name: 'quotes', component: QuotesView, meta: { tab: 'quotes' } },
-        { path: 'quotes/new', name: 'quote-new', component: QuoteFormView, meta: { tab: 'quotes' } },
+        { path: 'quotes', name: 'quotes', component: () => import('@/views/QuotesView.vue'), meta: { tab: 'quotes' } },
+        { path: 'quotes/new', name: 'quote-new', component: () => import('@/views/QuoteFormView.vue'), meta: { tab: 'quotes' } },
         {
           path: 'quotes/:id(\\d+)/edit',
           name: 'quote-edit',
-          component: QuoteFormView,
+          component: () => import('@/views/QuoteFormView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'quotes' },
         },
         {
           path: 'quotes/:id(\\d+)/share',
           name: 'quote-share',
-          component: QuoteShareView,
+          component: () => import('@/views/QuoteShareView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
           meta: { tab: 'quotes' },
         },
-        { path: 'feed', name: 'feed', component: FeedView },
-        { path: 'people', name: 'people-search', component: PeopleSearchView },
+        { path: 'feed', name: 'feed', component: () => import('@/views/FeedView.vue') },
+        { path: 'people', name: 'people-search', component: () => import('@/views/PeopleSearchView.vue') },
         {
           path: 'u/:username',
           name: 'public-profile',
-          component: PublicProfileView,
+          component: () => import('@/views/PublicProfileView.vue'),
           props: (route) => ({ username: String(route.params.username) }),
           // Shared profile links work for guests too; signed-in readers get the usual layout.
           meta: { requiresAuth: false },
@@ -68,28 +53,28 @@ export const router = createRouter({
         {
           path: 'u/:username/followers',
           name: 'followers',
-          component: PeopleListView,
+          component: () => import('@/views/PeopleListView.vue'),
           props: (route) => ({ username: String(route.params.username), kind: 'followers' }),
         },
         {
           path: 'u/:username/following',
           name: 'following',
-          component: PeopleListView,
+          component: () => import('@/views/PeopleListView.vue'),
           props: (route) => ({ username: String(route.params.username), kind: 'following' }),
         },
-        { path: 'reader', name: 'reader', component: ReaderListView },
+        { path: 'reader', name: 'reader', component: () => import('@/views/ReaderListView.vue') },
         {
           path: 'reader/:id(\\d+)',
           name: 'reader-view',
-          component: ReaderView,
+          component: () => import('@/views/ReaderView.vue'),
           props: (route) => ({ id: Number(route.params.id) }),
         },
-        { path: 'stats', name: 'stats', component: StatsView, meta: { tab: 'stats' } },
-        { path: 'profile', name: 'profile', component: ProfileView },
+        { path: 'stats', name: 'stats', component: () => import('@/views/StatsView.vue'), meta: { tab: 'stats' } },
+        { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue') },
       ],
     },
     { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true } },
-    { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true } },
+    { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { guestOnly: true } },
     { path: '/:pathMatch(.*)*', redirect: { name: 'home' } },
   ],
 })
