@@ -18,7 +18,9 @@ FROM base AS dev
 ARG APP_UID=1000
 ARG APP_GID=1000
 
-RUN addgroup -g ${APP_GID} app \
+# Coverage driver for `make coverage` (reports for SonarQube). Only the dev image has it.
+RUN install-php-extensions pcov \
+    && addgroup -g ${APP_GID} app \
     && adduser -D -u ${APP_UID} -G app app
 
 COPY docker/php/entrypoint.dev.sh /usr/local/bin/entrypoint

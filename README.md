@@ -41,6 +41,12 @@ On Linux also add `APP_UID=$(id -u)` and `APP_GID=$(id -g)` there so files creat
 
 Composer and artisan run inside the container, e.g. `docker compose exec app composer require ...`.
 
+## Code quality (SonarQube)
+
+`make sonar-up`, then `SONAR_TOKEN=... make sonar` analyses both apps and the backend test coverage in a local SonarQube at
+<http://localhost:9002>. The same analysis runs in CI once `SONAR_ENABLED` is set. See [`docs/sonar.md`](docs/sonar.md)
+(in Ukrainian). `make coverage` only builds the backend report (it needs the dev image rebuilt with pcov: `make up`).
+
 ## Repository layout
 
 ```

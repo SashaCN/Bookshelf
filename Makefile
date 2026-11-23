@@ -1,6 +1,7 @@
-.PHONY: up down logs migrate fresh shell test test-backend test-frontend lint format stan build
+.PHONY: coverage sonar-up sonar-down sonar up down logs migrate fresh shell test test-backend test-frontend lint format stan build
 
 COMPOSE := docker compose
+SONAR := docker compose -f docker-compose.sonar.yml
 APP := $(COMPOSE) exec app
 FRONT := $(COMPOSE) exec frontend
 
@@ -44,3 +45,15 @@ stan:
 
 build: ## Production build of the SPA
 	$(FRONT) npm run build
+
+coverage: ## Backend coverage report (backend/coverage/clover.xml); needs the dev image with pcov (make up rebuilds it)
+	$(APP) vendor/bin/pest --coverage-clover=coverage/clover.xml
+
+sonar-up: ## Start the local SonarQube (http://localhost:9002)
+	$(SONAR) up -d
+
+sonar-down: ## Stop the local SonarQube (data is kept)
+	$(SONAR) down
+
+sonar: coverage ## Analyse the code in the local SonarQube (needs SONAR_TOKEN)
+	$(SONAR) run --rm scanner
