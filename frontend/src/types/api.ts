@@ -130,6 +130,10 @@ export interface Quote {
   page: number | null
   is_favorite: boolean
   visibility: QuoteVisibility
+  /** Present in the lists: the own quotes and quotes of other readers. */
+  likes_count?: number
+  /** Present on quotes of other readers; always false for a guest. */
+  liked_by_me?: boolean
   created_at: string
   user_book_id: number
   book: { title: string; authors: string[]; cover_url: string | null }

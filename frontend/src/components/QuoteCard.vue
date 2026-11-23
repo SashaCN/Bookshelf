@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useAuthStore } from '@/stores/auth'
 import { useQuotesStore } from '@/stores/quotes'
+import { useSocialStore } from '@/stores/social'
 import type { FeedQuote, Quote } from '@/types/api'
 import ErrorNotice from './ErrorNotice.vue'
 import QuoteSource from './QuoteSource.vue'
@@ -10,12 +13,34 @@ import QuoteSource from './QuoteSource.vue'
 const props = defineProps<{ quote: Quote | FeedQuote; readonly?: boolean }>()
 
 const quotes = useQuotesStore()
+const social = useSocialStore()
+const auth = useAuthStore()
+const { t } = useI18n()
 const errorMessage = useApiErrorMessage()
 
 const error = ref('')
 const busy = ref(false)
 const confirmingDelete = ref(false)
 let togglingFavorite = false
+let togglingLike = false
+
+const likesCount = computed(() => props.quote.likes_count ?? 0)
+const likesText = computed(() => t('quotes.likes', likesCount.value))
+
+async function toggleLike() {
+  if (togglingLike) return
+
+  togglingLike = true
+  error.value = ''
+
+  try {
+    await social.toggleLike(props.quote)
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    togglingLike = false
+  }
+}
 
 async function toggleFavorite() {
   // A second tap while the first is on its way would race it for the final state.
@@ -101,6 +126,33 @@ async function remove() {
     <p v-if="quote.note" class="whitespace-pre-line break-words text-sm text-ink-muted">{{ quote.note }}</p>
 
     <QuoteSource :quote="quote" :plain="readonly" />
+
+    <div v-if="readonly && quote.likes_count !== undefined" class="flex items-center">
+      <button
+        v-if="auth.isAuthenticated"
+        type="button"
+        :aria-pressed="quote.liked_by_me === true"
+        :aria-label="t(quote.liked_by_me ? 'quotes.unlike' : 'quotes.like', { count: likesText })"
+        class="-ml-2 inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-full px-2 text-sm hover:bg-sunken"
+        :class="quote.liked_by_me ? 'text-accent' : 'text-ink-muted'"
+        @click="toggleLike"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          class="size-6"
+          :fill="quote.liked_by_me ? 'currentColor' : 'none'"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 20.5s-8.5-5.1-8.5-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8.5 2.5c0 5.9-8.5 11-8.5 11z" />
+        </svg>
+        <span aria-hidden="true">{{ likesCount }}</span>
+      </button>
+      <p v-else class="text-sm text-ink-muted" data-test="likes-count">{{ likesText }}</p>
+    </div>
+    <p v-else-if="!readonly && likesCount > 0" class="text-xs text-ink-muted" data-test="likes-count">{{ likesText }}</p>
 
     <ErrorNotice v-if="error" :message="error" />
 

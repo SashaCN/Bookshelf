@@ -123,6 +123,23 @@ describe('demo mock API', () => {
     await expect(socialApi.search('a')).rejects.toMatchObject({ status: 422 })
   })
 
+  it('likes and unlikes public quotes, counting them in the feed and the own list', async () => {
+    const before = (await socialApi.feed()).data[0]
+    expect(before.liked_by_me).toBe(false)
+
+    await socialApi.like(before.id)
+    await socialApi.like(before.id)
+    const liked = (await socialApi.feed()).data.find((q) => q.id === before.id)
+    expect(liked).toMatchObject({ liked_by_me: true, likes_count: (before.likes_count ?? 0) + 1 })
+
+    await socialApi.unlike(before.id)
+    await socialApi.unlike(before.id)
+    expect((await socialApi.feed()).data.find((q) => q.id === before.id)?.liked_by_me).toBe(false)
+
+    await expect(socialApi.like(999999)).rejects.toMatchObject({ status: 404 })
+    expect((await quotesApi.list()).data.every((q) => typeof q.likes_count === 'number')).toBe(true)
+  })
+
   it('shows profiles, follows and the feed of fake readers', async () => {
     expect(await socialApi.profile('olena_reads')).toMatchObject({ is_following: true, is_me: false, followers_count: 3 })
     expect((await socialApi.profile('demo_reader')).is_me).toBe(true)

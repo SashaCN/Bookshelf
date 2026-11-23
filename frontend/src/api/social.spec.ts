@@ -35,6 +35,17 @@ describe('socialApi', () => {
     expect(http.get).toHaveBeenNthCalledWith(4, '/api/feed?page=4')
   })
 
+  it('likes and unlikes a quote', async () => {
+    vi.mocked(http.post).mockResolvedValue(null)
+    vi.mocked(http.delete).mockResolvedValue(null)
+
+    await socialApi.like(5)
+    await socialApi.unlike(5)
+
+    expect(http.post).toHaveBeenCalledWith('/api/quotes/5/like')
+    expect(http.delete).toHaveBeenCalledWith('/api/quotes/5/like')
+  })
+
   it('searches people by an encoded query and unwraps the list', async () => {
     vi.mocked(http.get).mockResolvedValue({ data: [{ username: 'olena', name: 'Олена', is_following: false }] })
 

@@ -42,6 +42,8 @@ interface State {
   goals: Record<number, number>
   /** Usernames of the fake readers the demo user follows. */
   following: string[]
+  /** Ids of the quotes the demo user liked. */
+  liked: number[]
   documents: StoredDocument[]
 }
 
@@ -204,6 +206,7 @@ function seed(): State {
     quotes,
     goals: { [new Date().getFullYear()]: 12 },
     following: ['olena_reads'],
+    liked: [],
     documents: [
       {
         id: 1,
@@ -366,6 +369,12 @@ function presentEntry(e: Entry): UserBook {
     allowed_statuses: transitions[e.status],
     progress_percent: e.total_pages ? Math.round((e.current_page / e.total_pages) * 100) : null,
   }
+}
+
+/** Other readers' likes are made up from the id, so every quote has a plausible count; the demo user's own like comes on top. */
+function withLikes<T extends Quote | StoredQuote>(q: T): T {
+  const liked = state.liked.includes(q.id)
+  return { ...q, likes_count: (q.id % 4) + (liked ? 1 : 0), liked_by_me: liked }
 }
 
 function presentQuote(q: StoredQuote): Quote {
@@ -762,7 +771,7 @@ route('GET', '/api/quotes', (_p, query) => {
     .filter((q) => !query.get('type') || q.type === query.get('type'))
     .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
   const { data, links } = paginate(all, page, '/api/quotes')
-  return { data: data.map(presentQuote), links }
+  return { data: data.map((q) => ({ ...presentQuote(q), likes_count: withLikes(q).likes_count })), links }
 })
 route('GET', '/api/quotes/(\\d+)', ([id]) => ok(presentQuote(findQuote(Number(id)))))
 route('POST', '/api/library/(\\d+)/quotes', ([id], _q, body) => {
@@ -823,7 +832,7 @@ route('GET', '/api/users/([^/]+)/quotes', ([username], query) => {
     person.key === ME
       ? state.quotes.filter((q) => q.visibility === 'public').sort(newestFirst).map(presentQuote)
       : fakeQuotes(fakeReaders.find((r) => r.username === name) as FakeReader)
-  return paginate(all, Number(query.get('page') ?? 1), `/api/users/${username}/quotes`)
+  return paginate(all.map(withLikes), Number(query.get('page') ?? 1), `/api/users/${username}/quotes`)
 })
 route('POST', '/api/users/([^/]+)/follow', ([username]) => {
   const name = decodeURIComponent(username)
@@ -850,9 +859,26 @@ route('GET', '/api/users/([^/]+)/following', ([username], query) => {
 route('GET', '/api/feed', (_p, query) => {
   const quotes = fakeReaders
     .filter((r) => state.following.includes(r.username))
-    .flatMap((r) => fakeQuotes(r).map((q): FeedQuote => ({ ...q, author: { username: r.username, name: r.name } })))
+    .flatMap((r) => fakeQuotes(r).map(withLikes).map((q): FeedQuote => ({ ...q, author: { username: r.username, name: r.name } })))
     .sort(newestFirst)
   return paginate(quotes, Number(query.get('page') ?? 1), '/api/feed')
+})
+
+/** A quote that can be liked: public, of the demo user or of a fake reader. */
+function findLikeable(id: number): void {
+  const own = state.quotes.find((q) => q.id === id)
+  const known = own ? own.visibility === 'public' : fakeReaders.some((r) => fakeQuotes(r).some((q) => q.id === id))
+  if (!known) throw new HttpError(404, { message: 'Not found' })
+}
+route('POST', '/api/quotes/(\\d+)/like', ([id]) => {
+  findLikeable(Number(id))
+  if (!state.liked.includes(Number(id))) state.liked.push(Number(id))
+  return null
+})
+route('DELETE', '/api/quotes/(\\d+)/like', ([id]) => {
+  if (!state.liked.includes(Number(id))) findLikeable(Number(id))
+  state.liked = state.liked.filter((liked) => liked !== Number(id))
+  return null
 })
 
 // Reader: the demo cannot parse uploaded files, so it ships one sample document.

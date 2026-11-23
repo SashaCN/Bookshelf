@@ -3,16 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { socialApi } from '@/api/social'
 import { makeFeedQuote } from '@/test/fixtures'
+import { useAuthStore } from '@/stores/auth'
 import { createTestEnvironment } from '@/test/utils'
 import type { FeedQuote } from '@/types/api'
 import FeedView from './FeedView.vue'
 
 vi.mock('@/api/social', () => ({
-  socialApi: { profile: vi.fn(), quotes: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
+  socialApi: { profile: vi.fn(), quotes: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn(), like: vi.fn(), unlike: vi.fn() },
 }))
 
 async function mountView(items: FeedQuote[], next: string | null = null) {
   const { plugins, router } = createTestEnvironment()
+  useAuthStore().user = { id: 1, name: 'Я', email: 'me@example.com', timezone: 'Europe/Kyiv', username: 'me', is_public: true }
   vi.mocked(socialApi.feed).mockResolvedValue({ data: items, links: { next } })
   await router.push('/feed')
 
@@ -37,6 +39,23 @@ describe('FeedView', () => {
     expect(wrapper.find('a[href="/u/olena"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="В улюблених"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Редагувати')
+  })
+
+  it('likes a quote from the feed and rolls back on an error', async () => {
+    const { wrapper } = await mountView([makeFeedQuote({ likes_count: 3, liked_by_me: false })])
+    vi.mocked(socialApi.like).mockResolvedValueOnce(null).mockRejectedValueOnce(new ApiError(500, 'Server error'))
+
+    await wrapper.get('button[aria-pressed]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('button[aria-pressed]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('button[aria-pressed]').text()).toBe('4')
+    expect(socialApi.like).toHaveBeenCalledWith(1)
+
+    vi.mocked(socialApi.unlike).mockRejectedValueOnce(new ApiError(500, 'Server error'))
+    await wrapper.get('button[aria-pressed]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('button[aria-pressed]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('button[aria-pressed]').text()).toBe('4')
   })
 
   it('links to the people search from the header', async () => {

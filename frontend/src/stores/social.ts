@@ -104,6 +104,22 @@ export const useSocialStore = defineStore('social', () => {
     }
   }
 
+  /** The heart changes at once and the request follows; if the server turns it down the heart and the count go back. */
+  async function toggleLike(quote: Quote): Promise<void> {
+    const liked = quote.liked_by_me === true
+    const count = quote.likes_count ?? 0
+    quote.liked_by_me = !liked
+    quote.likes_count = Math.max(0, count + (liked ? -1 : 1))
+
+    try {
+      await (liked ? socialApi.unlike(quote.id) : socialApi.like(quote.id))
+    } catch (error) {
+      quote.liked_by_me = liked
+      quote.likes_count = count
+      throw error
+    }
+  }
+
   function loadFeed(): Promise<void> {
     return feed.load((page) => socialApi.feed(page))
   }
@@ -120,5 +136,5 @@ export const useSocialStore = defineStore('social', () => {
     people.reset()
   }
 
-  return { profile, profileQuotes, feed, people, loadProfile, setFollowing, loadFeed, loadPeople, reset }
+  return { profile, profileQuotes, feed, people, loadProfile, setFollowing, toggleLike, loadFeed, loadPeople, reset }
 })
