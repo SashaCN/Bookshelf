@@ -90,3 +90,28 @@ it('keeps the current session signed in after changing the password', function (
 
     $this->getJson('/api/me')->assertOk();
 });
+
+it('throttles wrong current passwords', function () {
+    $payload = [
+        'current_password' => 'not-my-password',
+        'password' => 'a-brand-new-password',
+        'password_confirmation' => 'a-brand-new-password',
+    ];
+
+    foreach (range(1, 5) as $attempt) {
+        $this->actAs($this->user)->putJson('/api/auth/user/password', $payload)->assertUnprocessable();
+    }
+
+    $this->actAs($this->user)->putJson('/api/auth/user/password', $payload)->assertTooManyRequests();
+    // Even the right password waits for the limit to pass.
+    $this->actAs($this->user)->putJson('/api/auth/user/password', ['current_password' => 'password'] + $payload)->assertTooManyRequests();
+    expect(Hash::check('password', $this->user->fresh()->password))->toBeTrue();
+});
+
+it('throttles per user, not for everyone', function () {
+    foreach (range(1, 5) as $attempt) {
+        $this->actAs($this->user)->putJson('/api/auth/user/password', ['current_password' => 'x'])->assertUnprocessable();
+    }
+
+    $this->actAs(User::factory()->create())->putJson('/api/auth/user/password', ['current_password' => 'x'])->assertUnprocessable();
+});

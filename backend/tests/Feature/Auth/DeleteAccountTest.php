@@ -97,3 +97,13 @@ it('cannot log in after deletion', function () {
         ->assertUnprocessable();
     $this->assertGuest();
 });
+
+it('throttles wrong passwords and keeps the account', function () {
+    foreach (range(1, 5) as $attempt) {
+        $this->actAs($this->user)->deleteJson('/api/me', ['password' => 'wrong'])->assertUnprocessable();
+    }
+
+    $this->actAs($this->user)->deleteJson('/api/me', ['password' => 'wrong'])->assertTooManyRequests();
+    $this->actAs($this->user)->deleteJson('/api/me', ['password' => 'password'])->assertTooManyRequests();
+    expect(User::find($this->user->id))->not->toBeNull();
+});

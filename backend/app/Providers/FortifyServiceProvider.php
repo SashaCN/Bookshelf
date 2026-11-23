@@ -46,5 +46,11 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('forgot-password', function (Request $request) {
             return Limit::perMinute(5)->by(Str::transliterate(Str::lower((string) $request->input(Fortify::email())).'|'.$request->ip()));
         });
+
+        // 30 an hour: well above a real household behind one NAT, low enough to stop scripted sign-ups.
+        RateLimiter::for('register', fn (Request $request) => Limit::perHour(30)->by((string) $request->ip()));
+
+        // Re-entering the current password (account deletion, password change) is a guessing target for a stolen session.
+        RateLimiter::for('password-confirm', fn (Request $request) => Limit::perMinute(5)->by((string) ($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }
 }
