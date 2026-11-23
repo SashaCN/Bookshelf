@@ -24,6 +24,6 @@ class PickQuoteOfTheDay
         $day = now($user->timezone)->toDateString();
         $offset = crc32("{$user->id}:{$day}") % $count;
 
-        return $quotes->with('userBook.book.authors')->orderBy('id')->offset($offset)->limit(1)->first();
+        return $quotes->with('userBook.book.authors', 'tags')->orderBy('id')->offset($offset)->limit(1)->first();
     }
 }

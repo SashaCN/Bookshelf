@@ -86,6 +86,14 @@ async function remove() {
 
     <QuoteSource :quote="quote" />
 
+    <ul v-if="quote.tags?.length" :aria-label="$t('quotes.tags.label')" class="-mx-1 flex flex-wrap">
+      <li v-for="tag in quote.tags" :key="tag">
+        <RouterLink :to="{ name: 'quotes', query: { tag } }" class="inline-flex min-h-11 items-center px-1 text-sm">
+          <span class="rounded-full bg-sunken px-2.5 py-0.5 text-ink-muted">#{{ tag }}</span>
+        </RouterLink>
+      </li>
+    </ul>
+
     <ErrorNotice v-if="error" :message="error" />
 
     <div v-if="!confirmingDelete" class="flex flex-wrap gap-2 border-t border-line pt-3">

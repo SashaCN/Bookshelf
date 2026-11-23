@@ -51,6 +51,24 @@ describe('QuoteCard', () => {
     expect(wrapper.text()).toContain('Atomic Habits · James Clear · с. 42')
   })
 
+  it('shows the own tags as chips that open the list filtered by the tag', async () => {
+    const { wrapper } = await mountCard(makeQuote({ tags: ['мудрість', 'звички'] }))
+
+    const chips = wrapper.findAll('ul[aria-label="Теги"] a')
+
+    expect(chips.map((chip) => chip.text())).toEqual(['#мудрість', '#звички'])
+    expect(chips.map((chip) => chip.attributes('href'))).toEqual([
+      '/quotes?tag=%D0%BC%D1%83%D0%B4%D1%80%D1%96%D1%81%D1%82%D1%8C',
+      '/quotes?tag=%D0%B7%D0%B2%D0%B8%D1%87%D0%BA%D0%B8',
+    ])
+  })
+
+  it('shows no tag list for a quote without tags', async () => {
+    const { wrapper } = await mountCard(makeQuote({ tags: [] }))
+
+    expect(wrapper.find('ul[aria-label="Теги"]').exists()).toBe(false)
+  })
+
   it('links the title to the book', async () => {
     const { wrapper } = await mountCard(makeQuote({ user_book_id: 7 }))
 

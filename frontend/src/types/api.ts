@@ -144,6 +144,8 @@ export interface Quote {
   is_favorite: boolean
   /** Where in the uploaded text of the book the quote was selected; null for one that was typed in. */
   anchor: QuoteAnchor | null
+  /** The reader's own tags (lowercase, by name). Private: they never reach what other readers see. */
+  tags?: string[]
   created_at: string
   user_book_id: number
   book: { title: string; authors: string[]; cover_url: string | null }
@@ -158,6 +160,8 @@ export interface QuotePayload {
   is_favorite?: boolean
   /** Where in the uploaded text of the book the quote was selected (only when it is created). */
   anchor?: AnchorPayload
+  /** The whole set of tags of the quote: the server normalizes them and drops duplicates. */
+  tags?: string[]
 }
 
 export interface QuoteFilters {
@@ -165,6 +169,10 @@ export interface QuoteFilters {
   /** The id of a library entry (user book). */
   book?: number
   type?: QuoteType
+  /** Full-text search over the text and notes of the reader's quotes (2 to 100 characters). */
+  q?: string
+  /** Only quotes carrying this tag. */
+  tag?: string
 }
 
 export interface QuotesPage {

@@ -1,4 +1,5 @@
 import account from './account.uk'
+import quoteTools from './quotes.uk'
 import recap from './recap.uk'
 import reader, { apiErrors as readerApiErrors } from './reader.uk'
 import social, { apiErrors as socialApiErrors } from './social.uk'
@@ -192,6 +193,8 @@ export default {
     startHint: 'Оновлення сторінки позначить книгу як «Читаю».',
   },
   quotes: {
+    // Search, tags and export live in a file of their own.
+    ...quoteTools,
     title: 'Цитати',
     add: 'Додати',
     addQuote: 'Додати цитату',

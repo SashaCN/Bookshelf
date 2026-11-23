@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\QuoteType;
+use App\Http\Requests\Concerns\NormalizesTags;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -10,6 +11,8 @@ use Illuminate\Validation\Rule;
 
 class UpdateQuoteRequest extends FormRequest
 {
+    use NormalizesTags;
+
     /**
      * Checked before the body, so somebody else's quote is "not found" whatever is sent to it.
      */
@@ -29,6 +32,7 @@ class UpdateQuoteRequest extends FormRequest
             'note' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             'is_favorite' => ['sometimes', 'boolean'],
+            ...$this->tagRules(),
         ];
     }
 }

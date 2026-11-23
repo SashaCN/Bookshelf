@@ -6,6 +6,7 @@ use App\Http\Controllers\MeController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\StatsController;
+use App\Http\Controllers\TagController;
 use App\Http\Controllers\UserBookController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,8 +27,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::post('/library/{userBook}/quotes', [QuoteController::class, 'store'])->name('library.quotes.store');
     // Before the {quote} routes, or "daily" would be taken for a quote id.
+    Route::get('/quotes/export', [QuoteController::class, 'export'])->name('quotes.export');
     Route::get('/quotes/daily', [QuoteController::class, 'daily'])->name('quotes.daily');
     Route::apiResource('quotes', QuoteController::class)->except('store');
+    Route::get('/tags', TagController::class)->name('tags.index');
 
     Route::get('/stats/summary', [StatsController::class, 'summary'])->name('stats.summary');
     Route::get('/stats/daily', [StatsController::class, 'daily'])->name('stats.daily');

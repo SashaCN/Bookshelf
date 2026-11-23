@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { libraryApi } from '@/api/library'
 import { quotesApi } from '@/api/quotes'
@@ -13,7 +13,7 @@ vi.mock('@/api/library', () => ({
   catalogApi: { search: vi.fn() },
 }))
 vi.mock('@/api/quotes', () => ({
-  quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  quotesApi: { list: vi.fn(), daily: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), exportMarkdown: vi.fn() },
 }))
 
 const books = [
@@ -201,6 +201,134 @@ describe('QuotesView', () => {
     })
   })
 
+  describe('search', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function type(wrapper: ReturnType<typeof mount>, text: string) {
+      await wrapper.get('#quotes-search').setValue(text)
+    }
+
+    async function settle() {
+      await vi.advanceTimersByTimeAsync(300)
+      await flushPromises()
+    }
+
+    it('has a labelled search field', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.get('#quotes-search').attributes('type')).toBe('search')
+      expect(wrapper.get('label[for="quotes-search"]').text()).toBe('Пошук у цитатах')
+    })
+
+    it('waits 300 ms after the last keystroke, then searches and remembers the text in the URL', async () => {
+      const { wrapper, router } = await mountView()
+      vi.mocked(quotesApi.list).mockClear()
+
+      await type(wrapper, 'щас')
+      await type(wrapper, 'щастя')
+      await vi.advanceTimersByTimeAsync(299)
+      expect(quotesApi.list).not.toHaveBeenCalled()
+
+      await settle()
+
+      expect(quotesApi.list).toHaveBeenCalledTimes(1)
+      expect(quotesApi.list).toHaveBeenLastCalledWith({ q: 'щастя' }, 1)
+      expect(router.currentRoute.value.query).toEqual({ q: 'щастя' })
+    })
+
+    it('does not search for a single character', async () => {
+      const { wrapper, router } = await mountView()
+      vi.mocked(quotesApi.list).mockClear()
+
+      await type(wrapper, 'щ')
+      await settle()
+
+      expect(quotesApi.list).not.toHaveBeenCalled()
+      expect(router.currentRoute.value.query).toEqual({})
+    })
+
+    it('starts from the text in the URL and works with the other filters', async () => {
+      const { wrapper, router } = await mountView({ q: 'зорі', favorite: '1' })
+
+      expect((wrapper.get('#quotes-search').element as HTMLInputElement).value).toBe('зорі')
+      expect(quotesApi.list).toHaveBeenLastCalledWith({ favorite: true, q: 'зорі' }, 1)
+
+      await wrapper.get('#quotes-book').setValue(2)
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1', book: '2', q: 'зорі' })
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ book: '2', q: 'зорі' })
+    })
+
+    it('keeps the book and favorites when the search changes', async () => {
+      const { wrapper, router } = await mountView({ favorite: '1', book: '2' })
+
+      await type(wrapper, 'небо')
+      await settle()
+
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1', book: '2', q: 'небо' })
+    })
+
+    it('clears the search at once with the button', async () => {
+      const { wrapper, router } = await mountView({ q: 'зорі' })
+      vi.mocked(quotesApi.list).mockClear()
+
+      await wrapper.get('button[aria-label="Очистити пошук"]').trigger('click')
+      await flushPromises()
+
+      expect((wrapper.get('#quotes-search').element as HTMLInputElement).value).toBe('')
+      expect(router.currentRoute.value.query).toEqual({})
+      expect(quotesApi.list).toHaveBeenLastCalledWith({}, 1)
+      expect(wrapper.find('button[aria-label="Очистити пошук"]').exists()).toBe(false)
+    })
+
+    it('says nothing was found, which is not the empty-library message', async () => {
+      const { wrapper } = await mountView({ q: 'зорі' }, page([]))
+
+      expect(wrapper.text()).toContain('Нічого не знайдено')
+      expect(wrapper.text()).toContain('«зорі»')
+      expect(wrapper.text()).not.toContain('Ще немає цитат')
+    })
+
+    it('shows only the answer to the latest search', async () => {
+      const { wrapper } = await mountView()
+      let answerFirst: (value: QuotesPage) => void = () => {}
+      vi.mocked(quotesApi.list)
+        .mockReturnValueOnce(new Promise<QuotesPage>((resolve) => (answerFirst = resolve)))
+        .mockResolvedValueOnce(page([makeQuote({ id: 8, content: 'Newest' })]))
+
+      await type(wrapper, 'перше')
+      await settle()
+      await type(wrapper, 'друге')
+      await settle()
+      answerFirst(page([makeQuote({ id: 7, content: 'Stale' })]))
+      await flushPromises()
+
+      expect(wrapper.findAll('blockquote').map((quote) => quote.text())).toEqual(['Newest'])
+    })
+
+    it('exports with the search', async () => {
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn().mockReturnValue('blob:x') })
+      Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+      vi.mocked(quotesApi.exportMarkdown).mockResolvedValue(new Blob(['x']))
+      const { wrapper } = await mountView({ q: 'зорі' })
+
+      await buttonWithText(wrapper, 'Експорт у Markdown').trigger('click')
+      await flushPromises()
+
+      expect(quotesApi.exportMarkdown).toHaveBeenCalledWith({ q: 'зорі' })
+    })
+  })
+
   describe('load more', () => {
     it('appends the next page and hides the button after the last one', async () => {
       const { wrapper } = await mountView({}, page([makeQuote({ id: 2 })], '/api/quotes?page=2'))
@@ -239,6 +367,52 @@ describe('QuotesView', () => {
     })
   })
 
+  describe('the tag filter', () => {
+    it('asks for the quotes with the tag from the route and shows it as a removable chip', async () => {
+      const { wrapper, router } = await mountView({ tag: 'мудрість', favorite: '1' })
+
+      expect(quotesApi.list).toHaveBeenCalledWith({ favorite: true, tag: 'мудрість' }, 1)
+      expect(wrapper.get('[data-test="tag-filter"]').text()).toContain('#мудрість')
+
+      await wrapper.get('[aria-label="Скинути фільтр за тегом мудрість"]').trigger('click')
+      await flushPromises()
+
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1' })
+      expect(quotesApi.list).toHaveBeenLastCalledWith({ favorite: true }, 1)
+      expect(wrapper.find('[data-test="tag-filter"]').exists()).toBe(false)
+    })
+
+    it('keeps the tag when the other filters change', async () => {
+      const { wrapper, router } = await mountView({ tag: 'мудрість' })
+
+      await buttonWithText(wrapper, 'Улюблені').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1', tag: 'мудрість' })
+
+      await wrapper.get('#quotes-book').setValue(2)
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1', book: '2', tag: 'мудрість' })
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ book: '2', tag: 'мудрість' })
+    })
+
+    it('hides the search field for a reader with no quotes, but keeps it when a search finds nothing', async () => {
+      const empty = await mountView({}, page([]))
+      expect(empty.wrapper.find('#quotes-search').exists()).toBe(false)
+
+      const searched = await mountView({ q: 'зорі' }, page([]))
+      expect(searched.wrapper.find('#quotes-search').exists()).toBe(true)
+    })
+
+    it('is told apart from an empty library when nothing matches', async () => {
+      const { wrapper } = await mountView({ tag: 'нічого' }, page([]))
+
+      expect(wrapper.text()).toContain('За цими фільтрами цитат немає.')
+    })
+  })
+
   it('offers a retry when the quotes cannot be loaded', async () => {
     const { plugins, router } = createTestEnvironment()
     vi.mocked(libraryApi.list).mockResolvedValue(books)
@@ -268,5 +442,83 @@ describe('QuotesView', () => {
 
     expect(wrapper.findAll('blockquote')).toHaveLength(1)
     expect(wrapper.findAll('#quotes-book option')).toHaveLength(1)
+  })
+
+  describe('export', () => {
+    it('is hidden when the user has no quotes at all', async () => {
+      const { wrapper } = await mountView({}, page([]))
+
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Експорт у Markdown')).toBe(false)
+    })
+
+    it('stays when a filter yields nothing but quotes may exist', async () => {
+      const { wrapper } = await mountView({ favorite: '1' }, page([]))
+
+      expect(buttonWithText(wrapper, 'Експорт у Markdown')).toBeTruthy()
+    })
+
+    function stubDownload() {
+      const createObjectURL = vi.fn().mockReturnValue('blob:export')
+      const revokeObjectURL = vi.fn()
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+      Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+      const downloads: { href: string; download: string }[] = []
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        downloads.push({ href: this.href, download: this.download })
+      })
+      return { createObjectURL, revokeObjectURL, downloads }
+    }
+
+    it('downloads the file with the current filters', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] })
+      const { createObjectURL, revokeObjectURL, downloads } = stubDownload()
+      const file = new Blob(['# Мої цитати'])
+      vi.mocked(quotesApi.exportMarkdown).mockResolvedValue(file)
+      const { wrapper } = await mountView({ favorite: '1', book: '2' })
+
+      await buttonWithText(wrapper, 'Експорт у Markdown').trigger('click')
+      await flushPromises()
+
+      expect(quotesApi.exportMarkdown).toHaveBeenCalledWith({ favorite: true, book: 2 })
+      expect(createObjectURL).toHaveBeenCalledWith(file)
+      expect(downloads).toHaveLength(1)
+      expect(downloads[0]?.download).toMatch(/^bookshelf-quotes-\d{4}-\d{2}-\d{2}\.md$/)
+      expect(document.querySelector('a[download]')).toBeNull()
+
+      vi.runAllTimers()
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:export')
+      vi.useRealTimers()
+    })
+
+    it('disables the button while the file is being prepared', async () => {
+      stubDownload()
+      let finish: (file: Blob) => void = () => undefined
+      vi.mocked(quotesApi.exportMarkdown).mockReturnValue(new Promise((resolve) => (finish = resolve)))
+      const { wrapper } = await mountView()
+
+      await buttonWithText(wrapper, 'Експорт у Markdown').trigger('click')
+
+      const pending = buttonWithText(wrapper, 'Готуємо файл…')
+      expect(pending.attributes('disabled')).toBeDefined()
+
+      finish(new Blob(['x']))
+      await flushPromises()
+
+      expect(buttonWithText(wrapper, 'Експорт у Markdown').attributes('disabled')).toBeUndefined()
+    })
+
+    it('shows the error and keeps the list when the export fails', async () => {
+      const { downloads } = stubDownload()
+      vi.mocked(quotesApi.exportMarkdown).mockRejectedValue(new ApiError(500, null))
+      const { wrapper } = await mountView()
+
+      await buttonWithText(wrapper, 'Експорт у Markdown').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('Не вдалося виконати запит')
+      expect(downloads).toHaveLength(0)
+      expect(wrapper.findAll('blockquote')).toHaveLength(1)
+      expect(buttonWithText(wrapper, 'Експорт у Markdown').attributes('disabled')).toBeUndefined()
+    })
   })
 })

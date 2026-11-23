@@ -131,7 +131,35 @@ async function request<T>(method: string, path: string, body?: unknown, options:
   return data as T
 }
 
+/**
+ * GET a file (not JSON): the raw body as a Blob, with the same session and error handling as the JSON calls. A large
+ * export is streamed by the server, so it gets as long as an upload does.
+ */
+async function download(path: string): Promise<Blob> {
+  const response = await send(
+    path,
+    { method: 'GET', headers: { Accept: '*/*', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' },
+    UPLOAD_TIMEOUT_MS,
+  )
+
+  if (response.status === 401) {
+    unauthorizedHandler?.()
+  }
+
+  if (!response.ok) {
+    const isJson = response.headers.get('content-type')?.includes('json') ?? false
+    throw new ApiError(response.status, isJson ? ((await response.json()) as unknown) : null)
+  }
+
+  try {
+    return await response.blob()
+  } catch {
+    throw new NetworkError()
+  }
+}
+
 export const http = {
+  download,
   get: <T>(path: string, options?: RequestOptions) => request<T>('GET', path, undefined, options),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, options),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, options),

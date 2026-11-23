@@ -286,4 +286,43 @@ describe('http client', () => {
       await expect(http.get('/api/library')).rejects.toBeInstanceOf(ApiError)
     })
   })
+
+  describe('downloading a file', () => {
+    it('returns the raw body as a Blob without a CSRF round trip', async () => {
+      fetchMock.mockResolvedValueOnce(new Response('# Мої цитати', { status: 200, headers: { 'Content-Type': 'text/markdown' } }))
+
+      const file = await http.download('/api/quotes/export')
+
+      expect(await file.text()).toBe('# Мої цитати')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/quotes/export')
+      expect(fetchMock.mock.calls[0]?.[1]?.credentials).toBe('same-origin')
+    })
+
+    it('throws ApiError with the body of a JSON refusal', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(422, { message: 'bad', errors: { q: ['short'] } }))
+
+      const error = await http.download('/api/quotes/export?q=a').catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(ApiError)
+      expect((error as ApiError).status).toBe(422)
+      expect((error as ApiError).fieldErrors).toEqual({ q: ['short'] })
+    })
+
+    it('tells the app the session has ended on a 401', async () => {
+      const handler = vi.fn()
+      onUnauthorized(handler)
+      fetchMock.mockResolvedValueOnce(jsonResponse(401, { message: 'Unauthenticated.' }))
+
+      await expect(http.download('/api/quotes/export')).rejects.toBeInstanceOf(ApiError)
+
+      expect(handler).toHaveBeenCalledTimes(1)
+    })
+
+    it('reports a missing network as a NetworkError', async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+      await expect(http.download('/api/quotes/export')).rejects.toBeInstanceOf(NetworkError)
+    })
+  })
 })

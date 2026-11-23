@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\QuoteType;
+use App\Http\Requests\Concerns\NormalizesTags;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -10,6 +11,8 @@ use Illuminate\Validation\Rule;
 
 class StoreQuoteRequest extends FormRequest
 {
+    use NormalizesTags;
+
     /**
      * Checked before the body, so somebody else's library entry is "not found" whatever is sent to it.
      */
@@ -35,6 +38,7 @@ class StoreQuoteRequest extends FormRequest
             'anchor.chapter' => ['required_with:anchor', 'integer', 'min:0', 'max:100000'],
             'anchor.start' => ['required_with:anchor', 'integer', 'min:0', 'max:100000000'],
             'anchor.end' => ['required_with:anchor', 'integer', 'gt:anchor.start', 'max:100000000'],
+            ...$this->tagRules(),
         ];
     }
 }
