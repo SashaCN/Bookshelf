@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 class FindPublicProfile
 {
     /**
-     * The reader behind a handle. A private or missing profile is "not found" for everybody
-     * but its owner (a guest has no private access), so the API never confirms that a private reader exists.
+     * The reader behind a handle. A private, missing or blocked (in either direction) profile is
+     * "not found" for everybody but its owner (a guest has no private access), so the API never confirms that such a reader exists.
      *
      * @throws ModelNotFoundException<User>
      */
@@ -18,6 +18,7 @@ class FindPublicProfile
         return User::query()
             ->where('username', mb_strtolower($username))
             ->where(fn ($query) => $query->where('is_public', true)->orWhere('id', $viewer?->id))
+            ->visibleTo($viewer)
             ->firstOrFail();
     }
 }

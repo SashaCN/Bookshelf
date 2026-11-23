@@ -53,7 +53,7 @@ class ProfileQuery
     {
         return Quote::query()
             ->where('visibility', QuoteVisibility::Public)
-            ->whereIn('user_id', $viewer->following()->where('users.is_public', true)->select('users.id'))
+            ->whereIn('user_id', $viewer->following()->where('users.is_public', true)->visibleTo($viewer)->select('users.id'))
             ->withLikes($viewer)
             ->with(['user', 'userBook.book.authors'])
             ->latest('id')
@@ -63,9 +63,9 @@ class ProfileQuery
     /**
      * @return Paginator<int, User&object{pivot: Pivot}>
      */
-    public function followers(User $profile): Paginator
+    public function followers(User $profile, ?User $viewer = null): Paginator
     {
-        return $profile->followers()->where('users.is_public', true)
+        return $profile->followers()->where('users.is_public', true)->visibleTo($viewer)
             ->orderByDesc('follows.created_at')->orderByDesc('users.id')
             ->simplePaginate(self::PER_PAGE);
     }
@@ -73,9 +73,9 @@ class ProfileQuery
     /**
      * @return Paginator<int, User&object{pivot: Pivot}>
      */
-    public function following(User $profile): Paginator
+    public function following(User $profile, ?User $viewer = null): Paginator
     {
-        return $profile->following()->where('users.is_public', true)
+        return $profile->following()->where('users.is_public', true)->visibleTo($viewer)
             ->orderByDesc('follows.created_at')->orderByDesc('users.id')
             ->simplePaginate(self::PER_PAGE);
     }

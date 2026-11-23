@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BlockController;
 use App\Http\Controllers\CatalogSearchController;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\FollowController;
@@ -71,6 +72,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/users/{username}/following', [ProfileController::class, 'following'])->name('users.following');
     Route::post('/users/{username}/follow', [FollowController::class, 'store'])->name('users.follow');
     Route::delete('/users/{username}/follow', [FollowController::class, 'destroy'])->name('users.unfollow');
+    Route::post('/users/{username}/block', [BlockController::class, 'store'])->name('users.block');
+    Route::delete('/users/{username}/block', [BlockController::class, 'destroy'])->name('users.unblock');
+    Route::get('/me/blocks', [BlockController::class, 'index'])->name('me.blocks');
 
     Route::get('/stats/summary', [StatsController::class, 'summary'])->name('stats.summary');
     Route::get('/stats/daily', [StatsController::class, 'daily'])->name('stats.daily');

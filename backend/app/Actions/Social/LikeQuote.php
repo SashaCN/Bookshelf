@@ -15,7 +15,7 @@ class LikeQuote
      */
     public function like(User $user, int $quoteId): void
     {
-        $quote = $this->findLikeable($quoteId);
+        $quote = $this->findLikeable($user, $quoteId);
 
         // One atomic statement: liking twice, even at the same moment, changes nothing.
         DB::table('quote_likes')->insertOrIgnore([
@@ -39,21 +39,21 @@ class LikeQuote
             ->delete();
 
         if ($removed === 0) {
-            $this->findLikeable($quoteId);
+            $this->findLikeable($user, $quoteId);
         }
     }
 
     /**
-     * A quote is likeable when it is public and its owner's profile is public: the same rule as the feed and profiles.
+     * A quote is likeable when it is public and its owner's profile is public and not blocked either way: the same rule as the feed and profiles.
      *
      * @throws ModelNotFoundException<Quote>
      */
-    private function findLikeable(int $quoteId): Quote
+    private function findLikeable(User $user, int $quoteId): Quote
     {
         return Quote::query()
             ->whereKey($quoteId)
             ->where('visibility', QuoteVisibility::Public)
-            ->whereHas('user', fn ($query) => $query->where('is_public', true))
+            ->whereHas('user', fn ($query) => $query->where('is_public', true)->visibleTo($user))
             ->firstOrFail();
     }
 }

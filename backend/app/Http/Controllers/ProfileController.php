@@ -38,7 +38,7 @@ class ProfileController extends Controller
     {
         $viewer = $request->user('sanctum');
         $profile = $find->handle($viewer, $username);
-        $followers = $query->followers($profile);
+        $followers = $query->followers($profile, $viewer);
 
         // Only the owner learns which followers are new; the seen mark is theirs alone.
         if ($viewer?->is($profile)) {
@@ -56,6 +56,8 @@ class ProfileController extends Controller
 
     public function following(Request $request, string $username, FindPublicProfile $find, ProfileQuery $query): AnonymousResourceCollection
     {
-        return ProfileMemberResource::collection($query->following($find->handle($request->user('sanctum'), $username)));
+        $viewer = $request->user('sanctum');
+
+        return ProfileMemberResource::collection($query->following($find->handle($viewer, $username), $viewer));
     }
 }

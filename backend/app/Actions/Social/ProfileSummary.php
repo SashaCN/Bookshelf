@@ -21,8 +21,8 @@ class ProfileSummary
             'username' => $profile->username,
             'name' => $profile->name,
             'books_finished_this_year' => $statistics->booksFinished($today->startOfYear(), $today->endOfYear()),
-            'followers_count' => $this->visible($profile->followers()),
-            'following_count' => $this->visible($profile->following()),
+            'followers_count' => $this->visible($profile->followers(), $viewer),
+            'following_count' => $this->visible($profile->following(), $viewer),
             'reviews_count' => $profile->userBooks()->where('review_visibility', QuoteVisibility::Public)->whereNotNull('review')->count(),
             'is_following' => $viewer?->following()->whereKey($profile->id)->exists() ?? false,
             'is_me' => $viewer?->is($profile) ?? false,
@@ -30,12 +30,12 @@ class ProfileSummary
     }
 
     /**
-     * Only public readers are counted, as only they are listed.
+     * Only public readers the viewer can see are counted, as only they are listed.
      *
      * @param  BelongsToMany<User, User>  $relation
      */
-    private function visible($relation): int
+    private function visible($relation, ?User $viewer): int
     {
-        return $relation->where('users.is_public', true)->count();
+        return $relation->where('users.is_public', true)->visibleTo($viewer)->count();
     }
 }

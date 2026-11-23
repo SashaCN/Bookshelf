@@ -5,11 +5,13 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable(['name', 'email', 'password', 'timezone', 'username', 'is_public'])]
 #[Hidden(['password', 'remember_token'])]
@@ -80,12 +82,30 @@ class User extends Authenticatable
     }
 
     /**
+     * Leaves out everybody the viewer has blocked and everybody who has blocked the viewer:
+     * a block hides both sides from each other. A guest has no blocks, so nothing is left out.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeVisibleTo(Builder $query, ?User $viewer): void
+    {
+        if ($viewer === null) {
+            return;
+        }
+
+        $query
+            ->whereNotIn('users.id', DB::table('user_blocks')->where('blocker_id', $viewer->id)->select('blocked_id'))
+            ->whereNotIn('users.id', DB::table('user_blocks')->where('blocked_id', $viewer->id)->select('blocker_id'));
+    }
+
+    /**
      * Public followers who followed after the reader last looked at the list, capped at NEW_FOLLOWERS_CAP.
      */
     public function newFollowersCount(): int
     {
         $count = $this->followers()
             ->where('users.is_public', true)
+            ->visibleTo($this)
             ->when($this->followers_seen_at, fn ($query, $seenAt) => $query->where('follows.created_at', '>', $seenAt))
             ->count();
 

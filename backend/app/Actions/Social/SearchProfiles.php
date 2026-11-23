@@ -28,6 +28,7 @@ class SearchProfiles
             ->where('is_public', true)
             ->whereNotNull('username')
             ->whereKeyNot($viewer->id)
+            ->visibleTo($viewer)
             ->where(fn ($query) => $query
                 ->where('username', 'like', $prefix)
                 ->orWhere('name', 'like', $contains))
