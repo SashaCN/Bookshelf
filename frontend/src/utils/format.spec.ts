@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDay, formatNumber, formatShortDay, signed } from './format'
+import { formatDay, formatMoment, formatNumber, formatShortDay, signed } from './format'
 
 describe('formatDay', () => {
   it('writes the day and the month in Ukrainian', () => {
@@ -38,5 +38,12 @@ describe('formatNumber', () => {
   it('groups thousands without letting the number break across lines', () => {
     expect(formatNumber(3100)).toMatch(/^3\u00a0100$/)
     expect(formatNumber(999)).toBe('999')
+  })
+})
+
+describe('formatMoment', () => {
+  it('uses the calendar of the given time zone, not UTC', () => {
+    expect(formatMoment('2026-10-05T22:30:00+00:00', 'Europe/Kyiv')).toBe('6 жовтня')
+    expect(formatMoment('2026-10-05T22:30:00+00:00', 'UTC')).toBe('5 жовтня')
   })
 })

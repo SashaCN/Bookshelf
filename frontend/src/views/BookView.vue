@@ -14,8 +14,9 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import ReadingJournal from '@/components/ReadingJournal.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
-import { formatDay } from '@/utils/format'
+import { formatMoment } from '@/utils/format'
 import type { BookStatus, UserBook } from '@/types/api'
 
 const props = defineProps<{ id: number }>()
@@ -23,6 +24,7 @@ const props = defineProps<{ id: number }>()
 const { t } = useI18n()
 const router = useRouter()
 const library = useLibraryStore()
+const auth = useAuthStore()
 const errorMessage = useApiErrorMessage()
 
 const userBook = ref<UserBook | null>(null)
@@ -164,9 +166,9 @@ async function reread() {
   }
 }
 
-/** "5 жовтня" for a pass moment (an ISO timestamp): the calendar day the reader has it on. */
+/** "5 жовтня" for a pass moment (an ISO timestamp): the calendar day in the reader's own time zone. */
 function passDay(iso: string): string {
-  return formatDay(iso.slice(0, 10))
+  return formatMoment(iso, auth.user?.timezone)
 }
 
 async function remove() {
@@ -348,7 +350,11 @@ function isDisabled(target: BookStatus): boolean {
       />
     </section>
 
-    <BookReview v-if="userBook.status === 'finished' || userBook.status === 'abandoned'" :key="userBook.id" :user-book="userBook" />
+    <BookReview
+      v-if="userBook.status === 'finished' || userBook.status === 'abandoned' || userBook.review !== null"
+      :key="userBook.id"
+      :user-book="userBook"
+    />
 
     <BookQuotes :book-id="userBook.id" />
 

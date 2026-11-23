@@ -485,6 +485,11 @@ describe('BookView', () => {
       expect((await mountView(makeUserBook({ status: 'abandoned', allowed_statuses: [] }))).wrapper.find('#book-review').exists()).toBe(true)
     })
 
+    it('keeps an existing review reachable while the book is read again', async () => {
+      const { wrapper } = await mountView(makeUserBook({ status: 'reading', allowed_statuses: [], review: 'Колись', review_visibility: 'public' }))
+      expect(wrapper.text()).toContain('Колись')
+    })
+
     it('counts characters, saves with the visibility and then shows the text read-only', async () => {
       const entry = finished()
       const { wrapper } = await mountView(entry)

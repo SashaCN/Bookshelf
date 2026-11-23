@@ -23,3 +23,12 @@ export function signed(value: number): string {
 export function formatNumber(value: number): string {
   return numberFormat.format(value)
 }
+
+/** An ISO timestamp (UTC) as "5 жовтня" on the calendar of the given time zone, or of the browser by default. */
+export function formatMoment(iso: string, timeZone?: string): string {
+  try {
+    return new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'long', timeZone }).format(new Date(iso))
+  } catch {
+    return formatDay(iso.slice(0, 10))
+  }
+}
