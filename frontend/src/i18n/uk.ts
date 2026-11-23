@@ -301,6 +301,7 @@ export default {
     timezone: 'Часовий пояс',
     timezoneHint: 'За ним визначається, до якого дня належить прочитане.',
     saved: 'Збережено.',
+    newFollowers: 'У вас {n} новий підписник | У вас {n} нові підписники | У вас {n} нових підписників',
     logout: 'Вийти',
     username: 'Імʼя користувача',
     usernameHint: '3–30 символів: малі латинські літери, цифри та підкреслення.',
@@ -330,6 +331,7 @@ export default {
       follow: 'Підписатися',
       unfollow: 'Відписатися',
     },
+    newFollowers: '{n} новий підписник | {n} нові підписники | {n} нових підписників',
     profile: {
       notFound: 'Такого профілю немає або він приватний.',
       finishedThisYear: 'Прочитано цього року',
@@ -351,6 +353,7 @@ export default {
     },
     people: {
       followersTitle: 'Підписники',
+      newChip: 'новий',
       followingTitle: 'Підписки',
       emptyTitle: 'Тут поки нікого',
       emptyFollowers: 'Підписників поки немає.',

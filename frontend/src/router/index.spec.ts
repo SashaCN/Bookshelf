@@ -6,7 +6,7 @@ import { router } from './index'
 
 vi.mock('@/api/auth', () => ({ authApi: { me: vi.fn() } }))
 
-const user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false }
+const user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
 
 describe('router guards', () => {
   beforeEach(async () => {

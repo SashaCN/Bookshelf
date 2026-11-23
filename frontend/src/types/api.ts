@@ -5,6 +5,8 @@ export interface User {
   timezone: string
   username: string | null
   is_public: boolean
+  /** Public readers who followed since the list was last opened; the server caps it at 99. */
+  new_followers_count: number
 }
 
 export interface LoginPayload {
@@ -259,6 +261,8 @@ export interface PublicProfile {
 export interface PersonSummary {
   username: string
   name: string
+  /** Only in the reader's own followers list: followed since they last looked. */
+  is_new?: boolean
 }
 
 /** A person found by the people search, with whether the reader already follows them. */

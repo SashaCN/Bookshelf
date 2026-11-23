@@ -145,7 +145,7 @@ describe('QuoteFormView', () => {
     it('warns that a public quote stays hidden while the profile is private', async () => {
       const { wrapper } = await mountCreate({ book: '1' })
       const auth = useAuthStore()
-      auth.user = { id: 1, name: 'Olena', email: 'o@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false }
+      auth.user = { id: 1, name: 'Olena', email: 'o@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
 
       expect(wrapper.text()).toContain('лише якщо ваш профіль публічний')
       expect(wrapper.text()).not.toContain('приватний, тож')
@@ -154,7 +154,7 @@ describe('QuoteFormView', () => {
       expect(wrapper.text()).toContain('Ваш профіль зараз приватний')
       expect(wrapper.findAll('a[href="/profile"]').map((link) => link.text())).toContain('Налаштувати профіль')
 
-      auth.user = { ...auth.user, is_public: true }
+      auth.user = { ...auth.user, is_public: true, new_followers_count: 0 }
       await wrapper.vm.$nextTick()
       expect(wrapper.text()).not.toContain('Ваш профіль зараз приватний')
     })

@@ -57,6 +57,18 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = await authApi.updateMe(payload)
   }
 
+  /** Tells the server the followers list was opened, and drops the badge without asking for the user again. */
+  async function markFollowersSeen(): Promise<void> {
+    if (!user.value || user.value.new_followers_count === 0) {
+      return
+    }
+
+    await authApi.followersSeen()
+    if (user.value) {
+      user.value = { ...user.value, new_followers_count: 0 }
+    }
+  }
+
   async function logout(): Promise<void> {
     await authApi.logout()
     user.value = null
@@ -71,5 +83,5 @@ export const useAuthStore = defineStore('auth', () => {
     clearApiCache()
   }
 
-  return { user, initialized, isAuthenticated, init, login, register, updateProfile, logout, expireSession }
+  return { user, initialized, isAuthenticated, init, login, register, updateProfile, markFollowersSeen, logout, expireSession }
 })

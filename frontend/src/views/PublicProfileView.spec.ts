@@ -12,7 +12,7 @@ vi.mock('@/api/social', () => ({
   socialApi: { profile: vi.fn(), quotes: vi.fn(), reviews: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
 }))
 
-const reader = { id: 1, name: 'Іван', email: 'ivan@example.com', timezone: 'Europe/Kyiv', username: 'ivan', is_public: true }
+const reader = { id: 1, name: 'Іван', email: 'ivan@example.com', timezone: 'Europe/Kyiv', username: 'ivan', is_public: true, new_followers_count: 0 }
 
 async function mountView(profile: PublicProfile | Error, next: string | null = null, guest = false) {
   const { plugins, router } = createTestEnvironment()

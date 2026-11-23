@@ -1,15 +1,18 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
+import { authApi } from '@/api/auth'
 import { socialApi } from '@/api/social'
+import { useAuthStore } from '@/stores/auth'
 import { createTestEnvironment } from '@/test/utils'
 import PeopleListView from './PeopleListView.vue'
 
+vi.mock('@/api/auth', () => ({ authApi: { followersSeen: vi.fn() } }))
 vi.mock('@/api/social', () => ({
   socialApi: { profile: vi.fn(), quotes: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
 }))
 
-async function mountView(kind: 'followers' | 'following', data: { username: string; name: string }[], next: string | null = null) {
+async function mountView(kind: 'followers' | 'following', data: { username: string; name: string; is_new?: boolean }[], next: string | null = null) {
   const { plugins, router } = createTestEnvironment()
   vi.mocked(socialApi[kind]).mockResolvedValue({ data, links: { next } })
   await router.push(`/u/olena/${kind}`)
@@ -103,5 +106,51 @@ describe('PeopleListView', () => {
 
     expect(wrapper.get('h1').text()).toBe('Підписки')
     expect(wrapper.text()).toContain('@ivan')
+  })
+
+  describe('own followers', () => {
+    const me = { id: 1, name: 'Olena', email: 'o@example.com', timezone: 'Europe/Kyiv', username: 'olena', is_public: true, new_followers_count: 2 }
+
+    async function mountOwn(kind: 'followers' | 'following' = 'followers', username = 'olena') {
+      const { plugins, router, pinia } = createTestEnvironment()
+      void pinia
+      useAuthStore().user = { ...me }
+      vi.mocked(socialApi[kind]).mockResolvedValue({
+        data: [{ username: 'ivan', name: 'Іван', is_new: true }, { username: 'petro', name: 'Петро', is_new: false }],
+        links: { next: null },
+      })
+      await router.push(`/u/${username}/${kind}`)
+      const wrapper = mount(PeopleListView, { props: { username, kind }, global: { plugins } })
+      await flushPromises()
+      return wrapper
+    }
+
+    it('highlights new followers and marks the list seen, which clears the badge count', async () => {
+      vi.mocked(authApi.followersSeen).mockResolvedValue(null)
+
+      const wrapper = await mountOwn()
+
+      expect(wrapper.findAll('[data-test="new-chip"]')).toHaveLength(1)
+      expect(wrapper.get('a[href="/u/ivan"]').text()).toContain('новий')
+      expect(wrapper.get('a[href="/u/petro"]').text()).not.toContain('новий')
+      expect(authApi.followersSeen).toHaveBeenCalledOnce()
+      expect(useAuthStore().user?.new_followers_count).toBe(0)
+    })
+
+    it('keeps the list when marking it seen fails', async () => {
+      vi.mocked(authApi.followersSeen).mockRejectedValue(new ApiError(500, null))
+
+      const wrapper = await mountOwn()
+
+      expect(wrapper.text()).toContain('@ivan')
+      expect(useAuthStore().user?.new_followers_count).toBe(2)
+    })
+
+    it('does not mark anything seen for somebody else\'s list or for following', async () => {
+      await mountOwn('followers', 'ivan')
+      await mountOwn('following')
+
+      expect(authApi.followersSeen).not.toHaveBeenCalled()
+    })
   })
 })

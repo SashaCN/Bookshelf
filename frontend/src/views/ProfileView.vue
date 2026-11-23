@@ -103,6 +103,15 @@ async function logout() {
 <template>
   <PageHeader :title="$t('profile.title')" :back-to="{ name: 'home' }" />
 
+  <RouterLink
+    v-if="auth.user?.username && auth.user.new_followers_count > 0"
+    :to="{ name: 'followers', params: { username: auth.user.username } }"
+    data-test="new-followers-line"
+    class="mb-4 flex min-h-11 items-center rounded-2xl border border-accent bg-surface px-4 py-3 font-medium"
+  >
+    {{ $t('profile.newFollowers', auth.user.new_followers_count) }}
+  </RouterLink>
+
   <form class="flex flex-col gap-4" @submit.prevent="save" @input="saved = false" @change="saved = false">
     <ErrorNotice v-if="error" :message="error" />
 

@@ -212,7 +212,7 @@ function seed(): State {
   ]
 
   return {
-    user: { id: 1, name: 'Демо-читач', email: 'demo@bookshelf.test', timezone: 'Europe/Kyiv', username: 'demo_reader', is_public: true },
+    user: { id: 1, name: 'Демо-читач', email: 'demo@bookshelf.test', timezone: 'Europe/Kyiv', username: 'demo_reader', is_public: true, new_followers_count: 1 },
     signedIn: true,
     nextId: 100,
     library,
@@ -674,6 +674,10 @@ route('PATCH', '/api/me', (_p, _q, body) => {
   state.user.is_public = isPublic
   return ok(state.user)
 })
+route('POST', '/api/me/followers-seen', () => {
+  state.user.new_followers_count = 0
+  return null
+})
 // Any credentials work in the demo, so nobody needs to remember a password.
 route('POST', '/api/auth/login', () => {
   state.signedIn = true
@@ -681,7 +685,7 @@ route('POST', '/api/auth/login', () => {
 })
 route('POST', '/api/auth/register', (_p, _q, body) => {
   state = seed()
-  state.user = { ...state.user, name: String(body.name ?? 'Читач'), email: String(body.email ?? ''), timezone: String(body.timezone ?? 'Europe/Kyiv'), username: null, is_public: false }
+  state.user = { ...state.user, name: String(body.name ?? 'Читач'), email: String(body.email ?? ''), timezone: String(body.timezone ?? 'Europe/Kyiv'), username: null, is_public: false, new_followers_count: 0 }
   return null
 })
 route('POST', '/api/auth/logout', () => {
@@ -934,7 +938,11 @@ route('DELETE', '/api/users/([^/]+)/follow', ([username]) => {
 })
 route('GET', '/api/users/([^/]+)/followers', ([username], query) => {
   const key = findPerson(decodeURIComponent(username)).key
-  const people = edges().filter(([, to]) => to === key).map(([from]) => summarize(from))
+  // Like the real API: only the owner sees who is new, and they are the latest followers.
+  const newCount = key === ME ? (state.user.new_followers_count ?? 0) : 0
+  const people = edges()
+    .filter(([, to]) => to === key)
+    .map(([from], i): PersonSummary => (key === ME ? { ...summarize(from), is_new: i < newCount } : summarize(from)))
   return paginate(people, Number(query.get('page') ?? 1), `/api/users/${username}/followers`)
 })
 route('GET', '/api/users/([^/]+)/following', ([username], query) => {

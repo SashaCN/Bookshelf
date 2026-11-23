@@ -7,7 +7,7 @@ import { useLibraryStore } from '@/stores/library'
 import { createTestRouter } from '@/test/utils'
 import { installSessionExpiry } from './session'
 
-const user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false }
+const user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
 
 describe('session expiry', () => {
   beforeEach(() => {

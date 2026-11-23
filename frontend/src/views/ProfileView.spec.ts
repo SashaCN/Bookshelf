@@ -12,13 +12,14 @@ function mountView(timezone = 'Europe/Kyiv', extra: Partial<User> = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const auth = useAuthStore()
-  auth.user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone, username: null, is_public: false, ...extra }
+  auth.user = { id: 1, name: 'Olena', email: 'olena@example.com', timezone, username: null, is_public: false, new_followers_count: 0, ...extra }
 
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/login', name: 'login', component: { template: '<div />' } },
+      { path: '/u/:username/followers', name: 'followers', component: { template: '<div />' } },
       { path: '/u/:username', name: 'public-profile', component: { template: '<div />' } },
       { path: '/profile', name: 'profile', component: ProfileView },
     ],
@@ -237,6 +238,22 @@ describe('ProfileView', () => {
       await wrapper.get('form').trigger('submit')
 
       expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    })
+  })
+
+  describe('new followers', () => {
+    it('links to the own followers list with a plural line', () => {
+      const { wrapper } = mountView('Europe/Kyiv', { username: 'olena', is_public: true, new_followers_count: 2 })
+
+      const line = wrapper.get('[data-test="new-followers-line"]')
+      expect(line.text()).toBe('У вас 2 нові підписники')
+      expect(line.attributes('href')).toBe('/u/olena/followers')
+    })
+
+    it('has no line without new followers', () => {
+      const { wrapper } = mountView('Europe/Kyiv', { username: 'olena', is_public: true, new_followers_count: 0 })
+
+      expect(wrapper.find('[data-test="new-followers-line"]').exists()).toBe(false)
     })
   })
 })

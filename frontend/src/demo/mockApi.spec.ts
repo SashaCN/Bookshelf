@@ -123,6 +123,17 @@ describe('demo mock API', () => {
     expect(updated).toMatchObject({ username: 'new_name', is_public: false })
   })
 
+  it('flags new followers for the owner until the list is marked as seen', async () => {
+    expect((await authApi.me()).new_followers_count).toBe(1)
+    expect((await socialApi.followers('demo_reader')).data).toEqual([{ username: 'taras_books', name: 'Тарас Мельник', is_new: true }])
+    expect((await socialApi.followers('olena_reads')).data.every((p) => p.is_new === undefined)).toBe(true)
+
+    await authApi.followersSeen()
+
+    expect((await authApi.me()).new_followers_count).toBe(0)
+    expect((await socialApi.followers('demo_reader')).data[0].is_new).toBe(false)
+  })
+
   it('stores quote visibility', async () => {
     const created = await quotesApi.create(1, { content: 'Для всіх', visibility: 'public' })
     expect(created.visibility).toBe('public')

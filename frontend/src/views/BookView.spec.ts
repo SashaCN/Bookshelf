@@ -541,7 +541,7 @@ describe('BookView', () => {
 
     it('warns that a public review of a private profile will not be seen', async () => {
       const { wrapper } = await mountView(finished())
-      useAuthStore().user = { id: 1, name: 'Іван', email: 'i@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false }
+      useAuthStore().user = { id: 1, name: 'Іван', email: 'i@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
 
       await buttonWithText(wrapper, 'Усі').trigger('click')
 

@@ -14,7 +14,7 @@ vi.mock('@/api/social', () => ({
 
 async function mountView(items: FeedQuote[], next: string | null = null) {
   const { plugins, router } = createTestEnvironment()
-  useAuthStore().user = { id: 1, name: 'Я', email: 'me@example.com', timezone: 'Europe/Kyiv', username: 'me', is_public: true }
+  useAuthStore().user = { id: 1, name: 'Я', email: 'me@example.com', timezone: 'Europe/Kyiv', username: 'me', is_public: true, new_followers_count: 0 }
   vi.mocked(socialApi.feed).mockResolvedValue({ data: items, links: { next } })
   await router.push('/feed')
 

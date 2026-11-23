@@ -188,7 +188,7 @@ describe('QuoteCard', () => {
   })
 
   describe('likes', () => {
-    const viewer = { id: 1, name: 'Іван', email: 'ivan@example.com', timezone: 'Europe/Kyiv', username: 'ivan', is_public: true }
+    const viewer = { id: 1, name: 'Іван', email: 'ivan@example.com', timezone: 'Europe/Kyiv', username: 'ivan', is_public: true, new_followers_count: 0 }
 
     function mountReadonly(quote: Quote, signedIn = true) {
       const { plugins } = createTestEnvironment()
