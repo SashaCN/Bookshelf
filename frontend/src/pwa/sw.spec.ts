@@ -154,4 +154,14 @@ describe('service worker', () => {
     expect(caches.has('bookshelf-api-v1')).toBe(false)
     await run('message', { type: 'other' })
   })
+
+  it('does not store an answer whose request started before the cache was cleared', async () => {
+    let finish!: (response: Response) => void
+    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => (finish = resolve)))
+    const pending = dispatch(get('/api/me'))
+    await run('message', { type: 'clear-api-cache' })
+    finish(new Response('{"id":1}'))
+    await pending
+    expect(caches.get('bookshelf-api-v1')?.store.size ?? 0).toBe(0)
+  })
 })

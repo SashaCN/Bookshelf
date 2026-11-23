@@ -35,6 +35,8 @@ export const useAuthStore = defineStore('auth', () => {
         throw error
       }
       user.value = null
+      // The cookie ran out while the app was closed: the answers cached for that reader must not outlive it.
+      clearApiCache()
     }
 
     initialized.value = true
@@ -44,6 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
     await authApi.login(payload)
     // Whoever used this device before must not leave their books behind.
     resetReaderData()
+    clearApiCache()
     user.value = await authApi.me()
     initialized.value = true
   }
@@ -51,6 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function register(payload: RegisterPayload): Promise<void> {
     await authApi.register(payload)
     resetReaderData()
+    clearApiCache()
     user.value = await authApi.me()
     initialized.value = true
   }

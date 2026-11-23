@@ -49,11 +49,15 @@ async function asset(request) {
   return response
 }
 
+/** Bumped whenever the page asks to forget the API answers, so a request that was already on its way cannot store its answer afterwards. */
+let apiGeneration = 0
+
 async function api(request) {
+  const generation = apiGeneration
   const cache = await caches.open(API_CACHE)
   try {
     const response = await fetch(request)
-    if (storable(response)) await cache.put(request, response.clone())
+    if (storable(response) && generation === apiGeneration) await cache.put(request, response.clone())
     return response
   } catch (error) {
     const cached = await cache.match(request)
@@ -89,5 +93,8 @@ self.addEventListener('fetch', (event) => {
 })
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'clear-api-cache') event.waitUntil(caches.delete(API_CACHE))
+  if (event.data && event.data.type === 'clear-api-cache') {
+    apiGeneration += 1
+    event.waitUntil(caches.delete(API_CACHE))
+  }
 })

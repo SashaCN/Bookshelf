@@ -2,11 +2,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '@/api/auth'
 import { ApiError } from '@/api/http'
+import { clearApiCache } from '@/pwa/clearApiCache'
 import { makeQuote } from '@/test/fixtures'
 import type { User } from '@/types/api'
 import { useAuthStore } from './auth'
 import { useQuotesStore } from './quotes'
 
+vi.mock('@/pwa/clearApiCache', () => ({ clearApiCache: vi.fn() }))
 vi.mock('@/api/auth', () => ({
   authApi: { me: vi.fn(), followersSeen: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(), changePassword: vi.fn(), deleteMe: vi.fn() },
 }))
@@ -27,6 +29,21 @@ describe('auth store', () => {
 
     expect(auth.isAuthenticated).toBe(false)
     expect(auth.initialized).toBe(true)
+  })
+
+  it('forgets cached API answers when init finds the session gone, and on every sign-in', async () => {
+    vi.mocked(authApi.me).mockRejectedValueOnce(new ApiError(401, null))
+    const auth = useAuthStore()
+    await auth.init()
+    expect(clearApiCache).toHaveBeenCalledTimes(1)
+
+    vi.mocked(authApi.login).mockResolvedValue({})
+    vi.mocked(authApi.register).mockResolvedValue({})
+    vi.mocked(authApi.me).mockResolvedValue(user)
+    await auth.login({ email: user.email, password: 'secret-password' })
+    expect(clearApiCache).toHaveBeenCalledTimes(2)
+    await auth.register({ name: user.name, email: user.email, password: 'secret-password', timezone: user.timezone })
+    expect(clearApiCache).toHaveBeenCalledTimes(3)
   })
 
   it('restores the session on init', async () => {
