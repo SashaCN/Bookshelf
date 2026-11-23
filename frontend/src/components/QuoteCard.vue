@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useAuthStore } from '@/stores/auth'
@@ -7,6 +7,7 @@ import { useQuotesStore } from '@/stores/quotes'
 import { useSocialStore } from '@/stores/social'
 import type { FeedQuote, Quote } from '@/types/api'
 import ErrorNotice from './ErrorNotice.vue'
+import QuoteComments from './QuoteComments.vue'
 import QuoteSource from './QuoteSource.vue'
 
 /** `readonly` is for somebody else's quote: no favorite star, no actions, and the book is not a link into the own library. */
@@ -21,6 +22,14 @@ const errorMessage = useApiErrorMessage()
 const error = ref('')
 const busy = ref(false)
 const confirmingDelete = ref(false)
+const commentsOpen = ref(false)
+const commentsCount = ref(props.quote.comments_count ?? 0)
+watch(
+  () => props.quote.comments_count,
+  (count) => {
+    commentsCount.value = count ?? 0
+  },
+)
 let togglingFavorite = false
 let togglingLike = false
 
@@ -153,6 +162,21 @@ async function remove() {
       <p v-else class="text-sm text-ink-muted" data-test="likes-count">{{ likesText }}</p>
     </div>
     <p v-else-if="!readonly && likesCount > 0" class="text-xs text-ink-muted" data-test="likes-count">{{ likesText }}</p>
+
+    <template v-if="readonly && quote.comments_count !== undefined">
+      <button
+        type="button"
+        :aria-expanded="commentsOpen"
+        :aria-controls="`comments-${quote.id}`"
+        class="-ml-2 inline-flex min-h-11 items-center self-start rounded-full px-2 text-sm text-ink-muted hover:bg-sunken"
+        @click="commentsOpen = !commentsOpen"
+      >
+        {{ t('quotes.comments.toggle', { n: commentsCount }) }}
+      </button>
+      <div v-if="commentsOpen" :id="`comments-${quote.id}`">
+        <QuoteComments :quote-id="quote.id" @added="commentsCount++" @removed="commentsCount = Math.max(0, commentsCount - 1)" />
+      </div>
+    </template>
 
     <ErrorNotice v-if="error" :message="error" />
 

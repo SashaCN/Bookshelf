@@ -167,6 +167,46 @@ describe('demo mock API', () => {
     expect((await quotesApi.list()).data.every((q) => typeof q.likes_count === 'number')).toBe(true)
   })
 
+  it('comments on public quotes: reads, posts, deletes, counts and honours blocks', async () => {
+    const quote = (await socialApi.feed()).data.find((q) => q.author.username === 'olena_reads')!
+    expect(quote.comments_count).toBe(2)
+
+    const thread = await socialApi.comments(quote.id)
+    expect(thread.data.map((c) => c.author.username)).toEqual(['taras_books', 'iryna_p'])
+    expect(thread.data.every((c) => !c.can_delete)).toBe(true)
+
+    const created = await socialApi.addComment(quote.id, '  Мій коментар  ')
+    expect(created).toMatchObject({ body: 'Мій коментар', can_delete: true, author: { username: 'demo_reader' } })
+    expect((await socialApi.feed()).data.find((q) => q.id === quote.id)?.comments_count).toBe(3)
+    await expect(socialApi.addComment(quote.id, '   ')).rejects.toMatchObject({ status: 422 })
+    await expect(socialApi.addComment(quote.id, 'я'.repeat(1001))).rejects.toMatchObject({ status: 422 })
+    await expect(socialApi.addComment(999999, 'x')).rejects.toMatchObject({ status: 404 })
+    await expect(socialApi.comments(999999)).rejects.toMatchObject({ status: 404 })
+
+    await expect(socialApi.deleteComment(quote.id, thread.data[0].id)).rejects.toMatchObject({ status: 404 })
+    await socialApi.deleteComment(quote.id, created.id)
+    expect((await socialApi.comments(quote.id)).data).toHaveLength(2)
+
+    await socialApi.addComment(quote.id, 'Ще один')
+    await socialApi.block('taras_books')
+    expect((await socialApi.comments(quote.id)).data.map((c) => c.author.username)).toEqual(['iryna_p', 'demo_reader'])
+    await socialApi.block('olena_reads')
+    await expect(socialApi.comments(quote.id)).rejects.toMatchObject({ status: 404 })
+    await socialApi.unblock('olena_reads')
+    expect((await socialApi.comments(quote.id)).data.map((c) => c.author.username)).toEqual(['iryna_p'])
+  })
+
+  it('lets the owner remove comments on their own public quote and refuses a guest to post', async () => {
+    const own = (await socialApi.quotes('demo_reader')).data[0]
+    const comment = await socialApi.addComment(own.id, 'Сам собі')
+    expect((await socialApi.quotes('demo_reader')).data[0].comments_count).toBe(1)
+    await socialApi.deleteComment(own.id, comment.id)
+
+    await authApi.logout()
+    expect((await socialApi.comments(own.id)).data).toEqual([])
+    await expect(socialApi.addComment(own.id, 'Привіт')).rejects.toMatchObject({ status: 401 })
+  })
+
   it('blocks a fake reader: hides them, drops follows and likes, and unblocks without bringing them back', async () => {
     const quote = (await socialApi.feed()).data.find((q) => q.author.username === 'olena_reads')!
     await socialApi.like(quote.id)

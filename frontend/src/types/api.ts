@@ -164,6 +164,8 @@ export interface Quote {
   visibility: QuoteVisibility
   /** Present in the lists: the own quotes and quotes of other readers. */
   likes_count?: number
+  /** Present in the lists of other readers' quotes: the comments the viewer can see. */
+  comments_count?: number
   /** Present on quotes of other readers; always false for a guest. */
   liked_by_me?: boolean
   created_at: string
@@ -291,6 +293,20 @@ export interface PeoplePage {
 /** A public quote in the feed, with whoever saved it. */
 export interface FeedQuote extends Quote {
   author: PersonSummary
+}
+
+/** A comment on a public quote. An author without a public profile is anonymous: no handle, no name. */
+export interface QuoteComment {
+  id: number
+  body: string
+  created_at: string
+  author: { username: string | null; name: string | null }
+  can_delete: boolean
+}
+
+export interface QuoteCommentsPage {
+  data: QuoteComment[]
+  links: { next: string | null }
 }
 
 export interface FeedPage {

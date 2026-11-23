@@ -37,6 +37,23 @@ describe('socialApi', () => {
     expect(http.get).toHaveBeenNthCalledWith(5, '/api/feed?page=4')
   })
 
+  it('reads, posts and deletes comments', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: [], links: { next: null } })
+    vi.mocked(http.post).mockResolvedValue({ data: { id: 9, body: 'Так', can_delete: true } })
+    vi.mocked(http.delete).mockResolvedValue(null)
+
+    await socialApi.comments(5)
+    await socialApi.comments(5, 2)
+    const created = await socialApi.addComment(5, 'Так')
+    await socialApi.deleteComment(5, 9)
+
+    expect(http.get).toHaveBeenNthCalledWith(1, '/api/quotes/5/comments?page=1')
+    expect(http.get).toHaveBeenNthCalledWith(2, '/api/quotes/5/comments?page=2')
+    expect(http.post).toHaveBeenCalledWith('/api/quotes/5/comments', { body: 'Так' })
+    expect(created.id).toBe(9)
+    expect(http.delete).toHaveBeenCalledWith('/api/quotes/5/comments/9')
+  })
+
   it('likes and unlikes a quote', async () => {
     vi.mocked(http.post).mockResolvedValue(null)
     vi.mocked(http.delete).mockResolvedValue(null)

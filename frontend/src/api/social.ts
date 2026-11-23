@@ -1,4 +1,4 @@
-import type { FeedPage, PeoplePage, PersonSearchResult, PublicProfile, QuotesPage, ReviewsPage } from '@/types/api'
+import type { FeedPage, QuoteComment, QuoteCommentsPage, PeoplePage, PersonSearchResult, PublicProfile, QuotesPage, ReviewsPage } from '@/types/api'
 import { http } from './http'
 
 const user = (username: string) => `/api/users/${encodeURIComponent(username)}`
@@ -18,5 +18,9 @@ export const socialApi = {
   blocked: (page = 1) => http.get<PeoplePage>(`/api/me/blocks?page=${page}`),
   like: (quoteId: number) => http.post<null>(`/api/quotes/${quoteId}/like`),
   unlike: (quoteId: number) => http.delete<null>(`/api/quotes/${quoteId}/like`),
+  comments: (quoteId: number, page = 1) => http.get<QuoteCommentsPage>(`/api/quotes/${quoteId}/comments?page=${page}`),
+  addComment: (quoteId: number, body: string) =>
+    http.post<{ data: QuoteComment }>(`/api/quotes/${quoteId}/comments`, { body }).then((response) => response.data),
+  deleteComment: (quoteId: number, commentId: number) => http.delete<null>(`/api/quotes/${quoteId}/comments/${commentId}`),
   feed: (page = 1) => http.get<FeedPage>(`/api/feed?page=${page}`),
 }

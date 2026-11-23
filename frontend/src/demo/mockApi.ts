@@ -14,6 +14,7 @@ import type {
   PersonSummary,
   PublicProfile,
   Quote,
+  QuoteComment,
   QuoteType,
   QuoteVisibility,
   ReaderBookmark,
@@ -25,7 +26,7 @@ import type {
   UserBook,
 } from '@/types/api'
 
-const STORAGE_KEY = 'bookshelf-demo-state-v4'
+const STORAGE_KEY = 'bookshelf-demo-state-v5'
 const PAGE_SIZE = 15
 const DAY_MS = 86_400_000
 
@@ -53,9 +54,19 @@ interface State {
   severed: string[]
   /** Ids of the quotes the demo user liked. */
   liked: number[]
+  /** Comments on public quotes; `by` is a reader key (ME or a fake username). */
+  comments: StoredComment[]
   documents: StoredDocument[]
   /** Bookmarks of the sample document, by document id. */
   bookmarks: Record<number, ReaderBookmark[]>
+}
+
+interface StoredComment {
+  id: number
+  quote_id: number
+  by: string
+  body: string
+  created_at: string
 }
 
 /** A document as stored: the linked book's title is looked up when it is shown. */
@@ -227,6 +238,11 @@ function seed(): State {
     blocked: [],
     severed: [],
     liked: [],
+    // Quotes 1000 and 1001 are the first two of the first fake reader (see fakeQuotes).
+    comments: [
+      { id: 90, quote_id: 1000, by: 'taras_books', body: 'Дуже влучно! Саме про це я думав, коли читав розділ.', created_at: daysAgo(2).toISOString() },
+      { id: 91, quote_id: 1000, by: 'iryna_p', body: 'Дякую, що поділилися.\nДодала до своїх цитат.', created_at: daysAgo(1).toISOString() },
+    ],
     documents: [
       {
         id: 1,
@@ -404,7 +420,30 @@ function presentEntry(e: Entry): UserBook {
 /** Other readers' likes are made up from the id, so every quote has a plausible count; the demo user's own like comes on top. */
 function withLikes<T extends Quote | StoredQuote>(q: T): T {
   const liked = state.liked.includes(q.id)
-  return { ...q, likes_count: (q.id % 4) + (liked ? 1 : 0), liked_by_me: liked }
+  return { ...q, likes_count: (q.id % 4) + (liked ? 1 : 0), liked_by_me: liked, comments_count: visibleComments(q.id).length }
+}
+
+/** The comments the demo user can see: those of blocked readers are hidden. */
+function visibleComments(quoteId: number): StoredComment[] {
+  return state.comments.filter((c) => c.quote_id === quoteId && !state.blocked.includes(c.by))
+}
+
+/** Who owns a public quote the demo user can comment on; anything else is "not found". Reuses the rule of likes. */
+function commentableOwner(id: number): string {
+  findLikeable(id)
+  return state.quotes.some((q) => q.id === id) ? ME : (fakeReaders.find((r) => fakeQuotes(r).some((q) => q.id === id)) as FakeReader).username
+}
+
+function presentComment(c: StoredComment, ownerKey: string): QuoteComment {
+  const known = c.by === ME ? state.user.is_public && state.user.username !== null : true
+  const person = known ? summarize(c.by) : null
+  return {
+    id: c.id,
+    body: c.body,
+    created_at: c.created_at,
+    author: { username: person?.username || null, name: person?.name ?? null },
+    can_delete: state.signedIn && (c.by === ME || ownerKey === ME),
+  }
 }
 
 function presentQuote(q: StoredQuote): Quote {
@@ -1001,6 +1040,11 @@ route('POST', '/api/users/([^/]+)/block', ([username]) => {
   if (fakeFollows.some(([from, to]) => from === name && to === ME)) state.severed.push(name)
   const theirs = fakeQuotes(fakeReaders.find((r) => r.username === name) as FakeReader).map((q) => q.id)
   state.liked = state.liked.filter((id) => !theirs.includes(id))
+  // Like the real API: the comments between the two on each other's quotes go away too.
+  const mine = state.quotes.map((q) => q.id)
+  state.comments = state.comments.filter(
+    (c) => !(c.by === name && mine.includes(c.quote_id)) && !(c.by === ME && theirs.includes(c.quote_id)),
+  )
   return null
 })
 route('DELETE', '/api/users/([^/]+)/block', ([username]) => {
@@ -1028,6 +1072,30 @@ route('POST', '/api/quotes/(\\d+)/like', ([id]) => {
 route('DELETE', '/api/quotes/(\\d+)/like', ([id]) => {
   if (!state.liked.includes(Number(id))) findLikeable(Number(id))
   state.liked = state.liked.filter((liked) => liked !== Number(id))
+  return null
+})
+
+route('GET', '/api/quotes/(\\d+)/comments', ([id], query) => {
+  const ownerKey = commentableOwner(Number(id))
+  const all = visibleComments(Number(id)).map((c) => presentComment(c, ownerKey))
+  return paginate(all, Number(query.get('page') ?? 1), `/api/quotes/${id}/comments`, 20)
+})
+route('POST', '/api/quotes/(\\d+)/comments', ([id], _q, body) => {
+  if (!state.signedIn) throw new HttpError(401, { message: 'Unauthenticated.' })
+  const ownerKey = commentableOwner(Number(id))
+  const text = String(body.body ?? '').trim()
+  if (!text || text.length > 1000) invalid('body', 'validation.invalid')
+
+  const created: StoredComment = { id: nextId(), quote_id: Number(id), by: ME, body: text, created_at: new Date().toISOString() }
+  state.comments.push(created)
+  return ok(presentComment(created, ownerKey))
+})
+route('DELETE', '/api/quotes/(\\d+)/comments/(\\d+)', ([id, commentId]) => {
+  if (!state.signedIn) throw new HttpError(401, { message: 'Unauthenticated.' })
+  const ownerKey = commentableOwner(Number(id))
+  const comment = visibleComments(Number(id)).find((c) => c.id === Number(commentId))
+  if (!comment || (comment.by !== ME && ownerKey !== ME)) throw new HttpError(404, { message: 'Not found' })
+  state.comments = state.comments.filter((c) => c.id !== comment.id)
   return null
 })
 
