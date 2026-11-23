@@ -74,6 +74,7 @@ export const useSocialStore = defineStore('social', () => {
   const profileReviews = reactive(createPager<PublicReview>((review) => review.id))
   const feed = reactive(createPager<FeedQuote>((quote) => quote.id))
   const people = reactive(createPager<PersonSummary>((person) => person.username))
+  const blocks = reactive(createPager<PersonSummary>((person) => person.username))
 
   let profileGeneration = 0
 
@@ -138,6 +139,38 @@ export const useSocialStore = defineStore('social', () => {
     return people.load((page) => socialApi[kind](username, page))
   }
 
+  /** Blocks the shown profile; once the server agrees the page has nothing left to show, so the profile is dropped. */
+  async function blockProfile(): Promise<void> {
+    const current = profile.value
+    if (!current || current.is_me) return
+
+    await socialApi.block(current.username)
+    if (profile.value?.username === current.username) {
+      profileGeneration++
+      profile.value = null
+      profileQuotes.reset()
+      profileReviews.reset()
+    }
+  }
+
+  function loadBlocks(): Promise<void> {
+    return blocks.load((page) => socialApi.blocked(page))
+  }
+
+  /** The row goes at once and the request follows; if the server turns it down the row comes back where it was. */
+  async function unblock(username: string): Promise<void> {
+    const index = blocks.items.findIndex((person) => person.username === username)
+    if (index === -1) return
+    const [person] = blocks.items.splice(index, 1)
+
+    try {
+      await socialApi.unblock(username)
+    } catch (error) {
+      blocks.items.splice(Math.min(index, blocks.items.length), 0, person)
+      throw error
+    }
+  }
+
   function reset(): void {
     profileGeneration++
     profile.value = null
@@ -145,7 +178,25 @@ export const useSocialStore = defineStore('social', () => {
     profileReviews.reset()
     feed.reset()
     people.reset()
+    blocks.reset()
   }
 
-  return { profile, profileQuotes, profileReviews, feed, people, loadProfile, loadProfileReviews, setFollowing, toggleLike, loadFeed, loadPeople, reset }
+  return {
+    profile,
+    profileQuotes,
+    profileReviews,
+    feed,
+    people,
+    blocks,
+    loadProfile,
+    loadProfileReviews,
+    setFollowing,
+    blockProfile,
+    toggleLike,
+    loadFeed,
+    loadPeople,
+    loadBlocks,
+    unblock,
+    reset,
+  }
 })

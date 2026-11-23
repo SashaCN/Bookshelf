@@ -57,6 +57,20 @@ describe('socialApi', () => {
     expect(found).toEqual([{ username: 'olena', name: 'Олена', is_following: false }])
   })
 
+  it('blocks, unblocks and lists the blocked readers', async () => {
+    vi.mocked(http.post).mockResolvedValue(null)
+    vi.mocked(http.delete).mockResolvedValue(null)
+    vi.mocked(http.get).mockResolvedValue({ data: [], links: { next: null } })
+
+    await socialApi.block('olena')
+    await socialApi.unblock('olena')
+    await socialApi.blocked(2)
+
+    expect(http.post).toHaveBeenCalledWith('/api/users/olena/block')
+    expect(http.delete).toHaveBeenCalledWith('/api/users/olena/block')
+    expect(http.get).toHaveBeenCalledWith('/api/me/blocks?page=2')
+  })
+
   it('follows and unfollows', async () => {
     vi.mocked(http.post).mockResolvedValue(null)
     vi.mocked(http.delete).mockResolvedValue(null)

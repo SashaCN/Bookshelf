@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/http'
+import BlockUserDialog from '@/components/BlockUserDialog.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import LoadMore from '@/components/LoadMore.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -18,6 +20,7 @@ const props = defineProps<{ username: string }>()
 
 const { t } = useI18n()
 const social = useSocialStore()
+const router = useRouter()
 const auth = useAuthStore()
 const errorMessage = useApiErrorMessage()
 
@@ -94,6 +97,36 @@ async function toggleFollow() {
     followError.value = errorMessage(e)
   } finally {
     busy.value = false
+  }
+}
+
+const blockOpen = ref(false)
+const blocking = ref(false)
+const blockError = ref('')
+
+function openBlock() {
+  blockError.value = ''
+  blockOpen.value = true
+}
+
+function closeBlock() {
+  if (!blocking.value) blockOpen.value = false
+}
+
+/** After the block the profile is of no use: the reader lands on the blocked list, where it can be undone. */
+async function confirmBlock() {
+  if (blocking.value) return
+
+  blocking.value = true
+  blockError.value = ''
+
+  try {
+    await social.blockProfile()
+    await router.push({ name: 'blocks', query: { blocked: '1' } })
+  } catch (e) {
+    blockError.value = errorMessage(e)
+  } finally {
+    blocking.value = false
   }
 }
 
@@ -214,6 +247,26 @@ watch(() => props.username, load, { immediate: true })
         @focus="($event.target as HTMLInputElement).select()"
       >
     </div>
+
+    <div v-if="auth.isAuthenticated && !social.profile.is_me" class="-mt-3 mb-6">
+      <button
+        type="button"
+        data-test="block"
+        class="min-h-11 w-full rounded-lg px-4 text-sm font-medium text-danger"
+        @click="openBlock"
+      >
+        {{ $t('social.profile.block') }}
+      </button>
+    </div>
+
+    <BlockUserDialog
+      v-if="blockOpen"
+      :username="social.profile.username"
+      :pending="blocking"
+      :error="blockError"
+      @cancel="closeBlock"
+      @confirm="confirmBlock"
+    />
 
     <SegmentedControl v-model="tab" :label="$t('social.profile.tabsLabel')" :options="tabOptions" hide-label class="mb-4" />
 

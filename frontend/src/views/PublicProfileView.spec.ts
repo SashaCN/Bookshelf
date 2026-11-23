@@ -9,7 +9,7 @@ import type { PublicProfile } from '@/types/api'
 import PublicProfileView from './PublicProfileView.vue'
 
 vi.mock('@/api/social', () => ({
-  socialApi: { profile: vi.fn(), quotes: vi.fn(), reviews: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
+  socialApi: { block: vi.fn(), profile: vi.fn(), quotes: vi.fn(), reviews: vi.fn(), follow: vi.fn(), unfollow: vi.fn(), followers: vi.fn(), following: vi.fn(), feed: vi.fn() },
 }))
 
 const reader = { id: 1, name: 'Іван', email: 'ivan@example.com', timezone: 'Europe/Kyiv', username: 'ivan', is_public: true, new_followers_count: 0 }
@@ -27,7 +27,7 @@ async function mountView(profile: PublicProfile | Error, next: string | null = n
 
   const wrapper = mount(PublicProfileView, { props: { username: 'olena' }, global: { plugins } })
   await flushPromises()
-  return { wrapper }
+  return { wrapper, router }
 }
 
 function buttonWithText(wrapper: ReturnType<typeof mount>, text: string) {
@@ -113,6 +113,53 @@ describe('PublicProfileView', () => {
 
     expect(buttonWithText(wrapper, 'Підписатися')).toBeDefined()
     expect(wrapper.text()).toContain('Не вдалося')
+  })
+
+  describe('blocking', () => {
+    it('asks for confirmation, explains the effects and blocks nobody until it is given', async () => {
+      const { wrapper } = await mountView(makeProfile())
+
+      await wrapper.get('[data-test="block"]').trigger('click')
+
+      const dialog = wrapper.get('[role="alertdialog"]')
+      expect(dialog.text()).toContain('Заблокувати @olena?')
+      expect(dialog.text()).toContain('підписки між вами буде скасовано')
+      expect(dialog.text()).toContain('лайки')
+      expect(socialApi.block).not.toHaveBeenCalled()
+
+      await dialog.findAll('button').find((b) => b.text() === 'Скасувати')!.trigger('click')
+      expect(wrapper.find('[role="alertdialog"]').exists()).toBe(false)
+      expect(socialApi.block).not.toHaveBeenCalled()
+    })
+
+    it('blocks and goes to the blocked list with a status', async () => {
+      vi.mocked(socialApi.block).mockResolvedValue(null)
+      const { wrapper, router } = await mountView(makeProfile())
+
+      await wrapper.get('[data-test="block"]').trigger('click')
+      await wrapper.get('[data-test="confirm-block"]').trigger('click')
+      await flushPromises()
+
+      expect(socialApi.block).toHaveBeenCalledWith('olena')
+      expect(router.currentRoute.value.fullPath).toBe('/blocks?blocked=1')
+    })
+
+    it('keeps the dialog open and says so when blocking fails', async () => {
+      vi.mocked(socialApi.block).mockRejectedValue(new ApiError(500, null))
+      const { wrapper } = await mountView(makeProfile())
+
+      await wrapper.get('[data-test="block"]').trigger('click')
+      await wrapper.get('[data-test="confirm-block"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alertdialog"]').text()).toContain('Не вдалося')
+      expect(wrapper.text()).toContain('Олена')
+    })
+
+    it('is offered neither to a guest nor on the own profile', async () => {
+      expect((await mountView(makeProfile(), null, true)).wrapper.find('[data-test="block"]').exists()).toBe(false)
+      expect((await mountView(makeProfile({ is_me: true }))).wrapper.find('[data-test="block"]').exists()).toBe(false)
+    })
   })
 
   it('has no follow button on the own profile', async () => {

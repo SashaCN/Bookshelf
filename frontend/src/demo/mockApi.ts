@@ -47,6 +47,10 @@ interface State {
   goals: Record<number, number>
   /** Usernames of the fake readers the demo user follows. */
   following: string[]
+  /** Usernames of the fake readers the demo user blocked, oldest first. */
+  blocked: string[]
+  /** Fake readers whose follow of the demo user a block has removed. */
+  severed: string[]
   /** Ids of the quotes the demo user liked. */
   liked: number[]
   documents: StoredDocument[]
@@ -220,6 +224,8 @@ function seed(): State {
     quotes,
     goals: { [new Date().getFullYear()]: 12 },
     following: ['olena_reads'],
+    blocked: [],
+    severed: [],
     liked: [],
     documents: [
       {
@@ -436,8 +442,19 @@ function findPerson(username: string): { key: string; name: string } {
   return { key: reader.username, name: reader.name }
 }
 
+/** A blocked reader is hidden from the demo user, and so is everything that touches them. */
 function edges(): [string, string][] {
-  return [...fakeFollows, ...state.following.map((username): [string, string] => [ME, username])]
+  const own = state.following.map((username): [string, string] => [ME, username])
+  const fake = fakeFollows.filter(([from, to]) => !(to === ME && state.severed.includes(from)))
+
+  return [...fake, ...own].filter(([from, to]) => !state.blocked.includes(from) && !state.blocked.includes(to))
+}
+
+/** Like findPerson, but a blocked reader is "not found" too. */
+function findVisible(username: string): { key: string; name: string } {
+  const person = findPerson(username)
+  if (state.blocked.includes(username)) throw new HttpError(404, { message: 'Not found' })
+  return person
 }
 
 function summarize(key: string): PersonSummary {
@@ -463,7 +480,7 @@ function fakeQuotes(reader: FakeReader): Quote[] {
 
 /** The public reviews of the demo user or of a fake reader, most recent first. */
 function publicReviews(name: string): PublicReview[] {
-  const person = findPerson(name)
+  const person = findVisible(name)
   if (person.key === ME) {
     return state.library
       .filter((e) => e.review !== null && e.review_visibility === 'public')
@@ -488,7 +505,7 @@ function publicReviews(name: string): PublicReview[] {
 }
 
 function profile(username: string): PublicProfile {
-  const person = findPerson(username)
+  const person = findVisible(username)
   const all = edges()
   return {
     username,
@@ -920,7 +937,7 @@ route('GET', '/api/users', (_p, query) => {
     return username === handle ? 0 : username.startsWith(handle) ? 1 : 2
   }
   const found = fakeReaders
-    .filter((r) => r.username !== state.user.username)
+    .filter((r) => r.username !== state.user.username && !state.blocked.includes(r.username))
     .filter((r) => r.username.toLowerCase().startsWith(handle) || r.name.toLowerCase().includes(q))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
     .slice(0, 20)
@@ -930,7 +947,7 @@ route('GET', '/api/users', (_p, query) => {
 route('GET', '/api/users/([^/]+)', ([username]) => ok(profile(decodeURIComponent(username))))
 route('GET', '/api/users/([^/]+)/quotes', ([username], query) => {
   const name = decodeURIComponent(username)
-  const person = findPerson(name)
+  const person = findVisible(name)
   const all =
     person.key === ME
       ? state.quotes.filter((q) => q.visibility === 'public').sort(newestFirst).map(presentQuote)
@@ -942,18 +959,18 @@ route('GET', '/api/users/([^/]+)/reviews', ([username], query) => {
 })
 route('POST', '/api/users/([^/]+)/follow', ([username]) => {
   const name = decodeURIComponent(username)
-  if (findPerson(name).key === ME) invalid('username', 'follow.self')
+  if (findVisible(name).key === ME) invalid('username', 'follow.self')
   if (!state.following.includes(name)) state.following.push(name)
   return null
 })
 route('DELETE', '/api/users/([^/]+)/follow', ([username]) => {
   const name = decodeURIComponent(username)
-  findPerson(name)
+  findVisible(name)
   state.following = state.following.filter((u) => u !== name)
   return null
 })
 route('GET', '/api/users/([^/]+)/followers', ([username], query) => {
-  const key = findPerson(decodeURIComponent(username)).key
+  const key = findVisible(decodeURIComponent(username)).key
   // Like the real API: only the owner sees who is new, and they are the latest followers.
   const newCount = key === ME ? (state.user.new_followers_count ?? 0) : 0
   const people = edges()
@@ -962,22 +979,45 @@ route('GET', '/api/users/([^/]+)/followers', ([username], query) => {
   return paginate(people, Number(query.get('page') ?? 1), `/api/users/${username}/followers`)
 })
 route('GET', '/api/users/([^/]+)/following', ([username], query) => {
-  const key = findPerson(decodeURIComponent(username)).key
+  const key = findVisible(decodeURIComponent(username)).key
   const people = edges().filter(([from]) => from === key).map(([, to]) => summarize(to))
   return paginate(people, Number(query.get('page') ?? 1), `/api/users/${username}/following`)
 })
 route('GET', '/api/feed', (_p, query) => {
   const quotes = fakeReaders
-    .filter((r) => state.following.includes(r.username))
+    .filter((r) => state.following.includes(r.username) && !state.blocked.includes(r.username))
     .flatMap((r) => fakeQuotes(r).map(withLikes).map((q): FeedQuote => ({ ...q, author: { username: r.username, name: r.name } })))
     .sort(newestFirst)
   return paginate(quotes, Number(query.get('page') ?? 1), '/api/feed')
 })
 
+route('POST', '/api/users/([^/]+)/block', ([username]) => {
+  const name = decodeURIComponent(username)
+  if (findPerson(name).key === ME) invalid('username', 'block.self')
+  if (state.blocked.includes(name)) return null
+
+  state.blocked.push(name)
+  state.following = state.following.filter((u) => u !== name)
+  if (fakeFollows.some(([from, to]) => from === name && to === ME)) state.severed.push(name)
+  const theirs = fakeQuotes(fakeReaders.find((r) => r.username === name) as FakeReader).map((q) => q.id)
+  state.liked = state.liked.filter((id) => !theirs.includes(id))
+  return null
+})
+route('DELETE', '/api/users/([^/]+)/block', ([username]) => {
+  const name = decodeURIComponent(username)
+  findPerson(name)
+  state.blocked = state.blocked.filter((u) => u !== name)
+  return null
+})
+route('GET', '/api/me/blocks', (_p, query) => {
+  const people = [...state.blocked].reverse().map(summarize)
+  return paginate(people, Number(query.get('page') ?? 1), '/api/me/blocks')
+})
+
 /** A quote that can be liked: public, of the demo user or of a fake reader. */
 function findLikeable(id: number): void {
   const own = state.quotes.find((q) => q.id === id)
-  const known = own ? own.visibility === 'public' : fakeReaders.some((r) => fakeQuotes(r).some((q) => q.id === id))
+  const known = own ? own.visibility === 'public' : fakeReaders.some((r) => !state.blocked.includes(r.username) && fakeQuotes(r).some((q) => q.id === id))
   if (!known) throw new HttpError(404, { message: 'Not found' })
 }
 route('POST', '/api/quotes/(\\d+)/like', ([id]) => {

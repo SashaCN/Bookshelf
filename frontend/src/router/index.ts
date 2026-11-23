@@ -62,6 +62,7 @@ export const router = createRouter({
           component: () => import('@/views/PeopleListView.vue'),
           props: (route) => ({ username: String(route.params.username), kind: 'following' }),
         },
+        { path: 'blocks', name: 'blocks', component: () => import('@/views/BlockedUsersView.vue') },
         { path: 'reader', name: 'reader', component: () => import('@/views/ReaderListView.vue') },
         {
           path: 'reader/:id(\\d+)',

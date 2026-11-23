@@ -21,6 +21,7 @@ function mountView(timezone = 'Europe/Kyiv', extra: Partial<User> = {}) {
       { path: '/login', name: 'login', component: { template: '<div />' } },
       { path: '/u/:username/followers', name: 'followers', component: { template: '<div />' } },
       { path: '/u/:username', name: 'public-profile', component: { template: '<div />' } },
+      { path: '/blocks', name: 'blocks', component: { template: '<div />' } },
       { path: '/profile', name: 'profile', component: ProfileView },
     ],
   })
@@ -33,6 +34,14 @@ function mountView(timezone = 'Europe/Kyiv', extra: Partial<User> = {}) {
 describe('ProfileView', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('links to the list of blocked readers', () => {
+    const { wrapper } = mountView()
+
+    const link = wrapper.get('[data-test="blocked-link"]')
+    expect(link.text()).toBe('Заблоковані')
+    expect(link.attributes('href')).toBe('/blocks')
   })
 
   it('shows the reader with the saved name, e-mail and time zone', () => {

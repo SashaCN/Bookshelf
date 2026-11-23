@@ -13,6 +13,9 @@ export const socialApi = {
   following: (username: string, page = 1) => http.get<PeoplePage>(`${user(username)}/following?page=${page}`),
   search: (q: string) =>
     http.get<{ data: PersonSearchResult[] }>(`/api/users?q=${encodeURIComponent(q)}`).then((response) => response.data),
+  block: (username: string) => http.post<null>(`${user(username)}/block`),
+  unblock: (username: string) => http.delete<null>(`${user(username)}/block`),
+  blocked: (page = 1) => http.get<PeoplePage>(`/api/me/blocks?page=${page}`),
   like: (quoteId: number) => http.post<null>(`/api/quotes/${quoteId}/like`),
   unlike: (quoteId: number) => http.delete<null>(`/api/quotes/${quoteId}/like`),
   feed: (page = 1) => http.get<FeedPage>(`/api/feed?page=${page}`),

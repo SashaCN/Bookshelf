@@ -196,6 +196,14 @@ function closeDelete() {
     {{ $t('profile.newFollowers', auth.user.new_followers_count) }}
   </RouterLink>
 
+  <RouterLink
+    :to="{ name: 'blocks' }"
+    data-test="blocked-link"
+    class="mb-4 flex min-h-11 items-center rounded-2xl border border-line bg-surface px-4 py-3 font-medium"
+  >
+    {{ $t('profile.blocked') }}
+  </RouterLink>
+
   <form class="flex flex-col gap-4" @submit.prevent="save" @input="saved = false" @change="saved = false">
     <ErrorNotice v-if="error" :message="error" />
 

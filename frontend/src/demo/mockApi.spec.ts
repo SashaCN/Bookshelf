@@ -167,6 +167,41 @@ describe('demo mock API', () => {
     expect((await quotesApi.list()).data.every((q) => typeof q.likes_count === 'number')).toBe(true)
   })
 
+  it('blocks a fake reader: hides them, drops follows and likes, and unblocks without bringing them back', async () => {
+    const quote = (await socialApi.feed()).data.find((q) => q.author.username === 'olena_reads')!
+    await socialApi.like(quote.id)
+
+    await socialApi.block('olena_reads')
+    await socialApi.block('olena_reads')
+
+    expect((await socialApi.blocked()).data).toEqual([{ username: 'olena_reads', name: 'Олена Коваль' }])
+    await expect(socialApi.profile('olena_reads')).rejects.toMatchObject({ status: 404 })
+    await expect(socialApi.quotes('olena_reads')).rejects.toMatchObject({ status: 404 })
+    await expect(socialApi.followers('olena_reads')).rejects.toMatchObject({ status: 404 })
+    await expect(socialApi.follow('olena_reads')).rejects.toMatchObject({ status: 404 })
+    await expect(socialApi.like(quote.id)).rejects.toMatchObject({ status: 404 })
+    expect(await socialApi.search('olena')).toEqual([])
+    expect((await socialApi.feed()).data.some((q) => q.author.username === 'olena_reads')).toBe(false)
+    expect((await socialApi.following('demo_reader')).data).toEqual([])
+    expect((await socialApi.profile('taras_books')).followers_count).toBe(0)
+
+    await socialApi.unblock('olena_reads')
+    await socialApi.unblock('olena_reads')
+
+    expect((await socialApi.blocked()).data).toEqual([])
+    expect(await socialApi.profile('olena_reads')).toMatchObject({ is_following: false })
+    expect((await socialApi.following('demo_reader')).data).toEqual([])
+  })
+
+  it('takes a blocking reader out of the own followers and refuses to block oneself or a stranger', async () => {
+    await socialApi.block('taras_books')
+    expect((await socialApi.followers('demo_reader')).data).toEqual([])
+
+    await expect(socialApi.block('demo_reader')).rejects.toMatchObject({ status: 422 })
+    await expect(socialApi.block('nobody')).rejects.toMatchObject({ status: 404 })
+    await expect(socialApi.unblock('nobody')).rejects.toMatchObject({ status: 404 })
+  })
+
   it('shows profiles, follows and the feed of fake readers', async () => {
     expect(await socialApi.profile('olena_reads')).toMatchObject({ is_following: true, is_me: false, followers_count: 3 })
     expect((await socialApi.profile('demo_reader')).is_me).toBe(true)

@@ -26,6 +26,7 @@ export function createTestRouter() {
       { path: '/u/:username', name: 'public-profile', component: stub },
       { path: '/u/:username/followers', name: 'followers', component: stub },
       { path: '/u/:username/following', name: 'following', component: stub },
+      { path: '/blocks', name: 'blocks', component: stub },
       { path: '/login', name: 'login', component: stub },
     ],
   })
