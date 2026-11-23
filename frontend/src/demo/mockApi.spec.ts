@@ -276,4 +276,23 @@ describe('demo mock API', () => {
     expect((await socialApi.profile('olena_reads')).reviews_count).toBe(2)
     await expect(socialApi.reviews('nobody')).rejects.toMatchObject({ status: 404 })
   })
+
+  it('accepts a valid password change and refuses a short or unconfirmed one', async () => {
+    await expect(authApi.changePassword({ current_password: 'x', password: 'new-password', password_confirmation: 'new-password' })).resolves.not.toThrow()
+    await expect(authApi.changePassword({ current_password: 'x', password: 'short', password_confirmation: 'short' })).rejects.toMatchObject({ status: 422 })
+    await expect(authApi.changePassword({ current_password: 'x', password: 'new-password', password_confirmation: 'other-password' })).rejects.toMatchObject({ status: 422 })
+    await expect(authApi.changePassword({ current_password: '', password: 'new-password', password_confirmation: 'new-password' })).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('deletes the account: signs out and starts the next visit from the sample data', async () => {
+    await libraryApi.update(4, { review: 'Змінений відгук' })
+    await expect(authApi.deleteMe('')).rejects.toMatchObject({ status: 422 })
+    expect((await authApi.me()).email).toBe('demo@bookshelf.test')
+
+    await authApi.deleteMe('anything')
+
+    await expect(authApi.me()).rejects.toMatchObject({ status: 401 })
+    await authApi.login({ email: 'anyone@example.com', password: 'whatever' })
+    expect((await libraryApi.get(4)).review).not.toBe('Змінений відгук')
+  })
 })

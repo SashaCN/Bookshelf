@@ -8,7 +8,7 @@ import { useAuthStore } from './auth'
 import { useQuotesStore } from './quotes'
 
 vi.mock('@/api/auth', () => ({
-  authApi: { me: vi.fn(), followersSeen: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn() },
+  authApi: { me: vi.fn(), followersSeen: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(), changePassword: vi.fn(), deleteMe: vi.fn() },
 }))
 
 const user: User = { id: 1, name: 'Olena', email: 'olena@example.com', timezone: 'Europe/Kyiv', username: null, is_public: false, new_followers_count: 0 }
@@ -107,5 +107,47 @@ describe('auth store', () => {
 
     await expect(auth.markFollowersSeen()).rejects.toBeInstanceOf(ApiError)
     expect(auth.user?.new_followers_count).toBe(3)
+  })
+
+  it('passes a password change to the API and keeps the session', async () => {
+    vi.mocked(authApi.changePassword).mockResolvedValue({})
+    const auth = useAuthStore()
+    auth.user = user
+    const payload = { current_password: 'old-password', password: 'new-password', password_confirmation: 'new-password' }
+
+    await auth.changePassword(payload)
+
+    expect(authApi.changePassword).toHaveBeenCalledWith(payload)
+    expect(auth.user).toEqual(user)
+  })
+
+  it('lets a failed password change through to the caller', async () => {
+    vi.mocked(authApi.changePassword).mockRejectedValue(new ApiError(422, { errors: { current_password: ['x'] } }))
+
+    await expect(useAuthStore().changePassword({ current_password: 'a', password: 'b', password_confirmation: 'b' })).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('forgets the reader and everything they had after the account is deleted', async () => {
+    vi.mocked(authApi.deleteMe).mockResolvedValue(null)
+    const auth = useAuthStore()
+    auth.user = user
+    const quotes = useQuotesStore()
+    quotes.items = [makeQuote({ id: 1 })]
+
+    await auth.deleteAccount('secret-password')
+
+    expect(authApi.deleteMe).toHaveBeenCalledWith('secret-password')
+    expect(auth.isAuthenticated).toBe(false)
+    expect(quotes.items).toEqual([])
+  })
+
+  it('stays signed in when the account cannot be deleted', async () => {
+    vi.mocked(authApi.deleteMe).mockRejectedValue(new ApiError(422, { errors: { password: ['x'] } }))
+    const auth = useAuthStore()
+    auth.user = user
+
+    await expect(auth.deleteAccount('wrong')).rejects.toBeInstanceOf(ApiError)
+
+    expect(auth.user).toEqual(user)
   })
 })

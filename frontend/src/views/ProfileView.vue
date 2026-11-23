@@ -4,7 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { apiErrorCode } from '@/api/errors'
 import { ApiError } from '@/api/http'
+import DeleteAccountDialog from '@/components/DeleteAccountDialog.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
+import FormField from '@/components/FormField.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useAuthStore } from '@/stores/auth'
@@ -97,6 +99,88 @@ async function logout() {
   } finally {
     loggingOut.value = false
   }
+}
+
+const currentPassword = ref('')
+const newPassword = ref('')
+const newPasswordConfirmation = ref('')
+const changingPassword = ref(false)
+const passwordChanged = ref(false)
+const passwordError = ref('')
+const currentPasswordError = ref('')
+const newPasswordError = ref('')
+
+async function changePassword() {
+  if (changingPassword.value) return
+
+  passwordError.value = ''
+  currentPasswordError.value = ''
+  newPasswordError.value = ''
+  passwordChanged.value = false
+
+  if (newPassword.value !== newPasswordConfirmation.value) {
+    newPasswordError.value = t('profile.password.mismatch')
+    return
+  }
+
+  changingPassword.value = true
+
+  try {
+    await auth.changePassword({
+      current_password: currentPassword.value,
+      password: newPassword.value,
+      password_confirmation: newPasswordConfirmation.value,
+    })
+    currentPassword.value = ''
+    newPassword.value = ''
+    newPasswordConfirmation.value = ''
+    passwordChanged.value = true
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 422 && (e.fieldErrors.current_password || e.fieldErrors.password)) {
+      if (e.fieldErrors.current_password) currentPasswordError.value = t('profile.password.currentWrong')
+      if (e.fieldErrors.password) newPasswordError.value = t('profile.password.newInvalid')
+    } else {
+      passwordError.value = errorMessage(e)
+    }
+  } finally {
+    changingPassword.value = false
+  }
+}
+
+const deleteOpen = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
+const deletePasswordError = ref('')
+
+function openDelete() {
+  deleteError.value = ''
+  deletePasswordError.value = ''
+  deleteOpen.value = true
+}
+
+async function deleteAccount(password: string) {
+  if (deleting.value) return
+
+  deleting.value = true
+  deleteError.value = ''
+  deletePasswordError.value = ''
+
+  try {
+    await auth.deleteAccount(password)
+    await router.push({ name: 'login', query: { deleted: '1' } })
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 422 && e.fieldErrors.password) {
+      deletePasswordError.value = t('profile.danger.passwordWrong')
+    } else {
+      deleteError.value = errorMessage(e)
+    }
+  } finally {
+    deleting.value = false
+  }
+}
+
+function closeDelete() {
+  if (!deleting.value) deleteOpen.value = false
 }
 </script>
 
@@ -208,4 +292,65 @@ async function logout() {
       {{ $t('profile.logout') }}
     </button>
   </div>
+
+  <section class="mt-8 border-t border-line pt-4" aria-labelledby="profile-password-title">
+    <h2 id="profile-password-title" class="mb-3 text-lg font-semibold">{{ $t('profile.password.title') }}</h2>
+    <form class="flex flex-col gap-4" data-test="password-form" @submit.prevent="changePassword" @input="passwordChanged = false">
+      <ErrorNotice v-if="passwordError" :message="passwordError" />
+      <FormField
+        id="profile-current-password"
+        v-model="currentPassword"
+        type="password"
+        autocomplete="current-password"
+        :label="$t('profile.password.current')"
+        :error="currentPasswordError"
+      />
+      <FormField
+        id="profile-new-password"
+        v-model="newPassword"
+        type="password"
+        autocomplete="new-password"
+        :label="$t('profile.password.new')"
+        :hint="$t('auth.hints.password')"
+        :error="newPasswordError"
+      />
+      <FormField
+        id="profile-confirm-password"
+        v-model="newPasswordConfirmation"
+        type="password"
+        autocomplete="new-password"
+        :label="$t('profile.password.confirm')"
+      />
+      <button
+        type="submit"
+        :disabled="changingPassword"
+        class="min-h-11 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+      >
+        {{ $t('profile.password.submit') }}
+      </button>
+      <p v-if="passwordChanged" role="status" class="text-sm text-ink-muted">{{ $t('profile.password.done') }}</p>
+    </form>
+  </section>
+
+  <section class="mt-8 border-t border-line pt-4" aria-labelledby="profile-danger-title">
+    <h2 id="profile-danger-title" class="mb-1 text-lg font-semibold text-danger">{{ $t('profile.danger.title') }}</h2>
+    <p class="mb-3 text-sm text-ink-muted">{{ $t('profile.danger.text') }}</p>
+    <button
+      type="button"
+      data-test="delete-account"
+      class="min-h-11 rounded-lg border border-danger bg-surface px-4 font-medium text-danger"
+      @click="openDelete"
+    >
+      {{ $t('profile.danger.open') }}
+    </button>
+  </section>
+
+  <DeleteAccountDialog
+    v-if="deleteOpen"
+    :pending="deleting"
+    :error="deleteError"
+    :password-error="deletePasswordError"
+    @cancel="closeDelete"
+    @confirm="deleteAccount"
+  />
 </template>

@@ -54,6 +54,10 @@ async function submit() {
         :label="$t('auth.fields.password')"
       />
 
+      <p v-if="route.query.deleted === '1'" role="status" data-test="account-deleted" class="rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted">
+        {{ $t('auth.login.accountDeleted') }}
+      </p>
+
       <p v-if="error" role="alert" class="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{{ error }}</p>
 
       <button

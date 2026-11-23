@@ -100,4 +100,17 @@ describe('LoginView', () => {
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Забагато спроб. Спробуйте за хвилину.')
   })
+
+  it('says the account was deleted after coming from the deletion', async () => {
+    const { wrapper, router } = mountView()
+    await router.push('/login?deleted=1')
+
+    expect(wrapper.get('[data-test="account-deleted"]').text()).toBe('Акаунт видалено')
+  })
+
+  it('has no such note on a normal visit', () => {
+    const { wrapper } = mountView()
+
+    expect(wrapper.find('[data-test="account-deleted"]').exists()).toBe(false)
+  })
 })

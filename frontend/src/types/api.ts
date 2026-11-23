@@ -14,6 +14,12 @@ export interface LoginPayload {
   password: string
 }
 
+export interface ChangePasswordPayload {
+  current_password: string
+  password: string
+  password_confirmation: string
+}
+
 export interface RegisterPayload extends LoginPayload {
   name: string
   timezone: string

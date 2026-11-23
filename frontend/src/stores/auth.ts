@@ -3,15 +3,17 @@ import { computed, ref } from 'vue'
 import { authApi } from '@/api/auth'
 import { ApiError } from '@/api/http'
 import { clearApiCache } from '@/pwa/clearApiCache'
-import type { LoginPayload, RegisterPayload, UpdateProfilePayload, User } from '@/types/api'
+import type { ChangePasswordPayload, LoginPayload, RegisterPayload, UpdateProfilePayload, User } from '@/types/api'
 import { useLibraryStore } from './library'
 import { useQuotesStore } from './quotes'
+import { useReaderStore } from './reader'
 import { useSocialStore } from './social'
 
 function resetReaderData(): void {
   useLibraryStore().reset()
   useQuotesStore().reset()
   useSocialStore().reset()
+  useReaderStore().reset()
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -57,6 +59,16 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = await authApi.updateMe(payload)
   }
 
+  async function changePassword(payload: ChangePasswordPayload): Promise<void> {
+    await authApi.changePassword(payload)
+  }
+
+  /** Deletes the account for good; the server ends the session, so everything of the reader is forgotten here. */
+  async function deleteAccount(password: string): Promise<void> {
+    await authApi.deleteMe(password)
+    expireSession()
+  }
+
   /** Tells the server the followers list was opened, and drops the badge without asking for the user again. */
   async function markFollowersSeen(): Promise<void> {
     if (!user.value || user.value.new_followers_count === 0) {
@@ -83,5 +95,5 @@ export const useAuthStore = defineStore('auth', () => {
     clearApiCache()
   }
 
-  return { user, initialized, isAuthenticated, init, login, register, updateProfile, markFollowersSeen, logout, expireSession }
+  return { user, initialized, isAuthenticated, init, login, register, updateProfile, changePassword, deleteAccount, markFollowersSeen, logout, expireSession }
 })

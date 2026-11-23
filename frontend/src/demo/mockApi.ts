@@ -688,6 +688,19 @@ route('POST', '/api/auth/register', (_p, _q, body) => {
   state.user = { ...state.user, name: String(body.name ?? 'Читач'), email: String(body.email ?? ''), timezone: String(body.timezone ?? 'Europe/Kyiv'), username: null, is_public: false, new_followers_count: 0 }
   return null
 })
+route('PUT', '/api/auth/user/password', (_p, _q, body) => {
+  if (!body.current_password) invalid('current_password', 'The current password is incorrect.')
+  const next = String(body.password ?? '')
+  if (next.length < 8 || next !== body.password_confirmation) invalid('password', 'The password is invalid.')
+  return null
+})
+// Deleting the account wipes the demo data too: the next visitor sign-in starts from the sample library again.
+route('DELETE', '/api/me', (_p, _q, body) => {
+  if (!body.password) invalid('password', 'The password is incorrect.')
+  state = seed()
+  state.signedIn = false
+  return null
+})
 route('POST', '/api/auth/logout', () => {
   state.signedIn = false
   return null

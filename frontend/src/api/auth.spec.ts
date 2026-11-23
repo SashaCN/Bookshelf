@@ -3,7 +3,7 @@ import { authApi } from './auth'
 import { http } from './http'
 
 vi.mock('./http', () => ({
-  http: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+  http: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn(), put: vi.fn() },
 }))
 
 describe('authApi', () => {
@@ -17,5 +17,22 @@ describe('authApi', () => {
     await authApi.followersSeen()
 
     expect(http.post).toHaveBeenCalledWith('/api/me/followers-seen')
+  })
+
+  it('changes the password through Fortify', async () => {
+    vi.mocked(http.put).mockResolvedValue({})
+    const payload = { current_password: 'old-password', password: 'new-password', password_confirmation: 'new-password' }
+
+    await authApi.changePassword(payload)
+
+    expect(http.put).toHaveBeenCalledWith('/api/auth/user/password', payload)
+  })
+
+  it('deletes the account with the password in the body', async () => {
+    vi.mocked(http.delete).mockResolvedValue(null)
+
+    await authApi.deleteMe('secret-password')
+
+    expect(http.delete).toHaveBeenCalledWith('/api/me', { password: 'secret-password' })
   })
 })

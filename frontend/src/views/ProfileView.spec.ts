@@ -256,4 +256,183 @@ describe('ProfileView', () => {
       expect(wrapper.find('[data-test="new-followers-line"]').exists()).toBe(false)
     })
   })
+
+  describe('password change', () => {
+    async function fill(wrapper: ReturnType<typeof mountView>['wrapper'], confirmation = 'new-password') {
+      await wrapper.get('#profile-current-password').setValue('old-password')
+      await wrapper.get('#profile-new-password').setValue('new-password')
+      await wrapper.get('#profile-confirm-password').setValue(confirmation)
+      await wrapper.get('[data-test="password-form"]').trigger('submit')
+      await flushPromises()
+    }
+
+    it('sends the three passwords, clears the fields and says it is done', async () => {
+      const { wrapper, auth } = mountView()
+      const change = vi.spyOn(auth, 'changePassword').mockResolvedValue()
+
+      await fill(wrapper)
+
+      expect(change).toHaveBeenCalledWith({ current_password: 'old-password', password: 'new-password', password_confirmation: 'new-password' })
+      expect((wrapper.get('#profile-current-password').element as HTMLInputElement).value).toBe('')
+      expect(wrapper.get('[data-test="password-form"] [role="status"]').text()).toContain('Пароль змінено')
+    })
+
+    it('does not send mismatching passwords', async () => {
+      const { wrapper, auth } = mountView()
+      const change = vi.spyOn(auth, 'changePassword').mockResolvedValue()
+
+      await fill(wrapper, 'different')
+
+      expect(change).not.toHaveBeenCalled()
+      expect(wrapper.get('#profile-new-password-error').text()).toBe('Паролі не збігаються.')
+    })
+
+    it('shows a wrong current password next to its field', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'changePassword').mockRejectedValue(new ApiError(422, { errors: { current_password: ['wrong'] } }))
+
+      await fill(wrapper)
+
+      expect(wrapper.get('#profile-current-password-error').text()).toBe('Поточний пароль невірний.')
+      expect(wrapper.find('[data-test="password-form"] [role="status"]').exists()).toBe(false)
+    })
+
+    it('shows a refused new password next to its field', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'changePassword').mockRejectedValue(new ApiError(422, { errors: { password: ['weak'] } }))
+
+      await fill(wrapper)
+
+      expect(wrapper.get('#profile-new-password-error').text()).toContain('щонайменше 8')
+    })
+
+    it('shows other failures as a notice', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'changePassword').mockRejectedValue(new ApiError(500, null))
+
+      await fill(wrapper)
+
+      expect(wrapper.find('[data-test="password-form"] [role="alert"]').exists()).toBe(true)
+    })
+
+    it('disables the button while the request is on its way', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'changePassword').mockReturnValue(new Promise(() => undefined))
+
+      await fill(wrapper)
+
+      expect(wrapper.get('[data-test="password-form"] button[type="submit"]').attributes('disabled')).toBeDefined()
+    })
+  })
+
+  describe('account deletion', () => {
+    async function openDialog(wrapper: ReturnType<typeof mountView>['wrapper']) {
+      await wrapper.get('[data-test="delete-account"]').trigger('click')
+      await flushPromises()
+    }
+
+    async function confirm(wrapper: ReturnType<typeof mountView>['wrapper'], password = 'secret-password') {
+      await wrapper.get('#delete-account-password').setValue(password)
+      await wrapper.get('[role="dialog"] form').trigger('submit')
+      await flushPromises()
+    }
+
+    it('explains what is deleted and asks for the password before anything happens', async () => {
+      const { wrapper, auth } = mountView()
+      const remove = vi.spyOn(auth, 'deleteAccount').mockResolvedValue()
+
+      await openDialog(wrapper)
+
+      const text = wrapper.get('[role="dialog"]').text()
+      for (const part of ['бібліотека', 'цитати', 'відгуки', 'EPUB', 'підписники', 'неможливо скасувати']) {
+        expect(text).toContain(part)
+      }
+      expect(remove).not.toHaveBeenCalled()
+    })
+
+    it('moves the focus into the dialog, closes on Escape and gives the focus back', async () => {
+      const { wrapper } = mountView()
+      wrapper.element.ownerDocument.body.append(wrapper.element)
+      const opener = wrapper.get('[data-test="delete-account"]')
+      ;(opener.element as HTMLElement).focus()
+
+      await opener.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="dialog"]').element.contains(document.activeElement)).toBe(true)
+
+      await wrapper.get('[role="dialog"]').trigger('keydown', { key: 'Escape' })
+      await flushPromises()
+
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(document.activeElement).toBe(opener.element)
+      wrapper.unmount()
+    })
+
+    it('can be cancelled with the button without deleting anything', async () => {
+      const { wrapper, auth } = mountView()
+      const remove = vi.spyOn(auth, 'deleteAccount').mockResolvedValue()
+      await openDialog(wrapper)
+
+      await wrapper.get('[role="dialog"] button[type="button"]').trigger('click')
+
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(remove).not.toHaveBeenCalled()
+    })
+
+    it('deletes the account and goes to the login screen with a note', async () => {
+      const { wrapper, router, auth } = mountView()
+      const remove = vi.spyOn(auth, 'deleteAccount').mockResolvedValue()
+      await openDialog(wrapper)
+
+      await confirm(wrapper)
+
+      expect(remove).toHaveBeenCalledWith('secret-password')
+      expect(router.currentRoute.value.name).toBe('login')
+      expect(router.currentRoute.value.query.deleted).toBe('1')
+    })
+
+    it('does not send an empty password', async () => {
+      const { wrapper, auth } = mountView()
+      const remove = vi.spyOn(auth, 'deleteAccount').mockResolvedValue()
+      await openDialog(wrapper)
+
+      await confirm(wrapper, '')
+
+      expect(remove).not.toHaveBeenCalled()
+    })
+
+    it('keeps the dialog open and names the password when it is wrong', async () => {
+      const { wrapper, router, auth } = mountView()
+      vi.spyOn(auth, 'deleteAccount').mockRejectedValue(new ApiError(422, { errors: { password: ['wrong'] } }))
+      await openDialog(wrapper)
+
+      await confirm(wrapper, 'wrong')
+
+      expect(wrapper.get('#delete-account-password-error').text()).toBe('Пароль невірний.')
+      expect(router.currentRoute.value.name).not.toBe('login')
+    })
+
+    it('shows other failures inside the dialog', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'deleteAccount').mockRejectedValue(new ApiError(500, null))
+      await openDialog(wrapper)
+
+      await confirm(wrapper)
+
+      expect(wrapper.find('[role="dialog"] [role="alert"]').exists()).toBe(true)
+    })
+
+    it('disables the confirm button and ignores Escape while deleting', async () => {
+      const { wrapper, auth } = mountView()
+      vi.spyOn(auth, 'deleteAccount').mockReturnValue(new Promise(() => undefined))
+      await openDialog(wrapper)
+
+      await confirm(wrapper)
+      await wrapper.get('[role="dialog"]').trigger('keydown', { key: 'Escape' })
+
+      expect(wrapper.get('[role="dialog"] button[type="submit"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    })
+  })
 })
