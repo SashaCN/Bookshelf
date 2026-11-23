@@ -271,6 +271,18 @@ describe('QuotesView', () => {
   })
 
   describe('export', () => {
+    it('is hidden when the user has no quotes at all', async () => {
+      const { wrapper } = await mountView({}, page([]))
+
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Експорт у Markdown')).toBe(false)
+    })
+
+    it('stays when a filter yields nothing but quotes may exist', async () => {
+      const { wrapper } = await mountView({ favorite: '1' }, page([]))
+
+      expect(buttonWithText(wrapper, 'Експорт у Markdown')).toBeTruthy()
+    })
+
     function stubDownload() {
       const createObjectURL = vi.fn().mockReturnValue('blob:export')
       const revokeObjectURL = vi.fn()

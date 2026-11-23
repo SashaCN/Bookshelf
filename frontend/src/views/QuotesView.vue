@@ -149,7 +149,7 @@ onMounted(() => {
     </div>
   </div>
 
-  <div class="mb-4">
+  <div v-if="!quotes.loaded || quotes.items.length || hasFilters" class="mb-4">
     <button
       type="button"
       :disabled="exporting"
