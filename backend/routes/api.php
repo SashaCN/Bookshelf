@@ -8,6 +8,7 @@ use App\Http\Controllers\MeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\QuoteLikeController;
+use App\Http\Controllers\ReaderBookmarkController;
 use App\Http\Controllers\ReaderDocumentController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\StatsController;
@@ -53,6 +54,12 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/reader/{readerDocument}/chapters/{n}', [ReaderDocumentController::class, 'chapter'])
         ->where('n', '[0-9]{1,6}')
         ->name('reader.chapter');
+    Route::get('/reader/{readerDocument}/bookmarks', [ReaderBookmarkController::class, 'index'])->name('reader.bookmarks.index');
+    Route::post('/reader/{readerDocument}/bookmarks', [ReaderBookmarkController::class, 'store'])->name('reader.bookmarks.store');
+    Route::delete('/reader/{readerDocument}/bookmarks/{bookmark}', [ReaderBookmarkController::class, 'destroy'])
+        ->scopeBindings()
+        ->where('bookmark', '[0-9]+')
+        ->name('reader.bookmarks.destroy');
 
     Route::get('/feed', FeedController::class)->name('feed');
     Route::get('/users', UserSearchController::class)->name('users.search');

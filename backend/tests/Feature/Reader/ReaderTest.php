@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ReaderBookmark;
 use App\Models\ReaderDocument;
 use App\Models\User;
 use App\Models\UserBook;
@@ -110,6 +111,9 @@ it('requires authentication for every endpoint', function (string $method, strin
     ['DELETE', '/api/reader/1'],
     ['PUT', '/api/reader/1/position'],
     ['GET', '/api/reader/1/chapters/0'],
+    ['GET', '/api/reader/1/bookmarks'],
+    ['POST', '/api/reader/1/bookmarks'],
+    ['DELETE', '/api/reader/1/bookmarks/1'],
 ]);
 
 describe('uploading', function () {
@@ -398,6 +402,110 @@ it('answers 404 for somebody else\'s book on every route', function (string $met
     ['PUT', '/api/reader/{id}/position', ['chapter' => 99, 'fraction' => 9]],
     ['GET', '/api/reader/{id}/chapters/0', []],
 ]);
+
+describe('bookmarks', function () {
+    it('creates a bookmark', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+
+        $this->actingAs($this->user)->postJson("/api/reader/{$document->id}/bookmarks", ['chapter' => 1, 'note' => 'Come back'])
+            ->assertCreated()
+            ->assertJsonPath('data.chapter', 1)
+            ->assertJsonPath('data.note', 'Come back')
+            ->assertJsonPath('data.chapter_title', null);
+
+        expect($document->bookmarks()->count())->toBe(1);
+    });
+
+    it('updates the note instead of adding a second bookmark for the same chapter', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+        $url = "/api/reader/{$document->id}/bookmarks";
+
+        $this->actingAs($this->user)->postJson($url, ['chapter' => 2, 'note' => 'old'])->assertCreated();
+        $this->actingAs($this->user)->postJson($url, ['chapter' => 2, 'note' => 'new'])
+            ->assertOk()
+            ->assertJsonPath('data.note', 'new');
+        $this->actingAs($this->user)->postJson($url, ['chapter' => 2])->assertOk()->assertJsonPath('data.note', 'new');
+
+        expect($document->bookmarks()->count())->toBe(1);
+    });
+
+    it('lists bookmarks by chapter with titles', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create(['chapter_titles' => ['Start', '', 'End']]);
+        $url = "/api/reader/{$document->id}/bookmarks";
+        $this->actingAs($this->user)->postJson($url, ['chapter' => 2])->assertCreated();
+        $this->actingAs($this->user)->postJson($url, ['chapter' => 1])->assertCreated();
+        $this->actingAs($this->user)->postJson($url, ['chapter' => 0, 'note' => 'n'])->assertCreated();
+        ReaderBookmark::factory()->create();
+
+        $this->actingAs($this->user)->getJson($url)
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.chapter', 0)
+            ->assertJsonPath('data.0.chapter_title', 'Start')
+            ->assertJsonPath('data.0.note', 'n')
+            ->assertJsonPath('data.1.chapter', 1)
+            ->assertJsonPath('data.1.chapter_title', null)
+            ->assertJsonPath('data.2.chapter_title', 'End');
+    });
+
+    it('deletes a bookmark', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+        $bookmark = ReaderBookmark::factory()->for($document)->create();
+
+        $this->actingAs($this->user)->deleteJson("/api/reader/{$document->id}/bookmarks/{$bookmark->id}")->assertNoContent();
+
+        expect(ReaderBookmark::query()->count())->toBe(0);
+    });
+
+    it('rejects a chapter out of range and a long note', function (array $body, string $field) {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+
+        $this->actingAs($this->user)->postJson("/api/reader/{$document->id}/bookmarks", $body)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+
+        expect(ReaderBookmark::query()->count())->toBe(0);
+    })->with([
+        'past the end' => [['chapter' => 3], 'chapter'],
+        'negative' => [['chapter' => -1], 'chapter'],
+        'missing' => [[], 'chapter'],
+        'long note' => [['chapter' => 0, 'note' => str_repeat('a', 201)], 'note'],
+    ]);
+
+    it('answers 404 for somebody else\'s book on every bookmark route', function (string $method, string $uri, array $body) {
+        $document = ReaderDocument::factory()->for($this->stranger)->create();
+        $bookmark = ReaderBookmark::factory()->for($document)->create();
+
+        $this->actingAs($this->user)
+            ->json($method, str_replace(['{id}', '{b}'], [(string) $document->id, (string) $bookmark->id], $uri), $body)
+            ->assertNotFound();
+
+        expect(ReaderBookmark::query()->count())->toBe(1);
+    })->with([
+        ['GET', '/api/reader/{id}/bookmarks', []],
+        ['POST', '/api/reader/{id}/bookmarks', ['chapter' => 1]],
+        ['DELETE', '/api/reader/{id}/bookmarks/{b}', []],
+    ]);
+
+    it('answers 404 for a bookmark of another book', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+        $other = ReaderDocument::factory()->for($this->user)->create();
+        $bookmark = ReaderBookmark::factory()->for($other)->create();
+
+        $this->actingAs($this->user)->deleteJson("/api/reader/{$document->id}/bookmarks/{$bookmark->id}")->assertNotFound();
+
+        expect(ReaderBookmark::query()->count())->toBe(1);
+    });
+
+    it('removes bookmarks with the book', function () {
+        $document = ReaderDocument::factory()->for($this->user)->create();
+        ReaderBookmark::factory()->for($document)->create();
+
+        $this->actingAs($this->user)->deleteJson("/api/reader/{$document->id}")->assertNoContent();
+
+        expect(ReaderBookmark::query()->count())->toBe(0);
+    });
+});
 
 describe('references of the spine', function () {
     it('resolves encoded, fragment, absolute and parent references to archive entries once each', function () {

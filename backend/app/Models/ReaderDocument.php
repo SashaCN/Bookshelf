@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'user_id',
@@ -62,6 +63,14 @@ class ReaderDocument extends Model
     public function userBook(): BelongsTo
     {
         return $this->belongsTo(UserBook::class);
+    }
+
+    /**
+     * @return HasMany<ReaderBookmark, $this>
+     */
+    public function bookmarks(): HasMany
+    {
+        return $this->hasMany(ReaderBookmark::class);
     }
 
     /**
