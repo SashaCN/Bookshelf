@@ -21,6 +21,8 @@ class StoreUserBookRequest extends FormRequest
         return [
             'openlibrary_work_key' => ['required_without:title', 'string', 'regex:#^(/works/)?OL\d+W$#'],
             'title' => ['required_without:openlibrary_work_key', 'prohibits:openlibrary_work_key', 'string', 'max:255'],
+            // The cover of a book entered by hand is optional and may only be a secure link: it is shown through <img>.
+            'cover_url' => ['nullable', 'string', 'url:https', 'max:2048'],
             'authors' => ['nullable', 'array', 'max:5'],
             'authors.*' => ['string', 'max:255'],
             'published_year' => ['nullable', 'integer', 'min:1', 'max:'.((int) date('Y') + 1)],

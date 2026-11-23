@@ -17,8 +17,8 @@ use Illuminate\Validation\ValidationException;
  */
 class ResolveQuoteAnchor
 {
-    /** A quote is at most 2000 characters; this leaves room for the white space a browser may add. */
-    private const MAX_SPAN = 10_000;
+    /** A quote is at most 5000 characters; this leaves room for the white space a browser may add. */
+    private const MAX_SPAN = 20_000;
 
     /**
      * @param  array{chapter: int, start: int, end: int}  $anchor

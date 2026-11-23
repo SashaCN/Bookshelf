@@ -82,7 +82,7 @@ describe('assigned at registration', function () {
 
         expect(User::query()->sole()->handle)->toMatch('/^[a-z0-9_]{3,30}$/');
     })->with([
-        'very long' => [str_repeat('Oleksandrivna ', 10)],
+        'very long' => [str_repeat('Oleksandrivna ', 7)],
         'with symbols' => ['Ol@na_k!'],
         'with accents' => ['Zoë Çelik'],
         'only digits' => ['12345'],

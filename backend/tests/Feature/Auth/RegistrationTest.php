@@ -43,6 +43,14 @@ it('rejects invalid registration data', function (array $payload, string $field)
     'unknown time zone' => [['timezone' => 'Mars/Olympus'], 'timezone'],
 ]);
 
+it('limits the name to 100 characters', function () {
+    $payload = ['email' => 'long@example.com', 'password' => 'secret-password'];
+
+    $this->postJson('/api/auth/register', $payload + ['name' => str_repeat('я', 101)])
+        ->assertUnprocessable()->assertJsonValidationErrors('name');
+    $this->postJson('/api/auth/register', $payload + ['name' => str_repeat('я', 100)])->assertCreated();
+});
+
 it('rejects a duplicate email', function () {
     User::factory()->create(['email' => 'olena@example.com']);
 

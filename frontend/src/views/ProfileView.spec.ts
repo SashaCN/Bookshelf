@@ -51,6 +51,19 @@ describe('ProfileView', () => {
       expect(wrapper.text()).toContain('olena@example.com')
     })
 
+    it('show the version of the app at the bottom, taken from package.json', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.get('[data-test="app-version"]').text()).toBe(`Версія ${__APP_VERSION__}`)
+      expect(__APP_VERSION__).toBe('2.0.0')
+    })
+
+    it('limit the name to 100 characters', async () => {
+      const { wrapper } = await mountView()
+
+      expect(wrapper.get('#profile-name').attributes('maxlength')).toBe('100')
+    })
+
     it('are labelled', async () => {
       const { wrapper } = await mountView()
 

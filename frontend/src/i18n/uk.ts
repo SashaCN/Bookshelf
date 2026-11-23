@@ -158,6 +158,8 @@ export default {
       authorsHint: 'Кілька авторів розділяйте комою',
       pages: 'Сторінок',
       year: 'Рік видання',
+      cover: 'Обкладинка (посилання)',
+      coverHint: 'Необов’язково. Лише адреса, що починається з https://',
     },
   },
   book: {
@@ -258,7 +260,7 @@ export default {
       counter: '{count} з {max}',
     },
     errors: {
-      content: 'Введіть текст, не довший за 2000 символів.',
+      content: 'Введіть текст, не довший за 5000 символів.',
       note: 'Думка має бути не довшою за 2000 символів.',
       page: 'Вкажіть номер сторінки від 1 до 20000.',
     },
@@ -336,6 +338,7 @@ export default {
     timezoneHint: 'За ним визначається, до якого дня належить прочитане.',
     saved: 'Збережено.',
     logout: 'Вийти',
+    version: 'Версія {version}',
   },
   apiErrors: {
     // Messages of the business rules of the larger areas live in their own files.

@@ -32,7 +32,7 @@ const noteId = useId()
           :id="noteId"
           v-model="note"
           rows="2"
-          maxlength="2000"
+          maxlength="5000"
           :placeholder="$t('reader.selection.note')"
           class="reader-field rounded-lg px-3 py-2 text-base"
         />

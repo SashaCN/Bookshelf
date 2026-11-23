@@ -28,7 +28,7 @@ class StoreQuoteRequest extends FormRequest
     {
         return [
             'type' => ['sometimes', 'required', Rule::enum(QuoteType::class)],
-            'content' => ['required', 'string', 'max:2000'],
+            'content' => ['required', 'string', 'max:5000'],
             'note' => ['nullable', 'string', 'max:2000'],
             // Whether it fits the book is checked against the reader's page count by the action.
             'page' => ['nullable', 'integer', 'min:1', 'max:20000'],

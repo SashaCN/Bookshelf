@@ -56,6 +56,17 @@ describe('publishing a quote', function () {
             ->and($post->type)->toBe(PostType::Quote);
     });
 
+    it('keeps the whole text of a quote of 5000 characters in the post', function () {
+        $text = str_repeat('я', 5000);
+        $this->quote->update(['content' => $text]);
+
+        $this->actingAs($this->user)->postJson('/api/posts', ['type' => 'quote', 'quote_id' => $this->quote->id])
+            ->assertCreated()
+            ->assertJsonPath('data.content', $text);
+
+        expect(Post::query()->sole()->content)->toBe($text);
+    });
+
     it('does not need a comment', function () {
         $this->actingAs($this->user)->postJson('/api/posts', ['type' => 'quote', 'quote_id' => $this->quote->id])
             ->assertCreated()
@@ -494,13 +505,13 @@ describe('deleting a post', function () {
         $this->actingAs($this->user)->deleteJson("/api/posts/{$post->id}")->assertNotFound();
     });
 
-    it('disappears together with a hand-entered book nobody else has', function () {
+    it('survives the removal of a hand-entered book from the library', function () {
         $manual = Book::factory()->manual($this->user)->create();
         $entry = UserBook::factory()->for($this->user)->create(['book_id' => $manual->id]);
         $post = Post::factory()->review()->create(['user_id' => $this->user->id, 'book_id' => $manual->id]);
 
         $this->actingAs($this->user)->deleteJson("/api/library/{$entry->id}")->assertNoContent();
 
-        expect(Post::query()->find($post->id))->toBeNull();
+        expect(Post::query()->find($post->id))->not->toBeNull();
     });
 });

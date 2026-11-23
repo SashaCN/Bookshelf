@@ -14,7 +14,7 @@ export default defineConfig([
     languageOptions: { parserOptions: { parser: tseslint.parser } },
   },
   {
-    languageOptions: { globals: globals.browser },
+    languageOptions: { globals: { ...globals.browser, __APP_VERSION__: 'readonly' } },
   },
   {
     // Filled in at build time by vite.sw.config.ts.

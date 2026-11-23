@@ -71,7 +71,9 @@ class UserBookController extends Controller
             $book = $userBook->book;
             $userBook->delete();
 
-            if ($book->source === BookSource::Manual && ! $book->userBooks()->exists()) {
+            // Posts in the community point at the book itself and would be deleted with it: a book that still has
+            // posts stays in the catalog (its title is shown with them), whoever keeps it on a shelf.
+            if ($book->source === BookSource::Manual && ! $book->userBooks()->exists() && ! $book->posts()->exists()) {
                 $book->delete();
             }
         });

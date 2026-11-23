@@ -69,9 +69,9 @@ describe('QuoteFormView', () => {
     })
 
     it('cuts shared text that is longer than a quote can be', async () => {
-      const { wrapper } = await mountCreate({ text: 'я'.repeat(2500) })
+      const { wrapper } = await mountCreate({ text: 'я'.repeat(5500) })
 
-      expect((wrapper.get('#quote-content').element as HTMLTextAreaElement).value).toHaveLength(2000)
+      expect((wrapper.get('#quote-content').element as HTMLTextAreaElement).value).toHaveLength(5000)
     })
 
     it('asks for the book among the books of the library, alphabetically', async () => {
@@ -122,12 +122,12 @@ describe('QuoteFormView', () => {
 
     it('counts the characters of the text', async () => {
       const { wrapper } = await mountCreate()
-      expect(wrapper.text()).toContain('0 з 2000')
+      expect(wrapper.text()).toContain('0 з 5000')
 
       await wrapper.get('#quote-content').setValue('Hello')
 
-      expect(wrapper.text()).toContain('5 з 2000')
-      expect(wrapper.get('#quote-content').attributes('maxlength')).toBe('2000')
+      expect(wrapper.text()).toContain('5 з 5000')
+      expect(wrapper.get('#quote-content').attributes('maxlength')).toBe('5000')
       expect(wrapper.get('#quote-note').attributes('maxlength')).toBe('2000')
     })
 
@@ -383,7 +383,7 @@ describe('QuoteFormView', () => {
           }),
         )
 
-        expect(wrapper.get('#quote-content-error').text()).toBe('Введіть текст, не довший за 2000 символів.')
+        expect(wrapper.get('#quote-content-error').text()).toBe('Введіть текст, не довший за 5000 символів.')
         expect(wrapper.get('#quote-note-error').text()).toBe('Думка має бути не довшою за 2000 символів.')
         expect(wrapper.find('#quote-page-error').exists()).toBe(false)
       })

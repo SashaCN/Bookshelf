@@ -28,7 +28,7 @@ class UpdateQuoteRequest extends FormRequest
     {
         return [
             'type' => ['sometimes', 'required', Rule::enum(QuoteType::class)],
-            'content' => ['sometimes', 'required', 'string', 'max:2000'],
+            'content' => ['sometimes', 'required', 'string', 'max:5000'],
             'note' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             'is_favorite' => ['sometimes', 'boolean'],

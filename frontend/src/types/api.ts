@@ -122,6 +122,8 @@ export interface AddBookPayload {
   authors?: string[]
   published_year?: number | null
   total_pages?: number | null
+  /** Optional https link to the cover of a book added by hand. */
+  cover_url?: string | null
   status?: BookStatus
 }
 

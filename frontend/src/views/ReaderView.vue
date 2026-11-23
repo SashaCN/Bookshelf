@@ -25,7 +25,7 @@ import type { BookText, Chapter, Highlight, PositionPayload } from '@/types/read
 import '@/components/reader/reader.css'
 
 /** The longest quote the server keeps. */
-const MAX_QUOTE_LENGTH = 2000
+const MAX_QUOTE_LENGTH = 5000
 const TOAST_MS = 4000
 const FLASH_MS = 2500
 

@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+/** The version from package.json, injected by Vite (`define` in vite.config.ts), also under Vitest. */
+declare global {
+  const __APP_VERSION__: string
+}
+
 import 'vue-router'
 
 declare module 'vue-router' {

@@ -120,6 +120,7 @@ class AddBookToLibrary
             'page_count' => $data['total_pages'] ?? null,
             'published_year' => $data['published_year'] ?? null,
             'isbn_13' => $data['isbn_13'] ?? null,
+            'cover_url' => $data['cover_url'] ?? null,
             'source' => BookSource::Manual,
             'created_by' => $user->id,
         ]);

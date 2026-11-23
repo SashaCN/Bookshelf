@@ -7,8 +7,8 @@ const tabs = [
   { name: 'home', labelKey: 'tabs.reading', icon: 'M3 5.5c2.5-1 5.5-1 9 1v13c-3.5-2-6.5-2-9-1zM21 5.5c-2.5-1-5.5-1-9 1v13c3.5-2 6.5-2 9-1z' },
   { name: 'library', labelKey: 'tabs.library', icon: 'M4 4h4v15H4zM10 7h4v12h-4zM15.6 7.4l3.3-.9 2.8 11.4-3.3.9zM3 21h18' },
   { name: 'quotes', labelKey: 'tabs.quotes', icon: 'M10.7 9.5a3.2 3.2 0 1 1-3.2-3.2 3.2 3.2 0 0 1 3.2 3.2c0 4-2 6.7-5.7 8.2M19.7 9.5a3.2 3.2 0 1 1-3.2-3.2 3.2 3.2 0 0 1 3.2 3.2c0 4-2 6.7-5.7 8.2' },
-  { name: 'stats', labelKey: 'tabs.stats', icon: 'M5 20V11M12 20V4M19 20v-6M3 20h18' },
   { name: 'community', labelKey: 'social.tab', icon: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16.5 4.3a3.5 3.5 0 0 1 0 6.4M18 14.3c2.2.7 3.5 2.6 3.5 5.7' },
+  { name: 'stats', labelKey: 'tabs.stats', icon: 'M5 20V11M12 20V4M19 20v-6M3 20h18' },
 ] as const
 </script>
 

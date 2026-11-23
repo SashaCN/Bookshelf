@@ -28,9 +28,12 @@ export const libraryApi = {
   },
 }
 
+/** Spec 5.1.3: the server gives Open Library 3 s; this leaves it a second to answer "unavailable" before we give up. */
+export const CATALOG_SEARCH_TIMEOUT_MS = 4000
+
 export const catalogApi = {
   search: (query: string) =>
     http
-      .get<{ data: CatalogEntry[] }>(`/api/catalog/search?q=${encodeURIComponent(query)}`)
+      .get<{ data: CatalogEntry[] }>(`/api/catalog/search?q=${encodeURIComponent(query)}`, { timeoutMs: CATALOG_SEARCH_TIMEOUT_MS })
       .then((response) => response.data),
 }

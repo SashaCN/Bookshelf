@@ -41,6 +41,14 @@ it('updates the name and time zone', function () {
         ->timezone->toBe('America/New_York');
 });
 
+it('limits the name to 100 characters', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->patchJson('/api/me', ['name' => str_repeat('я', 101)])
+        ->assertUnprocessable()->assertJsonValidationErrors('name');
+    $this->actingAs($user)->patchJson('/api/me', ['name' => str_repeat('я', 100)])->assertOk();
+});
+
 it('rejects an unknown time zone', function () {
     $this->actingAs(User::factory()->create())
         ->patchJson('/api/me', ['timezone' => 'Mars/Olympus'])

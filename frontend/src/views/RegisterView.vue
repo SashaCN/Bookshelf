@@ -57,6 +57,7 @@ async function submit() {
         v-model="name"
         type="text"
         autocomplete="name"
+        :maxlength="100"
         :label="$t('auth.fields.name')"
         :error="fieldErrors.name"
       />

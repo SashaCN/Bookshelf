@@ -781,13 +781,13 @@ describe('ReaderView', () => {
 
     it('does not save a passage that is too long to be a quote', async () => {
       const list = chapters()
-      list[0]!.html = `<p>${'Слово '.repeat(500)}</p>`
-      list[0]!.characters = 2999
+      list[0]!.html = `<p>${'Слово '.repeat(1000)}</p>`
+      list[0]!.characters = 5999
       const { wrapper } = await mountReader({ chapterList: list })
 
-      await selectInChapter(wrapper, ['Слово', 0], ['Слово', 2900])
+      await selectInChapter(wrapper, ['Слово', 0], ['Слово', 5900])
 
-      expect(wrapper.get('[role="alert"]').text()).toBe('Цитата задовга: можна зберегти до 2000 символів.')
+      expect(wrapper.get('[role="alert"]').text()).toBe('Цитата задовга: можна зберегти до 5000 символів.')
       expect(buttonWithText(wrapper, 'Зберегти цитату').attributes('disabled')).toBeDefined()
 
       await buttonWithText(wrapper, 'Зберегти цитату').trigger('click')

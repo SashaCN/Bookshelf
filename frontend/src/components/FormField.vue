@@ -8,8 +8,9 @@ withDefaults(
     hint?: string
     error?: string
     minlength?: number
+    maxlength?: number
   }>(),
-  { type: 'text', autocomplete: undefined, hint: undefined, error: undefined, minlength: undefined },
+  { type: 'text', autocomplete: undefined, hint: undefined, error: undefined, minlength: undefined, maxlength: undefined },
 )
 
 const model = defineModel<string>({ required: true })
@@ -24,6 +25,7 @@ const model = defineModel<string>({ required: true })
       :type="type"
       :autocomplete="autocomplete"
       :minlength="minlength"
+      :maxlength="maxlength"
       :aria-invalid="error ? 'true' : undefined"
       :aria-describedby="error ? `${id}-error` : hint ? `${id}-hint` : undefined"
       required

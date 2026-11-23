@@ -14,7 +14,8 @@ import { useLibraryStore } from '@/stores/library'
 import { useQuotesStore } from '@/stores/quotes'
 import type { Quote, QuoteType } from '@/types/api'
 
-const MAX_LENGTH = 2000
+const MAX_LENGTH = 5000
+const NOTE_MAX_LENGTH = 2000
 /** The most pages the server accepts; the book's own page count is the tighter limit when it is known. */
 const MAX_PAGE = 20000
 /** The server's limits for tags. */
@@ -292,7 +293,7 @@ async function submit() {
         id="quote-note"
         v-model="form.note"
         rows="3"
-        :maxlength="MAX_LENGTH"
+        :maxlength="NOTE_MAX_LENGTH"
         :aria-invalid="fieldErrors.note ? 'true' : undefined"
         :aria-describedby="fieldErrors.note ? 'quote-note-error' : undefined"
         class="rounded-lg border border-line bg-surface px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger"

@@ -126,8 +126,12 @@ exit
   `bash /opt/bookshelf/rollout.sh ghcr.io/sashacn <sha коміту>`. Образ має бути вже завантажений на сервер або доступний у реєстрі
   після `docker login ghcr.io`. Міграції автоматично не відкочуються.
 - **Бекап бази:** `/opt/bookshelf/backup.sh` робить стиснений дамп у `/opt/bookshelf/backups` і видаляє дампи старші
-  за 14 днів. Щоб запускалось щоночі, виконайте `crontab -e` і додайте рядок `0 3 * * * /opt/bookshelf/backup.sh`.
-  Дампи лежать на тому ж диску, тож раз на якийсь час забирайте їх до себе: `scp -i ~/.ssh/bookshelf_deploy azureuser@<IP>:/opt/bookshelf/backups/* .`
+  за 14 днів. Щоденний запуск о 03:00 ставить `bootstrap-server.sh` (файл `/etc/cron.d/bookshelf-backup`, запуск від імені
+  користувача деплою, журнал у `/opt/bookshelf/backup.log`). Скрипт можна запускати повторно: він переписує цей файл і не
+  дублює завдання, тож на вже налаштованому сервері достатньо ще раз виконати `sudo bash bootstrap-server.sh <домен>`.
+  Дампи лежать на тому ж диску, що й база, тому їх треба копіювати за межі сервера (бекап на тій самій машині не рятує,
+  якщо вона зникне): раз на якийсь час забирайте їх до себе: `scp -i ~/.ssh/bookshelf_deploy azureuser@<IP>:/opt/bookshelf/backups/* .`
+  або налаштуйте копіювання в окреме сховище.
 - **Логи:** `docker compose --env-file production.env -f docker-compose.prod.yml logs -f app caddy`.
 
 ## Витрати й обмеження

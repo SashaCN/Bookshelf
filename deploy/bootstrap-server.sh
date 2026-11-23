@@ -4,7 +4,8 @@
 #   sudo bash bootstrap-server.sh <domain>
 #
 # It installs Docker, creates /opt/bookshelf and writes production.env with freshly generated
-# secrets. Running it again keeps an existing production.env untouched.
+# secrets, and installs a daily database backup job (cron, 03:00). Running it again keeps an existing
+# production.env untouched and does not duplicate the job.
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -52,6 +53,20 @@ EOF
     )
     chown "$DEPLOY_USER":"$DEPLOY_USER" "$SETTINGS"
 fi
+
+# Spec 5.2.1: a daily database backup. /etc/cron.d/bookshelf-backup is rewritten on every run, so running the
+# script again never adds a second job. The job runs as the deploy user (it is in the docker group); backup.sh itself
+# is copied to $APP_DIR by the deploy job and keeps the dumps of the last 14 days.
+echo "==> Installing the daily backup job (03:00, /etc/cron.d/bookshelf-backup)"
+apt-get install -y cron
+systemctl enable --now cron
+cat > /etc/cron.d/bookshelf-backup <<EOF
+# Managed by deploy/bootstrap-server.sh: edits are overwritten.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 3 * * * $DEPLOY_USER [ -f $APP_DIR/backup.sh ] && bash $APP_DIR/backup.sh >> $APP_DIR/backup.log 2>&1
+EOF
+chmod 644 /etc/cron.d/bookshelf-backup
 
 echo
 echo "Done. Log out and back in once, so that the docker group applies to your user."

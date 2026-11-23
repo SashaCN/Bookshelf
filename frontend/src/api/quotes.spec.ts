@@ -59,7 +59,7 @@ describe('quotesApi', () => {
 
     expect((await quotesApi.daily())?.id).toBe(4)
     expect(await quotesApi.daily()).toBeNull()
-    expect(http.get).toHaveBeenCalledWith('/api/quotes/daily')
+    expect(http.get).toHaveBeenCalledWith('/api/quotes/daily?favorite=1')
   })
 
   it('downloads the export with the filters that are set and without paging', async () => {

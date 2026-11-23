@@ -16,6 +16,7 @@ import { useAuthStore } from '@/stores/auth'
 /** Revoking the link at once can cancel the download in some browsers. */
 const REVOKE_DELAY_MS = 10_000
 const BIO_MAX = 280
+const appVersion = __APP_VERSION__
 
 const { t, te } = useI18n()
 const auth = useAuthStore()
@@ -226,7 +227,7 @@ function closeDelete() {
         v-model="name"
         type="text"
         required
-        maxlength="255"
+        maxlength="100"
         autocomplete="name"
         class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       >
@@ -408,4 +409,6 @@ function closeDelete() {
     @cancel="closeDelete"
     @confirm="deleteAccount"
   />
+
+  <p class="mt-8 text-center text-sm text-ink-muted" data-test="app-version">{{ $t('profile.version', { version: appVersion }) }}</p>
 </template>
