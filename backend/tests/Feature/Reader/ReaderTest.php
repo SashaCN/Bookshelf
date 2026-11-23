@@ -2,7 +2,9 @@
 
 use App\Models\ReaderDocument;
 use App\Models\User;
+use App\Models\UserBook;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -652,5 +654,97 @@ describe('table of contents', function () {
         $document = ReaderDocument::factory()->for($this->user)->create(['chapter_titles' => null]);
 
         $this->actingAs($this->user)->getJson("/api/reader/{$document->id}")->assertOk()->assertJsonPath('data.toc', []);
+    });
+});
+
+describe('linking to a library book', function () {
+    beforeEach(function () {
+        $this->owner = User::factory()->create();
+        $this->document = ReaderDocument::factory()->for($this->owner)->create();
+    });
+
+    it('links a document to my library book', function () {
+        $userBook = UserBook::factory()->for($this->owner)->create();
+
+        $this->actingAs($this->owner)->patchJson("/api/reader/{$this->document->id}", ['user_book_id' => $userBook->id])
+            ->assertOk()
+            ->assertJsonPath('data.user_book_id', $userBook->id)
+            ->assertJsonPath('data.user_book.id', $userBook->id)
+            ->assertJsonPath('data.user_book.title', $userBook->book->title);
+
+        expect($this->document->fresh()->user_book_id)->toBe($userBook->id);
+    });
+
+    it('unlinks a document', function () {
+        $userBook = UserBook::factory()->for($this->owner)->create();
+        $this->document->update(['user_book_id' => $userBook->id]);
+
+        $this->actingAs($this->owner)->patchJson("/api/reader/{$this->document->id}", ['user_book_id' => null])
+            ->assertOk()
+            ->assertJsonPath('data.user_book_id', null)
+            ->assertJsonPath('data.user_book', null);
+
+        expect($this->document->fresh()->user_book_id)->toBeNull();
+    });
+
+    it('rejects a foreign or missing library book as a validation error', function (bool $foreign) {
+        $id = $foreign ? UserBook::factory()->for(User::factory())->create()->id : 999999;
+
+        $this->actingAs($this->owner)->patchJson("/api/reader/{$this->document->id}", ['user_book_id' => $id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('user_book_id');
+
+        expect($this->document->fresh()->user_book_id)->toBeNull();
+    })->with([[true], [false]]);
+
+    it('answers 404 for somebody else\'s document', function () {
+        $mine = UserBook::factory()->for($this->owner)->create();
+        $stranger = User::factory()->create();
+
+        $this->actingAs($stranger)->patchJson("/api/reader/{$this->document->id}", ['user_book_id' => $mine->id])
+            ->assertNotFound();
+        $this->actingAs($stranger)->patchJson("/api/reader/{$this->document->id}", ['user_book_id' => null])
+            ->assertNotFound();
+    });
+
+    it('is unlinked when the library book is deleted', function () {
+        $userBook = UserBook::factory()->for($this->owner)->create();
+        $this->document->update(['user_book_id' => $userBook->id]);
+
+        $this->actingAs($this->owner)->deleteJson("/api/library/{$userBook->id}")->assertNoContent();
+
+        expect($this->document->fresh()->user_book_id)->toBeNull();
+        $this->actingAs($this->owner)->getJson('/api/reader')->assertJsonPath('data.0.user_book', null);
+    });
+
+    it('exposes the most recently read linked document on the library entry', function () {
+        $userBook = UserBook::factory()->for($this->owner)->create();
+
+        $this->actingAs($this->owner)->getJson("/api/library/{$userBook->id}")
+            ->assertOk()->assertJsonPath('data.reader_document_id', null);
+
+        ReaderDocument::factory()->for($this->owner)->create(['user_book_id' => $userBook->id, 'last_read_at' => now()->subDay()]);
+        $newer = ReaderDocument::factory()->for($this->owner)->create(['user_book_id' => $userBook->id, 'last_read_at' => now()]);
+
+        $this->actingAs($this->owner)->getJson("/api/library/{$userBook->id}")
+            ->assertJsonPath('data.reader_document_id', $newer->id);
+        $this->actingAs($this->owner)->getJson('/api/library')
+            ->assertJsonMissingPath('data.0.reader_document_id');
+    });
+
+    it('lists linked documents without a query per document', function () {
+        foreach (UserBook::factory()->for($this->owner)->count(5)->create() as $userBook) {
+            ReaderDocument::factory()->for($this->owner)->create(['user_book_id' => $userBook->id]);
+        }
+
+        $queries = 0;
+        DB::listen(function () use (&$queries) {
+            $queries++;
+        });
+
+        $this->actingAs($this->owner)->getJson('/api/reader')->assertOk()->assertJsonCount(6, 'data');
+
+        // session/auth lookups + reader_documents + user_books + books, independent of the number of documents
+        expect($queries)->toBeLessThan(8);
     });
 });

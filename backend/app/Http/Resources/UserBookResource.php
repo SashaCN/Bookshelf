@@ -12,12 +12,25 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class UserBookResource extends JsonResource
 {
+    private bool $withReaderDocument = false;
+
+    /**
+     * The linked EPUB is only looked up for a single entry, not in the list.
+     */
+    public function withReaderDocument(): static
+    {
+        $this->withReaderDocument = true;
+
+        return $this;
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
-        return [
+        /** @var array<string, mixed> $data */
+        $data = [
             'id' => $this->id,
             'status' => $this->status,
             // The statuses this entry may move to, so clients never duplicate the transition rules.
@@ -31,5 +44,11 @@ class UserBookResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
             'book' => new BookResource($this->whenLoaded('book')),
         ];
+
+        if ($this->withReaderDocument) {
+            $data['reader_document_id'] = $this->readerDocument?->id;
+        }
+
+        return $data;
     }
 }

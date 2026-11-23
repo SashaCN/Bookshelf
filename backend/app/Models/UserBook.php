@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'user_id',
@@ -77,6 +78,19 @@ class UserBook extends Model
     public function quotes(): HasMany
     {
         return $this->hasMany(Quote::class);
+    }
+
+    /**
+     * The linked EPUB the reader opened most recently (never-opened ones last, then the newest).
+     *
+     * @return HasOne<ReaderDocument, $this>
+     */
+    public function readerDocument(): HasOne
+    {
+        return $this->hasOne(ReaderDocument::class)
+            ->orderByRaw('last_read_at IS NULL')
+            ->orderByDesc('last_read_at')
+            ->orderByDesc('id');
     }
 
     public function progressPercent(): ?int

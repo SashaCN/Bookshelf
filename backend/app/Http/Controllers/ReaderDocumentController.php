@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Reader\ImportEpub;
+use App\Actions\Reader\LinkReaderDocument;
 use App\Http\Requests\StoreReaderDocumentRequest;
+use App\Http\Requests\UpdateReaderDocumentRequest;
 use App\Http\Requests\UpdateReaderPositionRequest;
 use App\Http\Resources\ReaderDocumentResource;
 use App\Models\ReaderDocument;
@@ -23,6 +25,7 @@ class ReaderDocumentController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         return ReaderDocumentResource::collection($request->user()->readerDocuments()
+            ->with('userBook.book')
             ->orderByRaw('last_read_at IS NULL')
             ->orderByDesc('last_read_at')
             ->orderByDesc('id')
@@ -63,6 +66,14 @@ class ReaderDocumentController extends Controller
         ]);
 
         return new ReaderDocumentResource($readerDocument);
+    }
+
+    /**
+     * Links the document to a library book, or unlinks it.
+     */
+    public function update(UpdateReaderDocumentRequest $request, ReaderDocument $readerDocument, LinkReaderDocument $link): ReaderDocumentResource
+    {
+        return new ReaderDocumentResource($link->handle($readerDocument, $request->validated('user_book_id')));
     }
 
     /**

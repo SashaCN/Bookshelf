@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'user_id',
+    'user_book_id',
     'title',
     'author',
     'path',
@@ -51,6 +52,16 @@ class ReaderDocument extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The library entry this document is linked to, if any. Only a link: nothing is synced between them.
+     *
+     * @return BelongsTo<UserBook, $this>
+     */
+    public function userBook(): BelongsTo
+    {
+        return $this->belongsTo(UserBook::class);
     }
 
     /**

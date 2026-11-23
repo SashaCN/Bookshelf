@@ -28,9 +28,17 @@ class ReaderDocumentResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // The list loads this for every document at once; a single document gets it here.
+        $this->resource->loadMissing('userBook.book');
+
         /** @var array<string, mixed> $data */
         $data = [
             'id' => $this->id,
+            'user_book_id' => $this->user_book_id,
+            'user_book' => $this->userBook === null ? null : [
+                'id' => $this->userBook->id,
+                'title' => $this->userBook->book->title,
+            ],
             'title' => $this->title,
             'author' => $this->author,
             'chapters_count' => $this->chapters_count,

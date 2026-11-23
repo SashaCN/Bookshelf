@@ -48,7 +48,7 @@ class UserBookController extends Controller
     {
         Gate::authorize('view', $userBook);
 
-        return new UserBookResource($userBook->load('book.authors'));
+        return (new UserBookResource($userBook->load('book.authors')))->withReaderDocument();
     }
 
     /**

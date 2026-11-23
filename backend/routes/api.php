@@ -45,7 +45,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->name('reader.store');
     Route::apiResource('reader', ReaderDocumentController::class)
         ->parameters(['reader' => 'readerDocument'])
-        ->except('update', 'store');
+        ->except('store');
     Route::put('/reader/{readerDocument}/position', [ReaderDocumentController::class, 'position'])->name('reader.position');
     Route::get('/reader/{readerDocument}/chapters/{n}', [ReaderDocumentController::class, 'chapter'])
         ->where('n', '[0-9]{1,6}')
