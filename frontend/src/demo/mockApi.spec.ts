@@ -23,6 +23,13 @@ describe('demo mock API', () => {
     expect((await authApi.me()).name).toBe('Демо-читач')
   })
 
+  it('hands over the reader data as a JSON file', async () => {
+    const data = JSON.parse(await (await authApi.exportData()).text())
+
+    expect(data).toMatchObject({ format: 'bookshelf-export', version: 1, profile: { email: 'demo@bookshelf.test' } })
+    expect(data.quotes.length).toBeGreaterThan(0)
+  })
+
   it('moves the bookmark, logs it and finishes the book at the last page', async () => {
     const before = (await libraryApi.get(2)).current_page
     const result = await libraryApi.progress(2, before + 10)

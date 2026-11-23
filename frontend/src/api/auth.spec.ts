@@ -3,7 +3,7 @@ import { authApi } from './auth'
 import { http } from './http'
 
 vi.mock('./http', () => ({
-  http: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn(), put: vi.fn() },
+  http: { download: vi.fn(), get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn(), put: vi.fn() },
 }))
 
 describe('authApi', () => {
@@ -17,6 +17,14 @@ describe('authApi', () => {
     await authApi.followersSeen()
 
     expect(http.post).toHaveBeenCalledWith('/api/me/followers-seen')
+  })
+
+  it('downloads all the reader data as a file', async () => {
+    const file = new Blob(['{}'])
+    vi.mocked(http.download).mockResolvedValue(file)
+
+    expect(await authApi.exportData()).toBe(file)
+    expect(http.download).toHaveBeenCalledWith('/api/me/export')
   })
 
   it('asks for a reset link and resets the password through Fortify', async () => {

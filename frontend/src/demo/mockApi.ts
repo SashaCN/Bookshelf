@@ -782,6 +782,18 @@ route('PATCH', '/api/me', (_p, _q, body) => {
   state.user.is_public = isPublic
   return ok(state.user)
 })
+// A small believable file; the real export carries the whole account.
+route('GET', '/api/me/export', () => {
+  const user = state.user
+  const data = {
+    format: 'bookshelf-export',
+    version: 1,
+    exported_at: new Date().toISOString(),
+    profile: { name: user.name, email: user.email, username: user.username, is_public: user.is_public, timezone: user.timezone },
+    quotes: state.quotes.map((q) => ({ id: q.id, type: q.type, content: q.content, note: q.note, page: q.page, is_favorite: q.is_favorite, tags: q.tags ?? [] })),
+  }
+  return new TextFile(`${JSON.stringify(data, null, 2)}\n`, 'application/json; charset=UTF-8')
+})
 route('POST', '/api/me/followers-seen', () => {
   state.user.new_followers_count = 0
   return null

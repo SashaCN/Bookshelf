@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { authApi } from '@/api/auth'
 import { ApiError } from '@/api/http'
 import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -442,6 +443,96 @@ describe('ProfileView', () => {
 
       expect(wrapper.get('[role="dialog"] button[type="submit"]').attributes('disabled')).toBeDefined()
       expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    })
+  })
+
+  describe('data export', () => {
+    function stubDownload() {
+      const createObjectURL = vi.fn().mockReturnValue('blob:export')
+      const revokeObjectURL = vi.fn()
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+      Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+      const downloads: { href: string; download: string }[] = []
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        downloads.push({ href: this.href, download: this.download })
+      })
+      return { createObjectURL, revokeObjectURL, downloads }
+    }
+
+    it('explains what is in the file and that EPUB files are not', () => {
+      const { wrapper } = mountView()
+
+      expect(wrapper.get('#profile-data-hint').text()).toContain('Самих EPUB-файлів у ньому немає.')
+      expect(wrapper.get('[data-test="export-data"]').text()).toBe('Завантажити мої дані')
+    })
+
+    it('sits above the danger zone', () => {
+      const { wrapper } = mountView()
+
+      const html = wrapper.html()
+      expect(html.indexOf('profile-data-title')).toBeLessThan(html.indexOf('profile-danger-title'))
+    })
+
+    it('downloads the file', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] })
+      const { createObjectURL, revokeObjectURL, downloads } = stubDownload()
+      const file = new Blob(['{}'])
+      vi.spyOn(authApi, 'exportData').mockResolvedValue(file)
+      const { wrapper } = mountView()
+
+      await wrapper.get('[data-test="export-data"]').trigger('click')
+      await flushPromises()
+
+      expect(createObjectURL).toHaveBeenCalledWith(file)
+      expect(downloads).toHaveLength(1)
+      expect(downloads[0]?.download).toMatch(/^bookshelf-export-\d{4}-\d{2}-\d{2}\.json$/)
+      expect(document.querySelector('a[download]')).toBeNull()
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+      vi.runAllTimers()
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:export')
+      vi.useRealTimers()
+    })
+
+    it('disables the button while the file is being prepared', async () => {
+      stubDownload()
+      let finish: (file: Blob) => void = () => undefined
+      vi.spyOn(authApi, 'exportData').mockReturnValue(new Promise((resolve) => (finish = resolve)))
+      const { wrapper } = mountView()
+
+      await wrapper.get('[data-test="export-data"]').trigger('click')
+
+      expect(wrapper.get('[data-test="export-data"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.get('[data-test="export-data"]').text()).toBe('Готуємо файл…')
+
+      finish(new Blob([]))
+      await flushPromises()
+
+      expect(wrapper.get('[data-test="export-data"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('shows an error notice when the download fails', async () => {
+      const { downloads } = stubDownload()
+      vi.spyOn(authApi, 'exportData').mockRejectedValue(new ApiError(500, null))
+      const { wrapper } = mountView()
+
+      await wrapper.get('[data-test="export-data"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+      expect(downloads).toEqual([])
+      expect(wrapper.get('[data-test="export-data"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('says the limit is per hour when it is reached', async () => {
+      stubDownload()
+      vi.spyOn(authApi, 'exportData').mockRejectedValue(new ApiError(429, null))
+      const { wrapper } = mountView()
+
+      await wrapper.get('[data-test="export-data"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('тричі на годину')
     })
   })
 })
