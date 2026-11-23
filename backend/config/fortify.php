@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ThrottleForgotPassword;
 use Laravel\Fortify\Features;
 
 /*
@@ -30,7 +31,7 @@ return [
 
     'domain' => null,
 
-    'middleware' => ['web'],
+    'middleware' => ['web', ThrottleForgotPassword::class],
 
     'limiters' => [
         'login' => 'login',
@@ -40,6 +41,7 @@ return [
 
     'features' => [
         Features::registration(),
+        Features::resetPasswords(),
         Features::updatePasswords(),
     ],
 ];
