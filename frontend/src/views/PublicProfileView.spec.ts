@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { socialApi } from '@/api/social'
 import { makeProfile, makeQuote } from '@/test/fixtures'
@@ -120,6 +120,79 @@ describe('PublicProfileView', () => {
 
     expect(buttonWithText(wrapper, 'Підписатися')).toBeUndefined()
     expect(buttonWithText(wrapper, 'Відписатися')).toBeUndefined()
+  })
+
+  describe('sharing the own profile', () => {
+    const url = `${location.origin}/u/olena`
+
+    function stubNavigator(share?: unknown, writeText?: unknown) {
+      Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+      Object.defineProperty(navigator, 'clipboard', { value: writeText ? { writeText } : undefined, configurable: true })
+    }
+
+    afterEach(() => {
+      vi.useRealTimers()
+      stubNavigator()
+    })
+
+    it('uses the share sheet when the browser has one', async () => {
+      const share = vi.fn().mockResolvedValue(undefined)
+      stubNavigator(share)
+      const { wrapper } = await mountView(makeProfile({ is_me: true }))
+
+      await buttonWithText(wrapper, 'Поділитися профілем')!.trigger('click')
+      await flushPromises()
+
+      expect(share).toHaveBeenCalledWith({ title: 'Олена', url })
+      expect(wrapper.find('input[readonly]').exists()).toBe(false)
+    })
+
+    it('ignores a closed share sheet', async () => {
+      const writeText = vi.fn()
+      stubNavigator(vi.fn().mockRejectedValue(new DOMException('closed', 'AbortError')), writeText)
+      const { wrapper } = await mountView(makeProfile({ is_me: true }))
+
+      await buttonWithText(wrapper, 'Поділитися профілем')!.trigger('click')
+      await flushPromises()
+
+      expect(writeText).not.toHaveBeenCalled()
+      expect(wrapper.find('input[readonly]').exists()).toBe(false)
+      expect(wrapper.get('[role="status"]').text()).toBe('')
+    })
+
+    it('copies the link and shows a status that goes away', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      stubNavigator(undefined, writeText)
+      const { wrapper } = await mountView(makeProfile({ is_me: true }))
+      vi.useFakeTimers()
+
+      await buttonWithText(wrapper, 'Поділитися профілем')!.trigger('click')
+      await flushPromises()
+
+      expect(writeText).toHaveBeenCalledWith(url)
+      expect(wrapper.get('[role="status"]').text()).toBe('Посилання скопійовано')
+
+      vi.advanceTimersByTime(2100)
+      await flushPromises()
+      expect(wrapper.get('[role="status"]').text()).toBe('')
+    })
+
+    it('shows the link in a read-only field when nothing else works', async () => {
+      stubNavigator(undefined, vi.fn().mockRejectedValue(new Error('denied')))
+      const { wrapper } = await mountView(makeProfile({ is_me: true }))
+
+      await buttonWithText(wrapper, 'Поділитися профілем')!.trigger('click')
+      await flushPromises()
+
+      const input = wrapper.get('input[readonly]')
+      expect((input.element as HTMLInputElement).value).toBe(url)
+    })
+
+    it('is not shown on another reader profile', async () => {
+      const { wrapper } = await mountView(makeProfile({ is_me: false }))
+
+      expect(buttonWithText(wrapper, 'Поділитися профілем')).toBeUndefined()
+    })
   })
 
   it('loads more quotes', async () => {

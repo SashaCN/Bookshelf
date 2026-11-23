@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import LoadMore from '@/components/LoadMore.vue'
@@ -57,6 +57,40 @@ async function toggleFollow() {
     busy.value = false
   }
 }
+
+const STATUS_MS = 2000
+const copied = ref(false)
+const showUrl = ref(false)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
+const profileUrl = computed(() => `${location.origin}/u/${encodeURIComponent(props.username)}`)
+
+/** The share sheet where the browser has one, the clipboard next, a copyable field as the last resort. */
+async function shareProfile() {
+  const url = profileUrl.value
+  showUrl.value = false
+
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ title: social.profile?.name ?? props.username, url })
+      return
+    } catch (e) {
+      // Closing the share sheet is the reader's choice, not a failure.
+      if (e instanceof DOMException && e.name === 'AbortError') return
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(url)
+    copied.value = true
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => (copied.value = false), STATUS_MS)
+  } catch {
+    showUrl.value = true
+  }
+}
+
+onBeforeUnmount(() => clearTimeout(copiedTimer))
 
 watch(() => props.username, load, { immediate: true })
 </script>
@@ -125,6 +159,22 @@ watch(() => props.username, load, { immediate: true })
     >
       {{ social.profile.is_following ? $t('social.profile.unfollow') : $t('social.profile.follow') }}
     </button>
+
+    <div v-if="auth.isAuthenticated && social.profile.is_me" class="mb-6">
+      <button type="button" class="min-h-11 w-full rounded-lg border border-line bg-surface px-4 font-semibold" @click="shareProfile">
+        {{ $t('social.profile.share') }}
+      </button>
+      <p role="status" class="mt-2 text-center text-sm text-ink-muted">{{ copied ? $t('social.profile.linkCopied') : '' }}</p>
+      <input
+        v-if="showUrl"
+        type="text"
+        readonly
+        :value="profileUrl"
+        :aria-label="$t('social.profile.copyHint')"
+        class="mt-2 min-h-11 w-full rounded-lg border border-line bg-surface px-3"
+        @focus="($event.target as HTMLInputElement).select()"
+      >
+    </div>
 
     <h2 class="mb-3 font-display text-xl font-semibold">{{ $t('social.profile.quotes') }}</h2>
 
