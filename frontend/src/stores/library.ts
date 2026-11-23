@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { libraryApi } from '@/api/library'
+import { searchKey } from '@/utils/librarySearch'
 import type { AddBookPayload, BookStatus, ProgressResult, UpdateBookPayload, UserBook } from '@/types/api'
 
 export const useLibraryStore = defineStore('library', () => {
@@ -17,6 +18,15 @@ export const useLibraryStore = defineStore('library', () => {
       groups[item.status].push(item)
     }
     return groups
+  })
+
+  /** Normalized search text per entry id; rebuilt only when the library itself changes, not per keystroke. */
+  const searchKeys = computed(() => {
+    const keys = new Map<number, string>()
+    for (const item of items.value) {
+      keys.set(item.id, searchKey(item))
+    }
+    return keys
   })
 
   /** For pickers: alphabetical, where `items` follows recent activity. */
@@ -158,5 +168,5 @@ export const useLibraryStore = defineStore('library', () => {
     loading.value = false
   }
 
-  return { items, loaded, loading, byStatus, byTitle, find, upsert, load, add, update, remove, reread, setProgress, reset }
+  return { items, loaded, loading, byStatus, byTitle, searchKeys, find, upsert, load, add, update, remove, reread, setProgress, reset }
 })
