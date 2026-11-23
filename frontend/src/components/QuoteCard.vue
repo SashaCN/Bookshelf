@@ -148,7 +148,7 @@ async function remove() {
         >
           <path d="M12 20.5s-8.5-5.1-8.5-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8.5 2.5c0 5.9-8.5 11-8.5 11z" />
         </svg>
-        <span aria-hidden="true">{{ likesCount }}</span>
+        <span v-if="likesCount > 0" aria-hidden="true">{{ likesCount }}</span>
       </button>
       <p v-else class="text-sm text-ink-muted" data-test="likes-count">{{ likesText }}</p>
     </div>

@@ -215,6 +215,15 @@ describe('QuoteCard', () => {
       expect(wrapper.get('button[aria-pressed]').attributes('aria-pressed')).toBe('true')
     })
 
+    it('shows the number next to the heart only when there are likes', () => {
+      const none = mountReadonly(makeQuote({ likes_count: 0, liked_by_me: false })).wrapper.get('button[aria-pressed]')
+      const some = mountReadonly(makeQuote({ likes_count: 3, liked_by_me: false })).wrapper.get('button[aria-pressed]')
+
+      expect(none.text()).toBe('')
+      expect(none.attributes('aria-label')).toBe('Вподобати. 0 вподобань')
+      expect(some.text()).toBe('3')
+    })
+
     it('takes a like back', async () => {
       vi.mocked(socialApi.unlike).mockResolvedValue(null)
       const { wrapper, reactiveQuote } = mountReadonly(makeQuote({ likes_count: 5, liked_by_me: true }))
