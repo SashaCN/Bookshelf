@@ -185,6 +185,25 @@ describe('demo mock API', () => {
     expect((await readerApi.link(doc.id, null)).user_book).toBeNull()
   })
 
+  it('keeps one bookmark per chapter of the sample document', async () => {
+    const [doc] = await readerApi.list()
+    expect(await readerApi.bookmarks(doc.id)).toEqual([])
+
+    const second = await readerApi.saveBookmark(doc.id, 2, 'later')
+    await readerApi.saveBookmark(doc.id, 0)
+    expect(second).toMatchObject({ chapter: 2, note: 'later', chapter_title: expect.any(String) })
+    expect((await readerApi.saveBookmark(doc.id, 2, 'changed')).id).toBe(second.id)
+    expect((await readerApi.saveBookmark(doc.id, 2)).note).toBe('changed')
+    expect((await readerApi.bookmarks(doc.id)).map((b) => b.chapter)).toEqual([0, 2])
+
+    await expect(readerApi.saveBookmark(doc.id, 3)).rejects.toMatchObject({ status: 422 })
+    await expect(readerApi.saveBookmark(doc.id, 0, 'x'.repeat(201))).rejects.toMatchObject({ status: 422 })
+
+    await readerApi.removeBookmark(doc.id, second.id)
+    expect((await readerApi.bookmarks(doc.id)).map((b) => b.chapter)).toEqual([0])
+    await expect(readerApi.removeBookmark(doc.id, second.id)).rejects.toMatchObject({ status: 404 })
+  })
+
   it('serves the sample document, saves the position and refuses uploads', async () => {
     const [doc] = await readerApi.list()
     expect(doc.chapters_count).toBe(3)

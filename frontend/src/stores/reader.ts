@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { readerApi } from '@/api/reader'
-import type { ReaderChapter, ReaderDocument, ReaderPosition } from '@/types/api'
+import type { ReaderBookmark, ReaderChapter, ReaderDocument, ReaderPosition } from '@/types/api'
 
 export const useReaderStore = defineStore('reader', () => {
   /** The uploaded books, newest first (the server's order). */
@@ -48,10 +48,22 @@ export const useReaderStore = defineStore('reader', () => {
     return readerApi.chapter(id, index)
   }
 
+  function bookmarks(id: number): Promise<ReaderBookmark[]> {
+    return readerApi.bookmarks(id)
+  }
+
+  function saveBookmark(id: number, chapterIndex: number, note?: string | null): Promise<ReaderBookmark> {
+    return readerApi.saveBookmark(id, chapterIndex, note)
+  }
+
+  function removeBookmark(id: number, bookmarkId: number): Promise<null> {
+    return readerApi.removeBookmark(id, bookmarkId)
+  }
+
   function reset(): void {
     items.value = []
     loaded.value = false
   }
 
-  return { items, loaded, load, get, upload, remove, savePosition, link, chapter, reset }
+  return { items, loaded, load, get, upload, remove, savePosition, link, chapter, bookmarks, saveBookmark, removeBookmark, reset }
 })

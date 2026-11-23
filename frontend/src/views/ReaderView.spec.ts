@@ -2,17 +2,19 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/http'
 import { readerApi } from '@/api/reader'
-import { makeReaderChapter, makeReaderDoc } from '@/test/readerFixtures'
+import { makeReaderBookmark, makeReaderChapter, makeReaderDoc } from '@/test/readerFixtures'
+import type { ReaderBookmark } from '@/types/api'
 import { createTestEnvironment } from '@/test/utils'
 import ReaderView from './ReaderView.vue'
 
 vi.mock('@/api/reader', () => ({
-  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), link: vi.fn(), chapter: vi.fn() },
+  readerApi: { list: vi.fn(), get: vi.fn(), upload: vi.fn(), remove: vi.fn(), savePosition: vi.fn(), link: vi.fn(), chapter: vi.fn(), bookmarks: vi.fn(), saveBookmark: vi.fn(), removeBookmark: vi.fn() },
 }))
 
 const mounted: ReturnType<typeof mount>[] = []
 
-async function mountView(chapter = 2, toc?: { index: number; title: string }[]) {
+async function mountView(chapter = 2, toc?: { index: number; title: string }[], marks: ReaderBookmark[] = []) {
+  vi.mocked(readerApi.bookmarks).mockResolvedValue(marks)
   vi.mocked(readerApi.get).mockResolvedValue(makeReaderDoc({ id: 4, position: { chapter, fraction: 0 }, toc }))
   vi.mocked(readerApi.chapter).mockImplementation(async (_id, index) =>
     makeReaderChapter({ index, html: `<p>Розділ-${index}</p>` }),
@@ -27,6 +29,14 @@ async function mountView(chapter = 2, toc?: { index: number; title: string }[]) 
 
 function buttonWithLabel(wrapper: ReturnType<typeof mount>, label: string) {
   return wrapper.get(`button[aria-label="${label}"]`)
+}
+
+function tocButton(wrapper: ReturnType<typeof mount>) {
+  return wrapper.findAll('button[aria-haspopup="dialog"]').find((b) => b.text() === 'Зміст')
+}
+
+function marksButton(wrapper: ReturnType<typeof mount>) {
+  return wrapper.findAll('button[aria-haspopup="dialog"]').find((b) => b.text() === 'Закладки')!
 }
 
 describe('ReaderView', () => {
@@ -283,14 +293,14 @@ describe('ReaderView', () => {
     ]
 
     it('hides the button when there is no toc', async () => {
-      expect((await mountView(2)).find('button[aria-haspopup="dialog"]').exists()).toBe(false)
-      expect((await mountView(2, [])).find('button[aria-haspopup="dialog"]').exists()).toBe(false)
+      expect(tocButton(await mountView(2))).toBeUndefined()
+      expect(tocButton(await mountView(2, []))).toBeUndefined()
     })
 
     it('opens the list, moves focus to the current entry and marks it', async () => {
       const wrapper = await mountView(3, toc)
 
-      await wrapper.get('button[aria-haspopup="dialog"]').trigger('click')
+      await tocButton(wrapper)!.trigger('click')
       await flushPromises()
 
       const items = wrapper.findAll('[role="dialog"] button')
@@ -303,7 +313,7 @@ describe('ReaderView', () => {
     it('jumps to the chapter and saves the position, debounced', async () => {
       const wrapper = await mountView(2, toc)
 
-      await wrapper.get('button[aria-haspopup="dialog"]').trigger('click')
+      await tocButton(wrapper)!.trigger('click')
       await flushPromises()
       await wrapper.findAll('[role="dialog"] button')[2].trigger('click')
       await flushPromises()
@@ -319,7 +329,154 @@ describe('ReaderView', () => {
 
     it('closes on Escape and returns focus to the button', async () => {
       const wrapper = await mountView(2, toc)
-      const button = wrapper.get('button[aria-haspopup="dialog"]')
+      const button = tocButton(wrapper)!
+
+      await button.trigger('click')
+      await flushPromises()
+      await wrapper.get('[role="dialog"]').trigger('keydown', { key: 'Escape' })
+      await flushPromises()
+
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(document.activeElement).toBe(button.element)
+    })
+  })
+
+  describe('bookmarks', () => {
+    const marks = [
+      makeReaderBookmark({ id: 11, chapter: 1, chapter_title: 'Ранок', note: 'Повернутися' }),
+      makeReaderBookmark({ id: 12, chapter: 5 }),
+    ]
+
+    it('loads the bookmarks once and shows the state for the current chapter', async () => {
+      const wrapper = await mountView(1, undefined, marks)
+
+      expect(readerApi.bookmarks).toHaveBeenCalledTimes(1)
+      const toggle = buttonWithLabel(wrapper, 'Прибрати закладку')
+      expect(toggle.attributes('aria-pressed')).toBe('true')
+
+      await buttonWithLabel(wrapper, 'Наступний розділ').trigger('click')
+      await flushPromises()
+
+      expect(buttonWithLabel(wrapper, 'Додати закладку').attributes('aria-pressed')).toBe('false')
+      expect(readerApi.bookmarks).toHaveBeenCalledTimes(1)
+    })
+
+    it('adds a bookmark at once and keeps the server\'s copy', async () => {
+      const wrapper = await mountView(3)
+      let resolve!: (b: ReaderBookmark) => void
+      vi.mocked(readerApi.saveBookmark).mockReturnValue(new Promise((r) => (resolve = r)))
+
+      await buttonWithLabel(wrapper, 'Додати закладку').trigger('click')
+      expect(readerApi.saveBookmark).toHaveBeenCalledWith(4, 3, undefined)
+      expect(buttonWithLabel(wrapper, 'Прибрати закладку').attributes('aria-pressed')).toBe('true')
+
+      resolve(makeReaderBookmark({ id: 40, chapter: 3 }))
+      await flushPromises()
+      await marksButton(wrapper).trigger('click')
+      await flushPromises()
+
+      expect(wrapper.findAll('[role="dialog"] li')).toHaveLength(1)
+      expect(wrapper.get('[role="dialog"]').text()).toContain('Розділ 4')
+    })
+
+    it('removes a bookmark at once', async () => {
+      vi.mocked(readerApi.removeBookmark).mockResolvedValue(null)
+      const wrapper = await mountView(1, undefined, marks)
+
+      await buttonWithLabel(wrapper, 'Прибрати закладку').trigger('click')
+      expect(buttonWithLabel(wrapper, 'Додати закладку').attributes('aria-pressed')).toBe('false')
+      await flushPromises()
+
+      expect(readerApi.removeBookmark).toHaveBeenCalledWith(4, 11)
+    })
+
+    it('rolls back when adding fails', async () => {
+      vi.mocked(readerApi.saveBookmark).mockRejectedValue(new ApiError(500, null))
+      const wrapper = await mountView(3)
+
+      await buttonWithLabel(wrapper, 'Додати закладку').trigger('click')
+      await flushPromises()
+
+      expect(buttonWithLabel(wrapper, 'Додати закладку').attributes('aria-pressed')).toBe('false')
+    })
+
+    it('rolls back when removing fails', async () => {
+      vi.mocked(readerApi.removeBookmark).mockRejectedValue(new ApiError(500, null))
+      const wrapper = await mountView(1, undefined, marks)
+
+      await buttonWithLabel(wrapper, 'Прибрати закладку').trigger('click')
+      await flushPromises()
+
+      expect(buttonWithLabel(wrapper, 'Прибрати закладку').attributes('aria-pressed')).toBe('true')
+    })
+
+    it('lists bookmarks with the title or the chapter number and the note, focus inside', async () => {
+      const wrapper = await mountView(2, undefined, marks)
+
+      await marksButton(wrapper).trigger('click')
+      await flushPromises()
+
+      const items = wrapper.findAll('[role="dialog"] li')
+      expect(items).toHaveLength(2)
+      expect(items[0].text()).toContain('Ранок')
+      expect(items[0].text()).toContain('Повернутися')
+      expect(items[1].text()).toContain('Розділ 6')
+      expect(wrapper.get('[role="dialog"]').element.contains(document.activeElement)).toBe(true)
+    })
+
+    it('shows a hint when there are no bookmarks', async () => {
+      const wrapper = await mountView(2)
+
+      await marksButton(wrapper).trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="dialog"]').text()).toContain('Закладок поки немає')
+    })
+
+    it('jumps to the bookmarked chapter and closes the panel', async () => {
+      const wrapper = await mountView(2, undefined, marks)
+
+      await marksButton(wrapper).trigger('click')
+      await flushPromises()
+      await wrapper.findAll('[role="dialog"] li')[1].get('button').trigger('click')
+      await flushPromises()
+
+      expect(readerApi.chapter).toHaveBeenLastCalledWith(4, 5)
+      expect(wrapper.get('iframe').attributes('srcdoc')).toContain('Розділ-5')
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    })
+
+    it('deletes a bookmark from the panel', async () => {
+      vi.mocked(readerApi.removeBookmark).mockResolvedValue(null)
+      const wrapper = await mountView(2, undefined, marks)
+
+      await marksButton(wrapper).trigger('click')
+      await flushPromises()
+      await wrapper.get('button[aria-label="Видалити закладку «Ранок»"]').trigger('click')
+      await flushPromises()
+
+      expect(readerApi.removeBookmark).toHaveBeenCalledWith(4, 11)
+      expect(wrapper.findAll('[role="dialog"] li')).toHaveLength(1)
+    })
+
+    it('saves an edited note', async () => {
+      vi.mocked(readerApi.saveBookmark).mockResolvedValue({ ...marks[0], note: 'Нове' })
+      const wrapper = await mountView(2, undefined, marks)
+
+      await marksButton(wrapper).trigger('click')
+      await flushPromises()
+      const item = wrapper.findAll('[role="dialog"] li')[0]
+      await item.get('input').setValue('Нове')
+      await item.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(readerApi.saveBookmark).toHaveBeenCalledWith(4, 1, 'Нове')
+      expect(wrapper.findAll('[role="dialog"] li')[0].text()).toContain('Нове')
+    })
+
+    it('closes on Escape and returns focus to the button', async () => {
+      const wrapper = await mountView(2, undefined, marks)
+      const button = marksButton(wrapper)
 
       await button.trigger('click')
       await flushPromises()

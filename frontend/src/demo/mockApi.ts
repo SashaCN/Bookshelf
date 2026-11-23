@@ -15,6 +15,7 @@ import type {
   Quote,
   QuoteType,
   QuoteVisibility,
+  ReaderBookmark,
   ReaderChapter,
   ReaderDocument,
   ReadingLog,
@@ -45,6 +46,8 @@ interface State {
   /** Ids of the quotes the demo user liked. */
   liked: number[]
   documents: StoredDocument[]
+  /** Bookmarks of the sample document, by document id. */
+  bookmarks: Record<number, ReaderBookmark[]>
 }
 
 /** A document as stored: the linked book's title is looked up when it is shown. */
@@ -221,6 +224,7 @@ function seed(): State {
         toc: demoBook.chapters.map((c, index) => ({ index, title: c.title })),
       },
     ],
+    bookmarks: {},
   }
 }
 
@@ -913,6 +917,7 @@ route('PATCH', '/api/reader/(\\d+)', ([id], _q, body) => {
 route('DELETE', '/api/reader/(\\d+)', ([id]) => {
   const doc = findDocument(id)
   state.documents = state.documents.filter((d) => d.id !== doc.id)
+  delete state.bookmarks[doc.id]
   return null
 })
 route('PUT', '/api/reader/(\\d+)/position', ([id], _q, body) => {
@@ -932,6 +937,40 @@ route('GET', '/api/reader/(\\d+)/chapters/(\\d+)', ([id, n]) => {
   if (!chapter) throw new HttpError(404, { message: 'Not found' })
   const html = `<h1>${chapter.title}</h1>${chapter.paragraphs.map((p) => `<p>${p}</p>`).join('')}`
   return ok({ index: Number(n), count: doc.chapters_count, title: chapter.title, html } satisfies ReaderChapter)
+})
+
+const sortedBookmarks = (doc: StoredDocument) => [...(state.bookmarks[doc.id] ?? [])].sort((a, b) => a.chapter - b.chapter)
+
+route('GET', '/api/reader/(\\d+)/bookmarks', ([id]) => ok(sortedBookmarks(findDocument(id))))
+route('POST', '/api/reader/(\\d+)/bookmarks', ([id], _q, body) => {
+  const doc = findDocument(id)
+  const chapter = Number(body.chapter)
+  if (!Number.isInteger(chapter) || chapter < 0 || chapter >= doc.chapters_count) invalid('chapter', 'validation.invalid')
+  const note = typeof body.note === 'string' && body.note !== '' ? body.note : null
+  if (note !== null && note.length > 200) invalid('note', 'validation.invalid')
+
+  const list = (state.bookmarks[doc.id] ??= [])
+  const existing = list.find((b) => b.chapter === chapter)
+  if (existing) {
+    if ('note' in body) existing.note = note
+    return ok(existing)
+  }
+  const created: ReaderBookmark = {
+    id: nextId(),
+    chapter,
+    chapter_title: doc.toc?.find((t) => t.index === chapter)?.title ?? null,
+    note,
+    created_at: new Date().toISOString(),
+  }
+  list.push(created)
+  return ok(created)
+})
+route('DELETE', '/api/reader/(\\d+)/bookmarks/(\\d+)', ([id, bookmarkId]) => {
+  const doc = findDocument(id)
+  const list = state.bookmarks[doc.id] ?? []
+  if (!list.some((b) => b.id === Number(bookmarkId))) throw new HttpError(404, { message: 'Not found' })
+  state.bookmarks[doc.id] = list.filter((b) => b.id !== Number(bookmarkId))
+  return null
 })
 
 route('GET', '/api/stats/summary', () => ok(summary()))

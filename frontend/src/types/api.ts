@@ -277,6 +277,15 @@ export interface ReaderDocument {
   toc?: ReaderTocEntry[]
 }
 
+/** A bookmark of a chapter (scroll inside a chapter is not tracked), with an optional short note. */
+export interface ReaderBookmark {
+  id: number
+  chapter: number
+  chapter_title: string | null
+  note: string | null
+  created_at: string
+}
+
 /** One chapter; `html` is untrusted markup and must only ever be shown in a sandboxed iframe. */
 export interface ReaderChapter {
   index: number

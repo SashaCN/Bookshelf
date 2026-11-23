@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeReaderChapter, makeReaderDoc } from '@/test/readerFixtures'
+import { makeReaderBookmark, makeReaderChapter, makeReaderDoc } from '@/test/readerFixtures'
 import { http } from './http'
 import { readerApi } from './reader'
 
@@ -51,5 +51,23 @@ describe('readerApi', () => {
     expect(http.patch).toHaveBeenNthCalledWith(1, '/api/reader/3', { user_book_id: 7 })
     expect(http.patch).toHaveBeenNthCalledWith(2, '/api/reader/3', { user_book_id: null })
     expect(http.get).toHaveBeenNthCalledWith(2, '/api/reader/3/chapters/2')
+  })
+
+  it('lists, saves and removes bookmarks', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: [makeReaderBookmark({ id: 8 })] })
+    vi.mocked(http.post).mockResolvedValue({ data: makeReaderBookmark({ id: 9, chapter: 2 }) })
+    vi.mocked(http.delete).mockResolvedValue(null)
+
+    expect((await readerApi.bookmarks(3))[0].id).toBe(8)
+    expect((await readerApi.saveBookmark(3, 2)).id).toBe(9)
+    await readerApi.saveBookmark(3, 2, 'note')
+    await readerApi.saveBookmark(3, 2, null)
+    await readerApi.removeBookmark(3, 9)
+
+    expect(http.get).toHaveBeenCalledWith('/api/reader/3/bookmarks')
+    expect(http.post).toHaveBeenNthCalledWith(1, '/api/reader/3/bookmarks', { chapter: 2 })
+    expect(http.post).toHaveBeenNthCalledWith(2, '/api/reader/3/bookmarks', { chapter: 2, note: 'note' })
+    expect(http.post).toHaveBeenNthCalledWith(3, '/api/reader/3/bookmarks', { chapter: 2, note: null })
+    expect(http.delete).toHaveBeenCalledWith('/api/reader/3/bookmarks/9')
   })
 })

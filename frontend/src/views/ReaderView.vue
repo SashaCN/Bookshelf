@@ -3,8 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
+import { useI18n } from 'vue-i18n'
 import { useReaderStore } from '@/stores/reader'
-import type { ReaderChapter, ReaderDocument } from '@/types/api'
+import type { ReaderBookmark, ReaderChapter, ReaderDocument } from '@/types/api'
 
 const props = defineProps<{ id: number }>()
 
@@ -16,6 +17,7 @@ const FONT_DEFAULT = 18
 
 const reader = useReaderStore()
 const errorMessage = useApiErrorMessage()
+const { t } = useI18n()
 
 const doc = ref<ReaderDocument | null>(null)
 const chapter = ref<ReaderChapter | null>(null)
@@ -30,6 +32,18 @@ const nextButton = ref<HTMLButtonElement | null>(null)
 const tocButton = ref<HTMLButtonElement | null>(null)
 const tocPanel = ref<HTMLElement | null>(null)
 const tocOpen = ref(false)
+const marksButton = ref<HTMLButtonElement | null>(null)
+const marksPanel = ref<HTMLElement | null>(null)
+const marksOpen = ref(false)
+/** Bookmarks are loaded once per book; null until then (or when loading failed). */
+const bookmarks = ref<ReaderBookmark[] | null>(null)
+const bookmarksError = ref('')
+const bookmarkBusy = ref(false)
+const noteDrafts = ref<Record<number, string>>({})
+const noteSaving = ref<number | null>(null)
+let nextTempId = -1
+
+const currentBookmark = computed(() => bookmarks.value?.find((b) => b.chapter === index.value) ?? null)
 
 const toc = computed(() => doc.value?.toc ?? [])
 /** The last table-of-contents entry at or before the current chapter: chapters without a title belong to the one before. */
@@ -132,6 +146,7 @@ async function go(step: number) {
 }
 
 async function openToc() {
+  closeMarks(false)
   tocOpen.value = true
   await nextTick()
   const current = tocPanel.value?.querySelector<HTMLElement>('[aria-current="true"]')
@@ -146,9 +161,105 @@ function closeToc() {
 async function jumpTo(chapterIndex: number) {
   if (loadingChapter.value) return
   closeToc()
+  closeMarks(false)
   if (chapterIndex === index.value || chapterIndex < 0 || chapterIndex >= count.value) return
   await openChapter(chapterIndex)
   if (index.value === chapterIndex) scheduleSave()
+}
+
+function bookmarkTitle(bookmark: ReaderBookmark): string {
+  return bookmark.chapter_title ?? t('reader.bookmarks.chapterN', { n: bookmark.chapter + 1 })
+}
+
+function setBookmarks(list: ReaderBookmark[]) {
+  bookmarks.value = [...list].sort((a, b) => a.chapter - b.chapter)
+}
+
+async function loadBookmarks() {
+  bookmarksError.value = ''
+  try {
+    const list = await reader.bookmarks(props.id)
+    setBookmarks(list)
+    noteDrafts.value = Object.fromEntries(list.map((b) => [b.id, b.note ?? '']))
+  } catch (e) {
+    bookmarksError.value = errorMessage(e)
+  }
+}
+
+/** Optimistic: the list changes at once and is put back when the server refuses. */
+async function toggleBookmark() {
+  const before = bookmarks.value
+  if (!before || bookmarkBusy.value) return
+  const chapterIndex = index.value
+  const existing = before.find((b) => b.chapter === chapterIndex)
+  bookmarkBusy.value = true
+
+  try {
+    if (existing) {
+      setBookmarks(before.filter((b) => b !== existing))
+      await reader.removeBookmark(props.id, existing.id)
+    } else {
+      const temp: ReaderBookmark = {
+        id: nextTempId--,
+        chapter: chapterIndex,
+        chapter_title: chapter.value?.title ?? null,
+        note: null,
+        created_at: new Date().toISOString(),
+      }
+      setBookmarks([...before, temp])
+      const saved = await reader.saveBookmark(props.id, chapterIndex)
+      setBookmarks((bookmarks.value ?? []).map((b) => (b === temp ? saved : b)))
+      noteDrafts.value[saved.id] = saved.note ?? ''
+    }
+  } catch (e) {
+    bookmarks.value = before
+    error.value = errorMessage(e)
+  } finally {
+    bookmarkBusy.value = false
+  }
+}
+
+async function removeBookmark(bookmark: ReaderBookmark) {
+  const before = bookmarks.value
+  if (!before || bookmark.id < 0) return
+  setBookmarks(before.filter((b) => b !== bookmark))
+
+  try {
+    await reader.removeBookmark(props.id, bookmark.id)
+  } catch (e) {
+    bookmarks.value = before
+    error.value = errorMessage(e)
+  }
+}
+
+async function saveNote(bookmark: ReaderBookmark) {
+  if (noteSaving.value !== null || bookmark.id < 0) return
+  const note = (noteDrafts.value[bookmark.id] ?? '').trim()
+  noteSaving.value = bookmark.id
+
+  try {
+    const saved = await reader.saveBookmark(props.id, bookmark.chapter, note === '' ? null : note)
+    setBookmarks((bookmarks.value ?? []).map((b) => (b.id === bookmark.id ? saved : b)))
+    noteDrafts.value[saved.id] = saved.note ?? ''
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    noteSaving.value = null
+  }
+}
+
+async function openMarks() {
+  closeToc()
+  marksOpen.value = true
+  if (!bookmarks.value) loadBookmarks()
+  await nextTick()
+  ;(marksPanel.value?.querySelector<HTMLElement>('button, input') ?? marksPanel.value)?.focus()
+}
+
+function closeMarks(returnFocus = true) {
+  if (!marksOpen.value) return
+  marksOpen.value = false
+  if (returnFocus) nextTick(() => marksButton.value?.focus())
 }
 
 async function load() {
@@ -157,6 +268,7 @@ async function load() {
 
   try {
     doc.value = await reader.get(props.id)
+    loadBookmarks()
     await openChapter(Math.min(doc.value.position.chapter, Math.max(0, doc.value.chapters_count - 1)))
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) {
@@ -248,6 +360,61 @@ onBeforeUnmount(() => {
       </ul>
     </div>
 
+    <div
+      v-if="marksOpen"
+      ref="marksPanel"
+      role="dialog"
+      tabindex="-1"
+      :aria-label="$t('reader.bookmarks.title')"
+      class="max-h-[50dvh] overflow-y-auto rounded-2xl border border-line bg-surface p-2 shadow-lg"
+      @keydown.esc.stop="closeMarks()"
+    >
+      <ErrorNotice v-if="bookmarksError" :message="bookmarksError" retryable @retry="loadBookmarks" />
+      <p v-else-if="!bookmarks" class="px-3 py-2 text-sm text-ink-muted">{{ $t('common.loading') }}</p>
+      <p v-else-if="!bookmarks.length" class="px-3 py-2 text-sm text-ink-muted">{{ $t('reader.bookmarks.empty') }}</p>
+      <ul v-else class="flex flex-col gap-2">
+        <li v-for="bookmark in bookmarks" :key="bookmark.id" class="flex flex-col gap-1 rounded-lg border border-line p-2">
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="min-h-11 min-w-0 flex-1 rounded-lg px-3 text-left text-sm"
+              :class="bookmark.chapter === index ? 'bg-accent/10 font-semibold' : ''"
+              :aria-current="bookmark.chapter === index ? 'true' : undefined"
+              @click="jumpTo(bookmark.chapter)"
+            >
+              <span class="block truncate">{{ bookmarkTitle(bookmark) }}</span>
+              <span v-if="bookmark.note" class="block truncate text-xs font-normal text-ink-muted">{{ bookmark.note }}</span>
+            </button>
+            <button
+              type="button"
+              class="min-h-11 min-w-11 rounded-lg border border-line text-sm"
+              :aria-label="$t('reader.bookmarks.removeNamed', { title: bookmarkTitle(bookmark) })"
+              @click="removeBookmark(bookmark)"
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          </div>
+          <form class="flex items-center gap-2" @submit.prevent="saveNote(bookmark)">
+            <input
+              v-model="noteDrafts[bookmark.id]"
+              type="text"
+              maxlength="200"
+              class="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-sm"
+              :aria-label="$t('reader.bookmarks.note')"
+              :placeholder="$t('reader.bookmarks.notePlaceholder')"
+            >
+            <button
+              type="submit"
+              class="min-h-11 rounded-lg border border-line px-3 text-sm disabled:opacity-50"
+              :disabled="noteSaving !== null || (noteDrafts[bookmark.id] ?? '').trim() === (bookmark.note ?? '')"
+            >
+              {{ noteSaving === bookmark.id ? $t('reader.bookmarks.saving') : $t('reader.bookmarks.save') }}
+            </button>
+          </form>
+        </li>
+      </ul>
+    </div>
+
     <div v-if="notFound" class="flex flex-col items-start gap-2 rounded-2xl border border-dashed border-line p-4">
       <p class="text-ink-muted">{{ $t('reader.notFound') }}</p>
       <RouterLink :to="{ name: 'reader' }" class="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 font-semibold text-on-accent">
@@ -281,7 +448,32 @@ onBeforeUnmount(() => {
       >
         <span aria-hidden="true">←</span>
       </button>
-      <span role="status" class="text-sm text-ink-muted">{{ $t('reader.chapter', { n: index + 1, total: count }) }}</span>
+      <div class="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          class="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-surface disabled:opacity-50"
+          :class="currentBookmark ? 'text-accent' : 'text-ink-muted'"
+          :aria-label="currentBookmark ? $t('reader.bookmarks.remove') : $t('reader.bookmarks.add')"
+          :aria-pressed="currentBookmark !== null"
+          :disabled="!bookmarks || bookmarkBusy"
+          @click="toggleBookmark"
+        >
+          <svg viewBox="0 0 24 24" class="size-6" :fill="currentBookmark ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 4h12v17l-6-4-6 4z" />
+          </svg>
+        </button>
+        <button
+          ref="marksButton"
+          type="button"
+          class="min-h-11 rounded-lg border border-line bg-surface px-3 text-sm"
+          aria-haspopup="dialog"
+          :aria-expanded="marksOpen"
+          @click="marksOpen ? closeMarks() : openMarks()"
+        >
+          {{ $t('reader.bookmarks.title') }}
+        </button>
+        <span role="status" class="truncate text-sm text-ink-muted">{{ $t('reader.chapter', { n: index + 1, total: count }) }}</span>
+      </div>
       <button
         ref="nextButton"
         type="button"
