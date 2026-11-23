@@ -17,14 +17,22 @@ class BlockController extends Controller
 
     public function store(Request $request, string $username, BlockUser $blockUser): Response
     {
-        $blockUser->block($request->user(), $blockUser->find($username));
+        $target = $blockUser->find($username);
+
+        if ($target !== null) {
+            $blockUser->block($request->user(), $target);
+        }
 
         return response()->noContent();
     }
 
     public function destroy(Request $request, string $username, BlockUser $blockUser): Response
     {
-        $blockUser->unblock($request->user(), $blockUser->find($username));
+        $target = $blockUser->find($username);
+
+        if ($target !== null) {
+            $blockUser->unblock($request->user(), $target);
+        }
 
         return response()->noContent();
     }

@@ -4,7 +4,6 @@ namespace App\Actions\Social;
 
 use App\Models\User;
 use Illuminate\Contracts\Pagination\Paginator;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -57,13 +56,11 @@ class BlockUser
 
     /**
      * The reader behind a handle, whatever their visibility: blocking a private reader is allowed.
-     * Only a missing handle is "not found".
-     *
-     * @throws ModelNotFoundException<User>
+     * A missing handle is null and the caller answers it like a success, so the endpoint never tells a private reader from a missing one.
      */
-    public function find(string $username): User
+    public function find(string $username): ?User
     {
-        return User::query()->where('username', mb_strtolower($username))->firstOrFail();
+        return User::query()->where('username', mb_strtolower($username))->first();
     }
 
     /**

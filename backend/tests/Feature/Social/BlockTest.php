@@ -44,8 +44,9 @@ describe('blocking', function () {
         expect(DB::table('user_blocks')->count())->toBe(0);
     });
 
-    it('answers 404 for an unknown handle', function (string $method) {
-        $this->actAs($this->alice)->json($method, '/api/users/nobody/block')->assertNotFound();
+    it('answers an unknown handle like a private one (no existence leak) and stores nothing', function (string $method) {
+        $this->actAs($this->alice)->json($method, '/api/users/nobody/block')->assertNoContent();
+        expect(DB::table('user_blocks')->count())->toBe(0);
     })->with(['POST', 'DELETE']);
 
     it('is case-insensitive about the handle', function () {
