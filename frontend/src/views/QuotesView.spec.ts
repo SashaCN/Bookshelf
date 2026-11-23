@@ -399,6 +399,14 @@ describe('QuotesView', () => {
       expect(router.currentRoute.value.query).toEqual({ book: '2', tag: 'мудрість' })
     })
 
+    it('hides the search field for a reader with no quotes, but keeps it when a search finds nothing', async () => {
+      const empty = await mountView({}, page([]))
+      expect(empty.wrapper.find('#quotes-search').exists()).toBe(false)
+
+      const searched = await mountView({ q: 'зорі' }, page([]))
+      expect(searched.wrapper.find('#quotes-search').exists()).toBe(true)
+    })
+
     it('is told apart from an empty library when nothing matches', async () => {
       const { wrapper } = await mountView({ tag: 'нічого' }, page([]))
 

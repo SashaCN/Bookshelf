@@ -166,7 +166,7 @@ onMounted(() => {
   </PageHeader>
 
   <div class="mb-4 flex flex-col gap-3">
-    <div class="relative">
+    <div v-if="!quotes.loaded || quotes.items.length || hasFilters" class="relative">
       <label for="quotes-search" class="sr-only">{{ $t('quotes.search.label') }}</label>
       <input
         id="quotes-search"
