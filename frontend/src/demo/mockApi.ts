@@ -213,16 +213,21 @@ function seed(): State {
 
   const quotes: StoredQuote[] = [
     quote(1, 3, 'quote', 'Зорко одне лише серце. Найголовнішого очима не побачиш.', 72, 36, {
+      tags: ['дружба', 'мудрість'],
       note: 'Те, до чого повертаюся щоразу, коли забуваю зупинитися.',
       is_favorite: true,
       visibility: 'public',
     }),
-    quote(2, 3, 'quote', 'Ти назавжди береш на себе відповідальність за тих, кого приручив.', 80, 36, { is_favorite: true }),
+    quote(2, 3, 'quote', 'Ти назавжди береш на себе відповідальність за тих, кого приручив.', 80, 36, { is_favorite: true, tags: ['дружба'] }),
     quote(3, 1, 'quote', 'Життя не те, що з тобою сталося, а те, що ти пам\'ятаєш і як ти про це розповідаєш.', 130, 9),
     quote(4, 1, 'insight', 'Родина Буендіа повторює імена й помилки — ніби історія ходить колами. Цікаво, чи є вихід із циклу.', 160, 6, {
       note: 'Порівняти з Орвеллом — там цикл насильницький, тут — самотність.',
     }),
-    quote(5, 4, 'quote', 'Хто керує минулим, той керує майбутнім; хто керує сьогоденням, той керує минулим.', 44, 63, { is_favorite: true, visibility: 'public' }),
+    quote(5, 4, 'quote', 'Хто керує минулим, той керує майбутнім; хто керує сьогоденням, той керує минулим.', 44, 63, {
+      is_favorite: true,
+      visibility: 'public',
+      tags: ['влада'],
+    }),
     quote(6, 5, 'quote', 'Contra spem spero! Без надії сподіваюсь.', 97, 125, { visibility: 'public' }),
     quote(7, 2, 'quote', 'Гуцульщина — це не місце на мапі, це спосіб слухати гори.', 40, 3),
     quote(8, 2, 'insight', 'У Коцюбинського природа не тло, а персонаж: вона вирішує долю Івана не менше за людей.', 52, 2),
@@ -451,7 +456,28 @@ function presentComment(c: StoredComment, ownerKey: string): QuoteComment {
 
 function presentQuote(q: StoredQuote): Quote {
   const e = findEntry(q.user_book_id)
-  return { ...q, book: { title: e.book.title, authors: e.book.authors, cover_url: e.book.cover_url } }
+  return { ...q, tags: [...(q.tags ?? [])].sort(), book: { title: e.book.title, authors: e.book.authors, cover_url: e.book.cover_url } }
+}
+
+/** A quote as other readers see it: tags are private to the owner. */
+function presentShared(q: StoredQuote): Quote {
+  const shared = presentQuote(q)
+  delete shared.tags
+  return shared
+}
+
+/** The server's spelling of a tag: trimmed, spaces collapsed, lowercase. */
+function normalizeTag(name: string): string {
+  return name.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+/** Validates and normalizes the `tags` of a request body: at most 10, each 1 to 40 characters, duplicates counted once. */
+function readTags(body: Record<string, unknown>): string[] | undefined {
+  if (body.tags === undefined) return undefined
+  if (!Array.isArray(body.tags)) invalid('tags', 'validation.array')
+  const names = [...new Set((body.tags as unknown[]).map((tag) => (typeof tag === 'string' ? normalizeTag(tag) : '')))]
+  if (names.length > 10 || names.some((name) => name.length < 1 || name.length > 40)) invalid('tags', 'validation.invalid')
+  return names
 }
 
 function findEntry(id: number): Entry {
@@ -940,6 +966,16 @@ function matchesSearch(q: StoredQuote, search: string | null): boolean {
   return words.every((word) => haystack.includes(word))
 }
 
+function hasTag(q: StoredQuote, tag: string | null): boolean {
+  return !tag || (q.tags ?? []).includes(normalizeTag(tag))
+}
+
+route('GET', '/api/tags', () => {
+  const counts = new Map<string, number>()
+  for (const q of state.quotes) for (const tag of q.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+  return ok([...counts].map(([name, quotes_count]) => ({ name, quotes_count })).sort((a, b) => a.name.localeCompare(b.name)))
+})
+
 // Simple on purpose: the real export escapes Markdown, the demo only has to hand over a believable file.
 route('GET', '/api/quotes/export', (_p, query) => {
   const chosen = state.quotes
@@ -947,6 +983,7 @@ route('GET', '/api/quotes/export', (_p, query) => {
     .filter((q) => !query.get('book') || q.user_book_id === Number(query.get('book')))
     .filter((q) => !query.get('type') || q.type === query.get('type'))
     .filter((q) => matchesSearch(q, query.get('q')))
+    .filter((q) => hasTag(q, query.get('tag')))
     .sort((a, b) => a.id - b.id)
 
   const byBook = new Map<string, string[]>()
@@ -954,7 +991,7 @@ route('GET', '/api/quotes/export', (_p, query) => {
     const { book } = presentQuote(q)
     const lines = byBook.get(book.title) ?? [`## ${book.title}`, ...(book.authors.length ? ['', `_${book.authors.join(', ')}_`] : [])]
     const text = q.type === 'insight' ? `💡 ${q.content}` : `> ${q.content}`
-    const details = [q.page ? `— с. ${q.page}` : '', q.note ? `Нотатка: ${q.note}` : '', q.is_favorite ? '★' : ''].filter(Boolean)
+    const details = [q.page ? `— с. ${q.page}` : '', q.note ? `Нотатка: ${q.note}` : '', q.is_favorite ? '★' : '', (q.tags ?? []).length ? [...(q.tags ?? [])].sort().map((tag) => `#${tag}`).join(' ') : ''].filter(Boolean)
     lines.push('', text, ...(details.length ? ['', details.join('  \n')] : []))
     byBook.set(book.title, lines)
   }
@@ -970,6 +1007,7 @@ route('GET', '/api/quotes', (_p, query) => {
     .filter((q) => !query.get('book') || q.user_book_id === Number(query.get('book')))
     .filter((q) => !query.get('type') || q.type === query.get('type'))
     .filter((q) => matchesSearch(q, query.get('q')))
+    .filter((q) => hasTag(q, query.get('tag')))
     .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
   const { data, links } = paginate(all, page, '/api/quotes')
   return { data: data.map((q) => ({ ...presentQuote(q), likes_count: withLikes(q).likes_count })), links }
@@ -981,6 +1019,7 @@ route('POST', '/api/library/(\\d+)/quotes', ([id], _q, body) => {
   if (!content) invalid('content', 'validation.required')
   if (typeof body.page === 'number' && e.total_pages !== null && body.page > e.total_pages) invalid('page', 'quotes.page_above_total')
 
+  const tags = readTags(body)
   const created: StoredQuote = {
     id: nextId(),
     type: (body.type as QuoteType | undefined) ?? 'quote',
@@ -991,6 +1030,7 @@ route('POST', '/api/library/(\\d+)/quotes', ([id], _q, body) => {
     visibility: (body.visibility as QuoteVisibility | undefined) ?? 'private',
     created_at: new Date().toISOString(),
     user_book_id: e.id,
+    tags: tags ?? [],
   }
   state.quotes.push(created)
   return ok(presentQuote(created))
@@ -999,7 +1039,8 @@ route('PATCH', '/api/quotes/(\\d+)', ([id], _q, body) => {
   const q = findQuote(Number(id))
   const entry = findEntry(q.user_book_id)
   if (typeof body.page === 'number' && entry.total_pages !== null && body.page > entry.total_pages) invalid('page', 'quotes.page_above_total')
-  Object.assign(q, body)
+  const tags = readTags(body)
+  Object.assign(q, body, tags === undefined ? {} : { tags })
   return ok(presentQuote(q))
 })
 route('DELETE', '/api/quotes/(\\d+)', ([id]) => {
@@ -1031,7 +1072,7 @@ route('GET', '/api/users/([^/]+)/quotes', ([username], query) => {
   const person = findVisible(name)
   const all =
     person.key === ME
-      ? state.quotes.filter((q) => q.visibility === 'public').sort(newestFirst).map(presentQuote)
+      ? state.quotes.filter((q) => q.visibility === 'public').sort(newestFirst).map(presentShared)
       : fakeQuotes(fakeReaders.find((r) => r.username === name) as FakeReader)
   return paginate(all.map(withLikes), Number(query.get('page') ?? 1), `/api/users/${username}/quotes`)
 })

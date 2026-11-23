@@ -106,6 +106,27 @@ describe('demo mock API', () => {
     expect(await (await quotesApi.exportMarkdown({ q: 'ніщонемає' })).text()).toContain('Цитат поки немає.')
   })
 
+  it('tags quotes: normalizes, filters, counts, exports and keeps them private', async () => {
+    const tags = await quotesApi.tags()
+    expect(tags.map((tag) => tag.name)).toEqual([...tags.map((tag) => tag.name)].sort((x, y) => x.localeCompare(y)))
+    expect(tags.find((tag) => tag.name === 'дружба')?.quotes_count).toBe(2)
+
+    const created = await quotesApi.create(1, { content: 'З тегами', tags: ['  Нова   Мітка ', 'нова мітка', 'дружба'] })
+    expect(created.tags).toEqual(['дружба', 'нова мітка'])
+    expect((await quotesApi.list({ tag: ' НОВА мітка' })).data.map((q) => q.id)).toEqual([created.id])
+    expect((await quotesApi.list({ tag: 'дружба', book: 1 })).data.map((q) => q.id)).toEqual([created.id])
+    expect(await (await quotesApi.exportMarkdown({ tag: 'нова мітка' })).text()).toContain('#дружба #нова мітка')
+
+    expect((await quotesApi.update(created.id, { tags: [] })).tags).toEqual([])
+    expect((await quotesApi.update(created.id, { content: 'Без змін у тегах' })).tags).toEqual([])
+    await expect(quotesApi.create(1, { content: 'Забагато', tags: Array.from({ length: 11 }, (_, i) => `t${i}`) })).rejects.toMatchObject({ status: 422 })
+    await expect(quotesApi.update(created.id, { tags: ['x'.repeat(41)] })).rejects.toMatchObject({ status: 422 })
+
+    const shared = (await socialApi.quotes('demo_reader')).data
+    expect(shared.length).toBeGreaterThan(0)
+    expect(shared.every((q) => !('tags' in q))).toBe(true)
+  })
+
   it('exports the quotes as Markdown, honouring the filters', async () => {
     const all = await (await quotesApi.exportMarkdown()).text()
     expect(all.startsWith('# Мої цитати\n')).toBe(true)

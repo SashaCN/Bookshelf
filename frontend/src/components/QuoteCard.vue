@@ -136,6 +136,17 @@ async function remove() {
 
     <QuoteSource :quote="quote" :plain="readonly" />
 
+    <ul v-if="!readonly && quote.tags?.length" :aria-label="$t('quotes.tags.label')" class="-mx-1 flex flex-wrap">
+      <li v-for="tag in quote.tags" :key="tag">
+        <RouterLink
+          :to="{ name: 'quotes', query: { tag } }"
+          class="inline-flex min-h-11 items-center px-1 text-sm"
+        >
+          <span class="rounded-full bg-sunken px-2.5 py-0.5 text-ink-muted">#{{ tag }}</span>
+        </RouterLink>
+      </li>
+    </ul>
+
     <div v-if="readonly && (quote.likes_count !== undefined || quote.comments_count !== undefined)" class="-mx-2 flex items-center gap-1">
       <template v-if="quote.likes_count !== undefined">
         <button

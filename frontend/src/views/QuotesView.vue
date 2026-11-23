@@ -29,6 +29,7 @@ const REVOKE_DELAY_MS = 10_000
 const SEARCH_DELAY_MS = 300
 const MIN_QUERY_LENGTH = 2
 const MAX_QUERY_LENGTH = 100
+const MAX_TAG_LENGTH = 40
 
 // The filters live in the URL, so going back from a quote returns to the same list.
 const favoritesOnly = computed(() => route.query.favorite === '1')
@@ -41,20 +42,26 @@ const searchFilter = computed(() => {
   const text = typeof route.query.q === 'string' ? route.query.q.trim() : ''
   return text.length >= MIN_QUERY_LENGTH ? text.slice(0, MAX_QUERY_LENGTH) : undefined
 })
+const tagFilter = computed(() => {
+  const name = typeof route.query.tag === 'string' ? route.query.tag.replace(/\s+/g, ' ').trim().toLowerCase() : ''
+  return name ? name.slice(0, MAX_TAG_LENGTH) : undefined
+})
 const filters = computed(() => {
   const result: QuoteFilters = {}
   if (favoritesOnly.value) result.favorite = true
   if (bookFilter.value !== undefined) result.book = bookFilter.value
   if (searchFilter.value !== undefined) result.q = searchFilter.value
+  if (tagFilter.value !== undefined) result.tag = tagFilter.value
   return result
 })
-const hasFilters = computed(() => favoritesOnly.value || bookFilter.value !== undefined || searchFilter.value !== undefined)
+const hasFilters = computed(() => favoritesOnly.value || bookFilter.value !== undefined || searchFilter.value !== undefined || tagFilter.value !== undefined)
 
-function select(next: { favorite?: boolean; book?: number; q?: string }) {
+function select(next: { favorite?: boolean; book?: number; q?: string; tag?: string }) {
   const query: Record<string, string> = {}
   if (next.favorite) query.favorite = '1'
   if (next.book !== undefined) query.book = String(next.book)
   if (next.q) query.q = next.q
+  if (next.tag) query.tag = next.tag
   router.replace({ name: 'quotes', query })
 }
 
@@ -67,7 +74,7 @@ let searchTimer: ReturnType<typeof setTimeout> | undefined
 
 function applySearch() {
   const text = search.value.trim()
-  select({ favorite: favoritesOnly.value, book: bookFilter.value, q: text.length >= MIN_QUERY_LENGTH ? text : undefined })
+  select({ favorite: favoritesOnly.value, book: bookFilter.value, q: text.length >= MIN_QUERY_LENGTH ? text : undefined, tag: tagFilter.value })
 }
 
 watch(search, () => {
@@ -78,7 +85,7 @@ watch(search, () => {
 function clearSearch() {
   clearTimeout(searchTimer)
   search.value = ''
-  select({ favorite: favoritesOnly.value, book: bookFilter.value })
+  select({ favorite: favoritesOnly.value, book: bookFilter.value, tag: tagFilter.value })
 }
 
 // Back and forward change the URL under the field.
@@ -96,7 +103,7 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
 
 const book = computed({
   get: () => bookFilter.value ?? '',
-  set: (value: number | '') => select({ favorite: favoritesOnly.value, book: value === '' ? undefined : value, q: searchFilter.value }),
+  set: (value: number | '') => select({ favorite: favoritesOnly.value, book: value === '' ? undefined : value, q: searchFilter.value, tag: tagFilter.value }),
 })
 
 async function load() {
@@ -111,7 +118,7 @@ async function load() {
 }
 
 watch(
-  () => `${favoritesOnly.value}:${bookFilter.value}:${searchFilter.value ?? ''}`,
+  () => `${favoritesOnly.value}:${bookFilter.value}:${searchFilter.value ?? ''}:${tagFilter.value ?? ''}`,
   () => {
     // While the reader leaves for another screen the route already holds that screen's query.
     if (route.name === 'quotes') load()
@@ -181,13 +188,27 @@ onMounted(() => {
       </button>
     </div>
 
+    <div v-if="tagFilter !== undefined" class="flex">
+      <span class="inline-flex items-center rounded-full bg-sunken pl-3 text-sm" data-test="tag-filter">
+        <span class="break-all">#{{ tagFilter }}</span>
+        <button
+          type="button"
+          :aria-label="$t('quotes.tags.removeFilter', { tag: tagFilter })"
+          class="inline-flex size-11 items-center justify-center text-ink-muted"
+          @click="select({ favorite: favoritesOnly, book: bookFilter, q: searchFilter })"
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
+      </span>
+    </div>
+
     <div role="group" :aria-label="$t('quotes.filters.label')" class="flex gap-2">
       <button
         type="button"
         :aria-pressed="!favoritesOnly"
         class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium"
         :class="!favoritesOnly ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
-        @click="select({ book: bookFilter, q: searchFilter })"
+        @click="select({ book: bookFilter, q: searchFilter, tag: tagFilter })"
       >
         {{ $t('quotes.filters.all') }}
       </button>
@@ -196,7 +217,7 @@ onMounted(() => {
         :aria-pressed="favoritesOnly"
         class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium"
         :class="favoritesOnly ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink-muted'"
-        @click="select({ favorite: true, book: bookFilter, q: searchFilter })"
+        @click="select({ favorite: true, book: bookFilter, q: searchFilter, tag: tagFilter })"
       >
         {{ $t('quotes.filters.favorites') }}
       </button>

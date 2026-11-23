@@ -368,6 +368,44 @@ describe('QuotesView', () => {
     })
   })
 
+  describe('the tag filter', () => {
+    it('asks for the quotes with the tag from the route and shows it as a removable chip', async () => {
+      const { wrapper, router } = await mountView({ tag: 'мудрість', favorite: '1' })
+
+      expect(quotesApi.list).toHaveBeenCalledWith({ favorite: true, tag: 'мудрість' }, 1)
+      expect(wrapper.get('[data-test="tag-filter"]').text()).toContain('#мудрість')
+
+      await wrapper.get('[aria-label="Скинути фільтр за тегом мудрість"]').trigger('click')
+      await flushPromises()
+
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1' })
+      expect(quotesApi.list).toHaveBeenLastCalledWith({ favorite: true }, 1)
+      expect(wrapper.find('[data-test="tag-filter"]').exists()).toBe(false)
+    })
+
+    it('keeps the tag when the other filters change', async () => {
+      const { wrapper, router } = await mountView({ tag: 'мудрість' })
+
+      await buttonWithText(wrapper, 'Улюблені').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1', tag: 'мудрість' })
+
+      await wrapper.get('#quotes-book').setValue(2)
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ favorite: '1', book: '2', tag: 'мудрість' })
+
+      await buttonWithText(wrapper, 'Усі').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.query).toEqual({ book: '2', tag: 'мудрість' })
+    })
+
+    it('is told apart from an empty library when nothing matches', async () => {
+      const { wrapper } = await mountView({ tag: 'нічого' }, page([]))
+
+      expect(wrapper.text()).toContain('За цими фільтрами цитат немає.')
+    })
+  })
+
   it('offers a retry when the quotes cannot be loaded', async () => {
     const { plugins, router } = createTestEnvironment()
     vi.mocked(libraryApi.list).mockResolvedValue(books)

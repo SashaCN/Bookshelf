@@ -1,4 +1,4 @@
-import type { Quote, QuoteFilters, QuotePayload, QuotesPage } from '@/types/api'
+import type { Quote, QuoteFilters, QuotePayload, QuotesPage, TagCount } from '@/types/api'
 import { http } from './http'
 
 function filterParams(filters: QuoteFilters): URLSearchParams {
@@ -7,6 +7,7 @@ function filterParams(filters: QuoteFilters): URLSearchParams {
   if (filters.book !== undefined) params.set('book', String(filters.book))
   if (filters.type) params.set('type', filters.type)
   if (filters.q) params.set('q', filters.q)
+  if (filters.tag) params.set('tag', filters.tag)
   return params
 }
 
@@ -18,6 +19,8 @@ function listQuery(filters: QuoteFilters, page: number): string {
 
 export const quotesApi = {
   list: (filters: QuoteFilters = {}, page = 1) => http.get<QuotesPage>(`/api/quotes?${listQuery(filters, page)}`),
+  /** The reader's tags with their quote counts, ordered by name. */
+  tags: () => http.get<{ data: TagCount[] }>('/api/tags').then((response) => response.data),
   /** The quote of the day, or null while the reader has no quotes. */
   daily: () => http.get<{ data: Quote | null }>('/api/quotes/daily').then((response) => response.data),
   get: (id: number) => http.get<{ data: Quote }>(`/api/quotes/${id}`).then((response) => response.data),

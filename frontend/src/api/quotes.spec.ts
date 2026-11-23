@@ -41,6 +41,19 @@ describe('quotesApi', () => {
     expect(http.download).toHaveBeenCalledWith('/api/quotes/export?q=%D1%89%D0%B0%D1%81%D1%82%D1%8F')
   })
 
+  it('sends the tag filter, in the list and in the export, and lists the tags', async () => {
+    vi.mocked(http.get).mockResolvedValue({ data: [{ name: 'мудрість', quotes_count: 2 }] })
+    vi.mocked(http.download).mockResolvedValue(new Blob([]))
+
+    await quotesApi.list({ book: 7, tag: 'мудрість' })
+    await quotesApi.exportMarkdown({ tag: 'a b' })
+
+    expect(http.get).toHaveBeenCalledWith('/api/quotes?book=7&tag=%D0%BC%D1%83%D0%B4%D1%80%D1%96%D1%81%D1%82%D1%8C&page=1')
+    expect(http.download).toHaveBeenCalledWith('/api/quotes/export?tag=a+b')
+    expect(await quotesApi.tags()).toEqual([{ name: 'мудрість', quotes_count: 2 }])
+    expect(http.get).toHaveBeenLastCalledWith('/api/tags')
+  })
+
   it('unwraps the quote of the day, which may be missing', async () => {
     vi.mocked(http.get).mockResolvedValueOnce({ data: makeQuote({ id: 4 }) }).mockResolvedValueOnce({ data: null })
 

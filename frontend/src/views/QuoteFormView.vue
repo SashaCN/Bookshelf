@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { quotesApi } from '@/api/quotes'
 import { isApiErrorCode } from '@/api/errors'
 import { ApiError } from '@/api/http'
 import ErrorNotice from '@/components/ErrorNotice.vue'
@@ -16,6 +17,9 @@ import type { Quote, QuoteType, QuoteVisibility } from '@/types/api'
 const MAX_LENGTH = 2000
 /** The most pages the server accepts; the book's own page count is the tighter limit when it is known. */
 const MAX_PAGE = 20000
+/** The server's limits for tags. */
+const MAX_TAGS = 10
+const MAX_TAG_LENGTH = 40
 
 type Field = 'content' | 'note' | 'page'
 const fields: Field[] = ['content', 'note', 'page']
@@ -37,6 +41,13 @@ const editing = computed(() => props.id !== undefined)
 const form = reactive({ type: 'quote' as QuoteType, visibility: 'private' as QuoteVisibility, content: '', note: '', page: '' })
 const bookId = ref<number | ''>('')
 const quote = ref<Quote | null>(null)
+
+// Tags are chips; what is being typed becomes one on Enter, a comma or leaving the field.
+const tags = ref<string[]>([])
+const tagInput = ref('')
+const knownTags = ref<string[]>([])
+const tagError = ref('')
+const tagSuggestions = computed(() => knownTags.value.filter((name) => !tags.value.includes(name)))
 
 const ready = ref(false)
 const notFound = ref(false)
@@ -67,6 +78,50 @@ function fill(source: Quote) {
   form.content = source.content
   form.note = source.note ?? ''
   form.page = source.page === null ? '' : String(source.page)
+  tags.value = [...(source.tags ?? [])]
+}
+
+/** Only feeds the suggestions: without them the field still works. */
+async function loadKnownTags() {
+  try {
+    knownTags.value = (await quotesApi.tags()).map((tag) => tag.name)
+  } catch {
+    knownTags.value = []
+  }
+}
+
+/** The same spelling the server keeps: trimmed, runs of spaces collapsed, lowercase. */
+function normalizeTag(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function addTag(value: string) {
+  const name = normalizeTag(value).slice(0, MAX_TAG_LENGTH)
+  if (name && !tags.value.includes(name) && tags.value.length < MAX_TAGS) {
+    tags.value = [...tags.value, name]
+  }
+}
+
+function removeTag(name: string) {
+  tags.value = tags.value.filter((tag) => tag !== name)
+}
+
+function commitTagInput() {
+  addTag(tagInput.value)
+  tagInput.value = ''
+}
+
+/** A comma (also typed on a phone keyboard, which sends no key event for it) ends a tag. */
+function onTagInput() {
+  if (!tagInput.value.includes(',')) return
+
+  const parts = tagInput.value.split(',')
+  tagInput.value = parts.pop() ?? ''
+  parts.forEach(addTag)
+}
+
+function onTagEnter() {
+  commitTagInput()
 }
 
 async function load() {
@@ -77,6 +132,7 @@ async function load() {
 
   try {
     await library.load()
+    loadKnownTags()
 
     if (props.id === undefined) {
       const requested = Number(route.query.book)
@@ -117,6 +173,12 @@ function leave() {
 function showFieldErrors(e: ApiError): boolean {
   let shown = false
 
+  const tagMessages = Object.entries(e.fieldErrors).filter(([key]) => key === 'tags' || key.startsWith('tags.'))
+  if (tagMessages.length) {
+    tagError.value = t('quotes.errors.tags')
+    shown = true
+  }
+
   for (const field of fields) {
     const messages = e.fieldErrors[field]
     if (!messages?.length) continue
@@ -133,6 +195,8 @@ async function submit() {
   saving.value = true
   error.value = ''
   for (const field of fields) delete fieldErrors[field]
+  tagError.value = ''
+  commitTagInput()
 
   const body = {
     type: form.type,
@@ -140,6 +204,7 @@ async function submit() {
     content: form.content.trim(),
     note: form.note.trim() || null,
     page: toPage(form.page),
+    tags: tags.value,
   }
 
   try {
@@ -268,6 +333,45 @@ async function submit() {
         @input="form.page = ($event.target as HTMLInputElement).value"
       >
       <p v-if="fieldErrors.page" id="quote-page-error" class="text-sm text-danger">{{ fieldErrors.page }}</p>
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <label for="quote-tags" class="text-sm font-medium">{{ $t('quotes.tags.field') }}</label>
+      <ul v-if="tags.length" class="flex flex-wrap gap-2">
+        <li v-for="tag in tags" :key="tag" class="inline-flex items-center rounded-full bg-sunken pl-3 text-sm">
+          <span class="break-all">#{{ tag }}</span>
+          <button
+            type="button"
+            :aria-label="$t('quotes.tags.remove', { tag })"
+            class="inline-flex size-11 items-center justify-center text-ink-muted"
+            @click="removeTag(tag)"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        </li>
+      </ul>
+      <input
+        id="quote-tags"
+        v-model="tagInput"
+        type="text"
+        list="quote-tag-suggestions"
+        :maxlength="MAX_TAG_LENGTH"
+        :disabled="tags.length >= MAX_TAGS"
+        :placeholder="$t('quotes.tags.placeholder')"
+        :aria-invalid="tagError ? 'true' : undefined"
+        aria-describedby="quote-tags-hint"
+        autocomplete="off"
+        enterkeyhint="done"
+        class="min-h-11 rounded-lg border border-line bg-surface px-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:opacity-60 aria-[invalid=true]:border-danger"
+        @input="onTagInput"
+        @keydown.enter.prevent="onTagEnter"
+        @blur="commitTagInput"
+      >
+      <datalist id="quote-tag-suggestions">
+        <option v-for="name in tagSuggestions" :key="name" :value="name" />
+      </datalist>
+      <p v-if="tagError" class="text-sm text-danger">{{ tagError }}</p>
+      <p id="quote-tags-hint" class="text-sm text-ink-muted">{{ $t('quotes.tags.hint', { max: MAX_TAGS, length: MAX_TAG_LENGTH }) }}</p>
     </div>
 
     <div class="flex gap-2">

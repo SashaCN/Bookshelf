@@ -162,6 +162,8 @@ export interface Quote {
   page: number | null
   is_favorite: boolean
   visibility: QuoteVisibility
+  /** The reader's own tags (lowercase, by name). Only on the own quotes, never on what other readers see. */
+  tags?: string[]
   /** Present in the lists: the own quotes and quotes of other readers. */
   likes_count?: number
   /** Present in the lists of other readers' quotes: the comments the viewer can see. */
@@ -181,6 +183,14 @@ export interface QuotePayload {
   page?: number | null
   is_favorite?: boolean
   visibility?: QuoteVisibility
+  /** The whole set of tags of the quote: the server normalizes them and drops duplicates. */
+  tags?: string[]
+}
+
+/** One of the reader's tags with the number of quotes carrying it. */
+export interface TagCount {
+  name: string
+  quotes_count: number
 }
 
 export interface QuoteFilters {
@@ -190,6 +200,8 @@ export interface QuoteFilters {
   type?: QuoteType
   /** Full-text search over the text and notes of the reader's quotes (2 to 100 characters). */
   q?: string
+  /** Only quotes carrying this tag. */
+  tag?: string
 }
 
 /** A public review of a book, as other readers see it. */
