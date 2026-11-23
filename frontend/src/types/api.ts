@@ -40,6 +40,12 @@ export interface Book {
 }
 
 /** A book in the reader's own library, with their progress. */
+/** An earlier, finished pass through a book that was read again. */
+export interface ReadPass {
+  started_at: string | null
+  finished_at: string
+}
+
 export interface UserBook {
   id: number
   status: BookStatus
@@ -59,6 +65,10 @@ export interface UserBook {
   book: Book
   /** The linked EPUB read most recently; only in the response for a single entry, not in the list. */
   reader_document_id?: number | null
+  /** Finished passes through the book, the current one included when it is finished. */
+  times_read: number
+  /** Archived earlier passes, newest first; only in the response for a single entry, not in the list. */
+  reads?: ReadPass[]
 }
 
 /** One move of the bookmark in a book's reading journal. */

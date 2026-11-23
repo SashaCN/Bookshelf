@@ -14,6 +14,7 @@ vi.mock('@/api/library', () => ({
     update: vi.fn(),
     remove: vi.fn(),
     progress: vi.fn(),
+    reread: vi.fn(),
     logs: vi.fn(),
   },
   catalogApi: { search: vi.fn() },

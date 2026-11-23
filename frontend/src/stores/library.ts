@@ -77,6 +77,13 @@ export const useLibraryStore = defineStore('library', () => {
     items.value = items.value.filter((item) => item.id !== id)
   }
 
+  /** Start another pass through a finished book; the server archives the finished one and resets the bookmark. */
+  async function reread(id: number): Promise<UserBook> {
+    const userBook = await libraryApi.reread(id)
+    upsert(userBook)
+    return userBook
+  }
+
   /** Requests of one book go out one at a time, so a quick second tap builds on the first instead of racing it. */
   const progressQueues = new Map<number, Promise<unknown>>()
   const progressInFlight = new Map<number, number>()
@@ -151,5 +158,5 @@ export const useLibraryStore = defineStore('library', () => {
     loading.value = false
   }
 
-  return { items, loaded, loading, byStatus, byTitle, find, upsert, load, add, update, remove, setProgress, reset }
+  return { items, loaded, loading, byStatus, byTitle, find, upsert, load, add, update, remove, reread, setProgress, reset }
 })

@@ -31,6 +31,7 @@ export function makeUserBook(overrides: Partial<UserBook> = {}): UserBook {
     started_at: null,
     finished_at: null,
     created_at: '2026-10-05T10:00:00+00:00',
+    times_read: 0,
     book: makeBook(),
     ...overrides,
   }

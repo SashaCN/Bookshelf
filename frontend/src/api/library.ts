@@ -17,6 +17,8 @@ export const libraryApi = {
     http.patch<{ data: UserBook }>(`/api/library/${id}`, payload).then((response) => response.data),
   remove: (id: number) => http.delete<null>(`/api/library/${id}`),
   progress: (id: number, page: number) => http.post<ProgressResult>(`/api/library/${id}/progress`, { page }),
+  reread: (id: number) =>
+    http.post<{ data: UserBook }>(`/api/library/${id}/reread`).then((response) => response.data),
   logs: (id: number, page = 1) => http.get<ReadingLogsPage>(`/api/library/${id}/logs?page=${page}`),
 }
 

@@ -9,7 +9,8 @@ import type { Quote, QuotesPage } from '@/types/api'
 import QuotesView from './QuotesView.vue'
 
 vi.mock('@/api/library', () => ({
-  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(), logs: vi.fn() },
+  libraryApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), progress: vi.fn(),
+    reread: vi.fn(), logs: vi.fn() },
   catalogApi: { search: vi.fn() },
 }))
 vi.mock('@/api/quotes', () => ({

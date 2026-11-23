@@ -15,6 +15,7 @@ import RatingStars from '@/components/RatingStars.vue'
 import ReadingJournal from '@/components/ReadingJournal.vue'
 import { useApiErrorMessage } from '@/composables/useApiErrorMessage'
 import { useLibraryStore } from '@/stores/library'
+import { formatDay } from '@/utils/format'
 import type { BookStatus, UserBook } from '@/types/api'
 
 const props = defineProps<{ id: number }>()
@@ -30,6 +31,7 @@ const error = ref('')
 const busy = ref(false)
 const pagesInput = ref('')
 const confirmingDelete = ref(false)
+const confirmingReread = ref(false)
 /** Bumped whenever the reading journal may have a new entry. */
 const journalVersion = ref(0)
 
@@ -50,6 +52,7 @@ async function load() {
   if (userBook.value && userBook.value.id !== props.id) {
     userBook.value = null
     confirmingDelete.value = false
+    confirmingReread.value = false
   }
 
   try {
@@ -141,6 +144,29 @@ function savePages() {
   if (Number.isFinite(pages)) {
     return save({ total_pages: pages })
   }
+}
+
+async function reread() {
+  if (!userBook.value) return
+
+  busy.value = true
+  error.value = ''
+
+  try {
+    // The answer is the full entry, so the previous passes are shown at once.
+    userBook.value = await library.reread(userBook.value.id)
+    journalVersion.value++
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    confirmingReread.value = false
+    busy.value = false
+  }
+}
+
+/** "5 жовтня" for a pass moment (an ISO timestamp): the calendar day the reader has it on. */
+function passDay(iso: string): string {
+  return formatDay(iso.slice(0, 10))
 }
 
 async function remove() {
@@ -239,6 +265,55 @@ function isDisabled(target: BookStatus): boolean {
       <p v-if="needsPages && userBook.allowed_statuses.includes('reading')" class="text-sm text-ink-muted">
         {{ $t('book.needsPages') }}
       </p>
+    </section>
+
+    <section v-if="userBook.status === 'finished'" class="flex flex-col gap-2">
+      <button
+        v-if="!confirmingReread"
+        type="button"
+        :disabled="busy"
+        class="min-h-11 rounded-lg border border-line bg-surface px-4 font-semibold disabled:opacity-50"
+        @click="confirmingReread = true"
+      >
+        {{ $t('book.reread.action') }}
+      </button>
+      <div v-else class="flex flex-col gap-2">
+        <p class="text-sm">{{ $t('book.reread.confirm') }}</p>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            :disabled="busy"
+            class="min-h-11 flex-1 rounded-lg bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+            @click="reread"
+          >
+            {{ $t('book.reread.yes') }}
+          </button>
+          <button
+            type="button"
+            :disabled="busy"
+            class="min-h-11 flex-1 rounded-lg border border-line bg-surface px-4 font-medium"
+            @click="confirmingReread = false"
+          >
+            {{ $t('common.cancel') }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="userBook.times_read > 0" class="flex flex-col gap-1">
+      <p class="text-sm font-medium">{{ $t('book.reread.timesRead', { n: userBook.times_read }, userBook.times_read) }}</p>
+      <template v-if="userBook.reads?.length">
+        <p class="text-sm text-ink-muted">{{ $t('book.reread.previous') }}</p>
+        <ul class="flex flex-col gap-0.5 text-sm tabular-nums text-ink-muted">
+          <li v-for="(pass, index) in userBook.reads" :key="index">
+            {{
+              pass.started_at
+                ? $t('book.reread.pass', { from: passDay(pass.started_at), to: passDay(pass.finished_at) })
+                : $t('book.reread.noStart', { to: passDay(pass.finished_at) })
+            }}
+          </li>
+        </ul>
+      </template>
     </section>
 
     <form class="flex flex-col gap-1.5" @submit.prevent="savePages">

@@ -37,6 +37,22 @@ describe('demo mock API', () => {
     await expect(libraryApi.progress(2, 100)).rejects.toBeInstanceOf(ApiError)
   })
 
+  it('starts a reread: archives the pass, resets the bookmark, refuses unfinished books', async () => {
+    const before = await libraryApi.get(3)
+    expect(before.status).toBe('finished')
+    expect(before.times_read).toBe(2)
+
+    const after = await libraryApi.reread(3)
+    expect(after.status).toBe('reading')
+    expect(after.current_page).toBe(0)
+    expect(after.finished_at).toBeNull()
+    expect(after.times_read).toBe(2)
+    expect(after.reads).toHaveLength(2)
+    expect(after.reads?.[0].finished_at).toBe(before.finished_at)
+
+    await expect(libraryApi.reread(3)).rejects.toMatchObject({ status: 422 })
+  })
+
   it('applies the status transition rules', async () => {
     await expect(libraryApi.update(3, { status: 'abandoned' })).rejects.toMatchObject({ status: 422 })
     expect((await libraryApi.update(6, { status: 'reading' })).started_at).not.toBeNull()

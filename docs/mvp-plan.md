@@ -32,7 +32,7 @@
 - Повнотекстовий пошук (FULLTEXT-індекс MySQL) і теги для цитат
 - Експорт цитат у Markdown — зроблено
 - Вхід через Google
-- Перечитування (кілька проходів однієї книги)
+- Перечитування (кілька проходів однієї книги) — зроблено
 
 Великі напрями:
 
@@ -194,6 +194,8 @@ erDiagram
 | want → finished | книга прочитана раніше: дати можна вказати вручну, журнал не створюється |
 | finished → reading | виправлення помилки: `finished_at` очищується. Повноцінне перечитування — у backlog |
 
+- Перечитування (`finished → reading` з архівацією): завершений прохід (`started_at`, `finished_at`) потрапляє в `user_book_reads`, журнал, оцінка й відгук лишаються. До «книг за період» (ціль, підсумки, профіль) входять усі завершені проходи: поточний `finished_at` плюс архівні
+
 ### Оновлення прогресу
 
 - Нова сторінка — ціле число від 0 до `total_pages`
@@ -237,6 +239,7 @@ erDiagram
 | POST | `/api/library` | додати книгу: `{openlibrary_work_key}` або ручні дані |
 | GET / PATCH / DELETE | `/api/library/{userBook}` | деталі; зміна статусу, оцінки, відгуку (`review`, `review_visibility`), `total_pages`; видалення. Відгук лише для прочитаної чи кинутої книги, інакше 422 `library.review_not_finished` |
 | POST | `/api/library/{userBook}/progress` | `{page}`: оновити прогрес |
+| POST | `/api/library/{userBook}/reread` | перечитати прочитану книгу: завершений прохід архівується в `user_book_reads`, статус `reading`, сторінка 0. Не `finished` → 422 `library.reread_not_finished`. Деталі книги віддають `reads` і `times_read` |
 | GET | `/api/library/{userBook}/logs` | журнал читання книги |
 | GET | `/api/quotes?favorite=&book=&type=` | мої цитати, нові першими, по 20 (з `likes_count`) |
 | GET | `/api/quotes/export?favorite=&book=&type=` | мої цитати файлом Markdown (`bookshelf-quotes-РРРР-ММ-ДД.md`, дата за календарем читача): за книгами, у книзі від старих до нових; ті самі фільтри, що й у списку |

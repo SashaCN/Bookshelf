@@ -18,6 +18,7 @@ vi.mock('@/api/library', () => ({
     update: vi.fn(),
     remove: vi.fn(),
     progress: vi.fn(),
+    reread: vi.fn(),
     logs: vi.fn(),
   },
   catalogApi: { search: vi.fn() },
@@ -136,6 +137,73 @@ describe('BookView', () => {
 
     expect(wrapper.text()).toContain('Читаю')
     expect(wrapper.text()).not.toContain('Оновлення сторінки позначить книгу як «Читаю».')
+  })
+
+  describe('rereading', () => {
+    const finished = (extra: Partial<UserBook> = {}) =>
+      makeUserBook({ status: 'finished', allowed_statuses: ['reading'], current_page: 320, times_read: 1, ...extra })
+
+    it('asks for confirmation, then restarts the book and shows the previous pass', async () => {
+      const { wrapper, library } = await mountView(finished())
+      vi.mocked(libraryApi.reread).mockResolvedValue(
+        makeUserBook({
+          status: 'reading',
+          allowed_statuses: ['finished', 'abandoned'],
+          times_read: 1,
+          reads: [{ started_at: '2026-09-01T10:00:00+00:00', finished_at: '2026-09-20T10:00:00+00:00' }],
+        }),
+      )
+
+      await buttonWithText(wrapper, 'Перечитати').trigger('click')
+      expect(libraryApi.reread).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Прогрес повернеться на сторінку 0')
+
+      await buttonWithText(wrapper, 'Почати знову').trigger('click')
+      await flushPromises()
+
+      expect(libraryApi.reread).toHaveBeenCalledWith(1)
+      expect(library.find(1)?.status).toBe('reading')
+      expect(wrapper.text()).toContain('Прочитано 1 раз')
+      expect(wrapper.text()).toContain('Попередні прочитання')
+      expect(wrapper.text()).toContain('1 вересня')
+      expect(wrapper.text()).not.toContain('Перечитати')
+    })
+
+    it('lets the reader back out', async () => {
+      const { wrapper } = await mountView(finished())
+
+      await buttonWithText(wrapper, 'Перечитати').trigger('click')
+      await buttonWithText(wrapper, 'Скасувати').trigger('click')
+
+      expect(libraryApi.reread).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Перечитати')
+    })
+
+    it('is not offered for a book that is not finished', async () => {
+      const { wrapper } = await mountView(makeUserBook({ status: 'reading', allowed_statuses: ['finished', 'abandoned'] }))
+
+      expect(wrapper.text()).not.toContain('Перечитати')
+    })
+
+    it('says so when the server refuses', async () => {
+      const { wrapper } = await mountView(finished())
+      vi.mocked(libraryApi.reread).mockRejectedValue(new ApiError(422, { errors: { status: ['library.reread_not_finished'] } }))
+
+      await buttonWithText(wrapper, 'Перечитати').trigger('click')
+      await buttonWithText(wrapper, 'Почати знову').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Перечитувати можна лише прочитану книгу.')
+    })
+
+    it('shows the plural form of the times read', async () => {
+      const { wrapper } = await mountView(
+        finished({ times_read: 5, reads: [{ started_at: null, finished_at: '2026-01-10T10:00:00+00:00' }] }),
+      )
+
+      expect(wrapper.text()).toContain('Прочитано 5 разів')
+      expect(wrapper.text()).toContain('до 10 січня')
+    })
   })
 
   it('does not offer a page form for a finished book', async () => {

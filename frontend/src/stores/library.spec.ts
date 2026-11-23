@@ -12,6 +12,7 @@ vi.mock('@/api/library', () => ({
     update: vi.fn(),
     remove: vi.fn(),
     progress: vi.fn(),
+    reread: vi.fn(),
     logs: vi.fn(),
   },
   catalogApi: { search: vi.fn() },
@@ -38,6 +39,22 @@ describe('library store', () => {
     expect(library.byStatus.reading.map((item) => item.id)).toEqual([1, 3])
     expect(library.byStatus.want).toHaveLength(1)
     expect(library.byStatus.finished).toEqual([])
+  })
+
+  it('puts the book into the library as it comes back from a reread', async () => {
+    vi.mocked(libraryApi.list).mockResolvedValue([
+      makeUserBook({ id: 1, status: 'finished', times_read: 1 }),
+      makeUserBook({ id: 2, status: 'want' }),
+    ])
+    vi.mocked(libraryApi.reread).mockResolvedValue(makeUserBook({ id: 2, status: 'reading', times_read: 1 }))
+    const library = useLibraryStore()
+    await library.load()
+
+    await library.reread(2)
+
+    expect(libraryApi.reread).toHaveBeenCalledWith(2)
+    expect(library.items.map((item) => item.id)).toEqual([2, 1])
+    expect(library.find(2)?.status).toBe('reading')
   })
 
   it('lists the books alphabetically for pickers, without touching their activity order', async () => {

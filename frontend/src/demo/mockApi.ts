@@ -8,6 +8,7 @@ import type {
   BookForecast,
   BookStatus,
   CatalogEntry,
+  ReadPass,
   FeedQuote,
   GoalProgress,
   PersonSummary,
@@ -24,12 +25,14 @@ import type {
   UserBook,
 } from '@/types/api'
 
-const STORAGE_KEY = 'bookshelf-demo-state-v3'
+const STORAGE_KEY = 'bookshelf-demo-state-v4'
 const PAGE_SIZE = 15
 const DAY_MS = 86_400_000
 
-interface Entry extends Omit<UserBook, 'book' | 'allowed_statuses' | 'progress_percent'> {
+interface Entry extends Omit<UserBook, 'book' | 'allowed_statuses' | 'progress_percent' | 'times_read' | 'reads'> {
   book: Book
+  /** Archived earlier passes, newest first. */
+  reads?: ReadPass[]
 }
 
 type StoredQuote = Omit<Quote, 'book'>
@@ -133,6 +136,7 @@ function seed(): State {
       reviewed_at: daysAgo(34).toISOString(),
       started_at: daysAgo(40).toISOString(),
       finished_at: daysAgo(35).toISOString(),
+      reads: [{ started_at: daysAgo(400).toISOString(), finished_at: daysAgo(390).toISOString() }],
     }),
     entry(4, 'finished', 0, book(4, '1984', ['Джордж Орвелл'], 328, 1949, ['Антиутопія']), {
       current_page: 328,
@@ -386,6 +390,8 @@ function presentEntry(e: Entry): UserBook {
     ...e,
     allowed_statuses: transitions[e.status],
     progress_percent: e.total_pages ? Math.round((e.current_page / e.total_pages) * 100) : null,
+    times_read: (e.reads?.length ?? 0) + (e.status === 'finished' ? 1 : 0),
+    reads: e.reads ?? [],
   }
 }
 
@@ -568,7 +574,9 @@ function sumPages(days: Map<string, number>, from: string, to: string): number {
 }
 
 function finishedIn(prefix: string): number {
-  return state.library.filter((e) => e.finished_at?.startsWith(prefix) || (e.finished_at && isoDay(new Date(e.finished_at)).startsWith(prefix))).length
+  const inMonth = (iso: string) => iso.startsWith(prefix) || isoDay(new Date(iso)).startsWith(prefix)
+  const archived = state.library.reduce((sum, e) => sum + (e.reads ?? []).filter((r) => inMonth(r.finished_at)).length, 0)
+  return archived + state.library.filter((e) => e.finished_at?.startsWith(prefix) || (e.finished_at && isoDay(new Date(e.finished_at)).startsWith(prefix))).length
 }
 
 function summary() {
@@ -780,6 +788,18 @@ route('POST', '/api/library/(\\d+)/progress', ([id], _q, body) => {
     data: presentEntry(e),
     meta: { pages: page - from, reached_end: e.total_pages !== null && page >= e.total_pages, streak: streak(pagesByDay()).current },
   }
+})
+route('POST', '/api/library/(\\d+)/reread', ([id]) => {
+  const e = findEntry(Number(id))
+  if (e.status !== 'finished') invalid('status', 'library.reread_not_finished')
+
+  e.reads = [{ started_at: e.started_at, finished_at: e.finished_at ?? new Date().toISOString() }, ...(e.reads ?? [])]
+  e.status = 'reading'
+  e.current_page = 0
+  e.started_at = new Date().toISOString()
+  e.finished_at = null
+  state.library = [e, ...state.library.filter((x) => x.id !== e.id)]
+  return ok(presentEntry(e))
 })
 route('GET', '/api/library/(\\d+)/logs', ([id], query) => {
   findEntry(Number(id))
