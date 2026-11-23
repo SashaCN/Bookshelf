@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { authApi } from '@/api/auth'
 import { ApiError } from '@/api/http'
+import { clearApiCache } from '@/pwa/clearApiCache'
 import type { LoginPayload, RegisterPayload, UpdateProfilePayload, User } from '@/types/api'
 import { useLibraryStore } from './library'
 import { useQuotesStore } from './quotes'
@@ -60,12 +61,14 @@ export const useAuthStore = defineStore('auth', () => {
     await authApi.logout()
     user.value = null
     resetReaderData()
+    clearApiCache()
   }
 
   /** The server no longer knows this session: forget the reader without asking it again. */
   function expireSession(): void {
     user.value = null
     resetReaderData()
+    clearApiCache()
   }
 
   return { user, initialized, isAuthenticated, init, login, register, updateProfile, logout, expireSession }
