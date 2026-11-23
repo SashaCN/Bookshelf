@@ -77,6 +77,17 @@ describe('http client', () => {
     await expect(http.get('/api/me')).resolves.toBeNull()
   })
 
+  it('sends the body of a DELETE when one is given, and none otherwise', async () => {
+    document.cookie = 'XSRF-TOKEN=token'
+    fetchMock.mockImplementation(async () => jsonResponse(204))
+
+    await http.delete('/api/me', { body: { password: 'secret' } })
+    expect(fetchMock.mock.calls.at(-1)![1]!.body).toBe('{"password":"secret"}')
+
+    await http.delete('/api/quotes/1')
+    expect(fetchMock.mock.calls.at(-1)![1]!.body).toBeUndefined()
+  })
+
   describe('a request that has to outlive the page', () => {
     function lastInit(): RequestInit {
       return fetchMock.mock.calls.at(-1)![1]!

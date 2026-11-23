@@ -17,6 +17,7 @@ function mountView() {
       { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/login', name: 'login', component: LoginView },
       { path: '/register', name: 'register', component: { template: '<div />' } },
+      { path: '/forgot-password', name: 'forgot-password', component: { template: '<div />' } },
     ],
   })
   router.push('/login')
@@ -87,5 +88,30 @@ describe('LoginView', () => {
     await fillAndSubmit(wrapper)
 
     expect(wrapper.get('[role="alert"]').text()).toContain('Немає зв’язку із сервером')
+  })
+
+  it('says the account was deleted after coming from the deletion', async () => {
+    const { wrapper, router } = mountView()
+    await router.push('/login?deleted=1')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="account-deleted"]').text()).toBe('Акаунт видалено')
+  })
+
+  it('says the password was changed after a reset', async () => {
+    const { wrapper, router } = mountView()
+    await router.push('/login?reset=1')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="password-changed"]').text()).toBe('Пароль змінено, увійдіть з новим паролем')
+  })
+
+  it('has neither note on a normal visit, and links to the password reset', async () => {
+    const { wrapper, router } = mountView()
+    await router.isReady()
+
+    expect(wrapper.find('[data-test="account-deleted"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="password-changed"]').exists()).toBe(false)
+    expect(wrapper.findAll('a').find((link) => link.text() === 'Забули пароль?')).toBeDefined()
   })
 })

@@ -48,4 +48,24 @@ describe('the app router', () => {
 
     expect(router.currentRoute.value.name).toBe('login')
   })
+
+  it('lets a guest open the password reset screens, with the token from the link', async () => {
+    vi.mocked(authApi.me).mockRejectedValue(new ApiError(401, null))
+
+    await router.push('/forgot-password')
+    expect(router.currentRoute.value.name).toBe('forgot-password')
+    expect(document.title).toBe('Відновлення пароля · Bookshelf')
+
+    await router.push('/reset-password/tok123?email=a%40b.test')
+    expect(router.currentRoute.value.name).toBe('reset-password')
+    expect(router.currentRoute.value.params.token).toBe('tok123')
+  })
+
+  it('keeps a signed-in reader away from the password reset screens', async () => {
+    vi.mocked(authApi.me).mockResolvedValue(user)
+
+    await router.push('/forgot-password')
+
+    expect(router.currentRoute.value.name).toBe('home')
+  })
 })

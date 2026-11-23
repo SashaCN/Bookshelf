@@ -37,7 +37,7 @@ class CreateNewUser implements CreatesNewUsers
                 Rule::unique(User::class),
             ],
             'password' => $this->passwordRules(),
-            'timezone' => ['nullable', 'timezone:all'],
+            'timezone' => ['nullable', 'timezone:all_with_bc'],
         ])->validate();
 
         // The handle comes from the name. Two readers with the same name registering at the very same moment

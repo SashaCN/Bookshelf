@@ -15,6 +15,7 @@ import QuotesView from '@/views/QuotesView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import StatsView from '@/views/StatsView.vue'
 import { redirectFor } from './access'
+import { accountRoutes } from './account'
 import { readerRoutes } from './reader'
 import { socialRoutes } from './social'
 
@@ -68,6 +69,7 @@ export const router = createRouter({
     ...readerRoutes,
     { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true, title: 'auth.login.title' } },
     { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true, title: 'auth.register.title' } },
+    ...accountRoutes,
   ],
 })
 

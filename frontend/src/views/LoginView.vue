@@ -56,7 +56,19 @@ async function submit() {
         :label="$t('auth.fields.password')"
       />
 
+      <p v-if="route.query.reset === '1'" role="status" data-test="password-changed" class="rounded-lg bg-sunken px-3 py-2 text-sm">
+        {{ $t('account.login.passwordChanged') }}
+      </p>
+
+      <p v-if="route.query.deleted === '1'" role="status" data-test="account-deleted" class="rounded-lg bg-sunken px-3 py-2 text-sm">
+        {{ $t('account.login.accountDeleted') }}
+      </p>
+
       <p v-if="error" role="alert" class="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{{ error }}</p>
+
+      <RouterLink :to="{ name: 'forgot-password' }" class="self-start text-sm font-medium text-accent underline underline-offset-2">
+        {{ $t('account.login.forgotPassword') }}
+      </RouterLink>
 
       <button
         type="submit"

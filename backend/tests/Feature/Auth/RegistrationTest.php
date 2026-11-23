@@ -52,3 +52,34 @@ it('rejects a duplicate email', function () {
         'password' => 'secret-password',
     ])->assertUnprocessable()->assertJsonValidationErrors('email');
 });
+
+it('accepts a legacy time zone name that some browsers still report', function () {
+    $this->postJson('/api/auth/register', [
+        'name' => 'Olena',
+        'email' => 'olena@example.com',
+        'password' => 'secret-password',
+        'timezone' => 'Europe/Kiev',
+    ])->assertCreated();
+
+    expect(User::first()->timezone)->toBe('Europe/Kiev');
+});
+
+it('throttles registrations from one address', function () {
+    foreach (range(1, 30) as $attempt) {
+        $this->postJson('/api/auth/register', [
+            'name' => 'Olena',
+            'email' => "olena{$attempt}@example.com",
+            'password' => 'secret-password',
+        ])->assertCreated();
+
+        // Registering signs the new user in, and Fortify turns signed-in callers away.
+        $this->flushSession();
+        $this->actAsGuest();
+    }
+
+    $this->postJson('/api/auth/register', [
+        'name' => 'Olena',
+        'email' => 'one-too-many@example.com',
+        'password' => 'secret-password',
+    ])->assertTooManyRequests();
+});

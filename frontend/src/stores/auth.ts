@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { authApi } from '@/api/auth'
 import { ApiError, NetworkError } from '@/api/http'
+import type { ChangePasswordPayload } from '@/types/account'
 import type { LoginPayload, RegisterPayload, UpdateProfilePayload, User } from '@/types/api'
 import { useLibraryStore } from './library'
 import { useQuotesStore } from './quotes'
@@ -72,6 +73,16 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = await authApi.updateMe(payload)
   }
 
+  async function changePassword(payload: ChangePasswordPayload): Promise<void> {
+    await authApi.changePassword(payload)
+  }
+
+  /** Deletes the account for good; the server ends the session, so everything of the reader is forgotten here. */
+  async function deleteAccount(password: string): Promise<void> {
+    await authApi.deleteMe(password)
+    expireSession()
+  }
+
   /** The server no longer knows this session (it expired): forget the reader, but keep the page they are on. */
   function expireSession(): void {
     user.value = null
@@ -84,5 +95,5 @@ export const useAuthStore = defineStore('auth', () => {
     resetReaderData()
   }
 
-  return { user, initialized, unreachable, initializing, isAuthenticated, init, login, register, updateProfile, expireSession, logout }
+  return { user, initialized, unreachable, initializing, isAuthenticated, init, login, register, updateProfile, changePassword, deleteAccount, expireSession, logout }
 })

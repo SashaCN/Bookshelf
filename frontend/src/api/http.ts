@@ -136,7 +136,8 @@ export const http = {
   post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('POST', path, body, options),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PATCH', path, body, options),
   put: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>('PUT', path, body, options),
-  delete: <T>(path: string, options?: RequestOptions) => request<T>('DELETE', path, undefined, options),
+  /** `body` is for the few deletions that ask for a confirmation, such as the password for deleting an account. */
+  delete: <T>(path: string, options?: RequestOptions & { body?: unknown }) => request<T>('DELETE', path, options?.body, options),
   /** Send a file (a `FormData`) with a POST; waits longer for the answer than the other methods. */
   upload: <T>(path: string, form: FormData, timeoutMs = UPLOAD_TIMEOUT_MS) => request<T>('POST', path, form, { timeoutMs }),
 }

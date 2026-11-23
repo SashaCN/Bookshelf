@@ -1,3 +1,4 @@
+import account from './account.uk'
 import reader, { apiErrors as readerApiErrors } from './reader.uk'
 import social, { apiErrors as socialApiErrors } from './social.uk'
 
@@ -5,6 +6,7 @@ export default {
   // Strings of the larger areas live in files of their own.
   social,
   reader,
+  account,
   app: {
     name: 'Bookshelf',
     tagline: 'Трекер читання і цитат',

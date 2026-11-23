@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/me', [MeController::class, 'show'])->name('me.show');
     Route::patch('/me', [MeController::class, 'update'])->name('me.update');
+    Route::delete('/me', [MeController::class, 'destroy'])->middleware('throttle:password-confirm')->name('me.destroy');
 
     Route::get('/catalog/search', CatalogSearchController::class)
         ->middleware('throttle:catalog')
