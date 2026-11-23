@@ -48,8 +48,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/quotes/export', [QuoteController::class, 'export'])->name('quotes.export');
     Route::get('/quotes/daily', [QuoteController::class, 'daily'])->name('quotes.daily');
     Route::apiResource('quotes', QuoteController::class)->except('store');
-    Route::post('/quotes/{quote}/like', [QuoteLikeController::class, 'store'])->where('quote', '[0-9]+')->name('quotes.like');
-    Route::delete('/quotes/{quote}/like', [QuoteLikeController::class, 'destroy'])->where('quote', '[0-9]+')->name('quotes.unlike');
+    Route::middleware('throttle:social')->group(function (): void {
+        Route::post('/quotes/{quote}/like', [QuoteLikeController::class, 'store'])->where('quote', '[0-9]+')->name('quotes.like');
+        Route::delete('/quotes/{quote}/like', [QuoteLikeController::class, 'destroy'])->where('quote', '[0-9]+')->name('quotes.unlike');
+    });
 
     Route::post('/quotes/{quote}/comments', [QuoteCommentController::class, 'store'])
         ->middleware('throttle:comments')
@@ -80,10 +82,12 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/users', UserSearchController::class)->name('users.search');
     Route::get('/users/{username}/followers', [ProfileController::class, 'followers'])->name('users.followers');
     Route::get('/users/{username}/following', [ProfileController::class, 'following'])->name('users.following');
-    Route::post('/users/{username}/follow', [FollowController::class, 'store'])->name('users.follow');
-    Route::delete('/users/{username}/follow', [FollowController::class, 'destroy'])->name('users.unfollow');
-    Route::post('/users/{username}/block', [BlockController::class, 'store'])->name('users.block');
-    Route::delete('/users/{username}/block', [BlockController::class, 'destroy'])->name('users.unblock');
+    Route::middleware('throttle:social')->group(function (): void {
+        Route::post('/users/{username}/follow', [FollowController::class, 'store'])->name('users.follow');
+        Route::delete('/users/{username}/follow', [FollowController::class, 'destroy'])->name('users.unfollow');
+        Route::post('/users/{username}/block', [BlockController::class, 'store'])->name('users.block');
+        Route::delete('/users/{username}/block', [BlockController::class, 'destroy'])->name('users.unblock');
+    });
     Route::get('/me/blocks', [BlockController::class, 'index'])->name('me.blocks');
 
     Route::get('/stats/summary', [StatsController::class, 'summary'])->name('stats.summary');

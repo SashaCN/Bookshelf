@@ -34,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
         // Posting is cheap but spammable: a reader may leave a handful of comments a minute.
         RateLimiter::for('comments', fn (Request $request) => Limit::perMinute(10)->by((string) $request->user()->id));
 
+        // Follows, likes and blocks are cheap writes that can still be scripted into spam or churn.
+        RateLimiter::for('social', fn (Request $request) => Limit::perMinute(60)->by((string) $request->user()->id));
+
         // Shared profile links are open to guests, who are told apart by address only.
         RateLimiter::for('public-profile', fn (Request $request) => Limit::perMinute(60)->by((string) ($request->user('sanctum')->id ?? $request->ip())));
     }

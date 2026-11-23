@@ -109,14 +109,15 @@ class Quote extends Model
     }
 
     /**
-     * Adds likes_count and, for a signed-in viewer, liked_by_me, in the same query (no query per quote).
+     * Adds likes_count (without likes of readers blocked either way, like comments_count) and, for a signed-in viewer,
+     * liked_by_me, in the same query (no query per quote).
      *
      * @param  Builder<Quote>  $query
      */
     #[Scope]
     protected function withLikes(Builder $query, ?User $viewer = null): void
     {
-        $query->withCount('likes');
+        $query->withCount(['likes' => fn ($likes) => $likes->visibleTo($viewer)]);
 
         if ($viewer !== null) {
             $query->withExists(['likes as liked_by_me' => fn ($likes) => $likes->where('users.id', $viewer->id)]);
