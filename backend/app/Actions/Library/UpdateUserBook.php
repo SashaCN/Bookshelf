@@ -84,8 +84,9 @@ class UpdateUserBook
             return;
         }
 
-        // Clearing a review is always allowed; writing one needs a book that has been read (or given up on).
-        if ($review !== null && ! in_array($userBook->status, [BookStatus::Finished, BookStatus::Abandoned], true)) {
+        // Clearing or editing an existing review is always allowed (a book read again has one while it is "reading");
+        // writing the first one needs a book that has been read (or given up on).
+        if ($review !== null && $userBook->review === null && ! in_array($userBook->status, [BookStatus::Finished, BookStatus::Abandoned], true)) {
             throw ValidationException::withMessages(['review' => ['library.review_not_finished']]);
         }
 

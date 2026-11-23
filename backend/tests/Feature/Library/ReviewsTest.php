@@ -81,6 +81,13 @@ describe('writing a review', function () {
         $this->actingAs($this->me)->patchJson("/api/library/{$userBook->id}", ['review' => null])->assertOk();
     });
 
+    it('lets a reader edit the review of a book that is being read again', function () {
+        $userBook = reviewedBook($this->me, [], 'reading');
+
+        $this->actingAs($this->me)->patchJson("/api/library/{$userBook->id}", ['review' => 'Changed my mind.', 'review_visibility' => 'private'])
+            ->assertOk()->assertJsonPath('data.review', 'Changed my mind.');
+    });
+
     it('limits the review to 5000 characters', function () {
         $userBook = UserBook::factory()->for($this->me)->finished()->create();
 
