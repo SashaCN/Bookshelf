@@ -273,6 +273,22 @@ describe('following', function () {
         expect($this->me->following()->count())->toBe(0);
     });
 
+    it('can unfollow a reader who went private since', function () {
+        $this->me->following()->attach($this->hidden->id);
+
+        $this->actingAs($this->me)->deleteJson('/api/users/hidden/follow')->assertNoContent();
+        expect($this->me->following()->count())->toBe(0);
+    });
+
+    it('answers 404 when unfollowing a private or missing reader that is not followed', function () {
+        $this->actingAs($this->me)->deleteJson('/api/users/hidden/follow')->assertNotFound();
+        $this->actingAs($this->me)->deleteJson('/api/users/nobody/follow')->assertNotFound();
+    });
+
+    it('still answers 404 when following a private reader', function () {
+        $this->actingAs($this->me)->postJson('/api/users/hidden/follow')->assertNotFound();
+    });
+
     it('does not fail when the follow is made at the same moment from two requests', function () {
         // Two requests that both found "not following yet": the second insert meets the first one's row.
         $action = new FollowUser;

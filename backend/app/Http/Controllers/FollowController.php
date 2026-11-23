@@ -18,7 +18,7 @@ class FollowController extends Controller
 
     public function destroy(Request $request, string $username, FindPublicProfile $find, FollowUser $followUser): Response
     {
-        $followUser->unfollow($request->user(), $find->handle($request->user(), $username));
+        $followUser->unfollow($request->user(), $followUser->findToUnfollow($request->user(), $username, $find));
 
         return response()->noContent();
     }

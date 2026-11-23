@@ -3,6 +3,7 @@
 namespace App\Actions\Social;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -28,5 +29,17 @@ class FollowUser
     public function unfollow(User $follower, User $target): void
     {
         $follower->following()->detach($target->id);
+    }
+
+    /**
+     * The reader to unfollow: anyone the follower currently follows (even if they went private since),
+     * otherwise the usual public lookup, so a private or missing reader that is not followed stays "not found".
+     *
+     * @throws ModelNotFoundException<User>
+     */
+    public function findToUnfollow(User $follower, string $username, FindPublicProfile $find): User
+    {
+        return $follower->following()->where('users.username', mb_strtolower($username))->first()
+            ?? $find->handle($follower, $username);
     }
 }
